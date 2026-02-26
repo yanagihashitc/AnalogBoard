@@ -213,7 +213,9 @@
     </ClCompile>
     <ClCompile Include="AnalogBoard_TestApp.cpp" />
     <ClCompile Include="AnalogBoard_TestAppDlg.cpp" />
-    <ClCompile Include="WaveFilePublish.cpp" />
+    <ClCompile Include="WaveFilePublish.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="AnalogBoardTestApp.rc" />

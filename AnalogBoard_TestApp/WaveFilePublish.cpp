@@ -1,6 +1,3 @@
-#ifdef _WIN32
-#include "pch.h"
-#endif
 #include "WaveFilePublish.h"
 
 #ifdef _WIN32

@@ -199,6 +199,7 @@
     <ClInclude Include="AnalogBoard_TestApp.h" />
     <ClInclude Include="AnalogBoard_TestAppDlg.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="WaveFilePublish.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CColorEdit.cpp" />
@@ -212,6 +213,9 @@
     </ClCompile>
     <ClCompile Include="AnalogBoard_TestApp.cpp" />
     <ClCompile Include="AnalogBoard_TestAppDlg.cpp" />
+    <ClCompile Include="WaveFilePublish.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="AnalogBoardTestApp.rc" />

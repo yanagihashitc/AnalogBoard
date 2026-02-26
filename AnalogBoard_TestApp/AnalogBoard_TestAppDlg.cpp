@@ -62,7 +62,8 @@ void CAnalogBoardTestAppDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_TAB_MAIN, m_tab_main);
 }
-
+#pragma warning(push)
+#pragma warning(disable : 26454)
 BEGIN_MESSAGE_MAP(CAnalogBoardTestAppDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
@@ -70,6 +71,7 @@ BEGIN_MESSAGE_MAP(CAnalogBoardTestAppDlg, CDialogEx)
 	ON_WM_CLOSE()
 	ON_NOTIFY(TCN_SELCHANGE, IDC_TAB_MAIN, &CAnalogBoardTestAppDlg::OnTcnSelchangeTabMain)
 END_MESSAGE_MAP()
+#pragma warning(pop)
 
 
 // CAnalogBoardTestAppDlg message handlers

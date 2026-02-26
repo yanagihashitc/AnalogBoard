@@ -58,7 +58,7 @@ UINT editTriggerRange[] = {
 IMPLEMENT_DYNAMIC(Dialog1_Main, CDialogEx)
 
 Dialog1_Main::Dialog1_Main(CAnalogBoardTestAppDlg* pParent /*=nullptr*/)
-	: CDialogEx(IDD_DIALOG1_MAIN, pParent), m_pMainDlg(pParent)
+	: CDialogEx(IDD_DIALOG1_MAIN, pParent), m_pMainDlg(pParent), m_bManualMode(false)
 {
 	/* Init Global Variables */
 #if 1
@@ -1137,23 +1137,31 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
 	wave_file_publish::WaveFilePairPath currentWaveFilePath;
-	BOOL hasOpenWaveFile = FALSE;
+
+	auto IsWaveDataFileOpen = [&]() -> BOOL {
+		return (File_Low.m_hFile != CFile::hFileNull) || (File_High.m_hFile != CFile::hFileNull);
+	};
 
 	auto CloseOnlyWaveDataFile = [&]() {
-		if (!hasOpenWaveFile)
+		if (!IsWaveDataFileOpen())
 		{
 			return;
 		}
 
-		File_Low.Flush();
-		File_High.Flush();
-		File_Low.Close();
-		File_High.Close();
-		hasOpenWaveFile = FALSE;
+		if (File_Low.m_hFile != CFile::hFileNull)
+		{
+			File_Low.Flush();
+			File_Low.Close();
+		}
+		if (File_High.m_hFile != CFile::hFileNull)
+		{
+			File_High.Flush();
+			File_High.Close();
+		}
 	};
 
 	auto CloseAndPublishWaveDataFile = [&]() -> BOOL {
-		if (!hasOpenWaveFile)
+		if (!IsWaveDataFileOpen())
 		{
 			return TRUE;
 		}
@@ -1504,60 +1512,60 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
-							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;						
+							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
-							else
-							{
-								File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-								SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-								if (!CloseAndPublishWaveDataFile())
-								{
-									break;
-								}
-								//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
-							}
-
-							File_WriteCnt += File_OnetimeWriteCnt;
-						}
-						while (File_WriteCnt < (INT)ulOneTimeCnt)
+						else
 						{
-							iRet = CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex, &currentWaveFilePath);
-							if (iRet != 0)
+							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
+							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (!CloseAndPublishWaveDataFile())
 							{
-								strTmp.Format(_T("Create wave tmp file failed(index=%d, err=%d)."), iIndex, iRet);
-								CurObject->m_pMainDlg->PrintLog(strTmp);
 								break;
 							}
-							hasOpenWaveFile = TRUE;
+							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
+						}
 
-							if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
+						File_WriteCnt += File_OnetimeWriteCnt;
+					}
+
+					while (File_WriteCnt < (INT)ulOneTimeCnt)
+					{
+						iRet = CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex, &currentWaveFilePath);
+						if (iRet != 0)
+						{
+							strTmp.Format(_T("Create wave tmp file failed(index=%d, err=%d)."), iIndex, iRet);
+							CurObject->m_pMainDlg->PrintLog(strTmp);
+							break;
+						}
+
+						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
+						{
+							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
+							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (!CloseAndPublishWaveDataFile())
 							{
-								File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-								SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-								if (!CloseAndPublishWaveDataFile())
-								{
-									break;
-								}
-								//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
+								break;
 							}
-							else
-							{
-								File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
+							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
+						}
+						else
+						{
+							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
-							File_WriteCnt += File_OnetimeWriteCnt;
-						}
-						if (iRet != 0)
-						{
-							break;
-						}
+						File_WriteCnt += File_OnetimeWriteCnt;
+					}
+					if (iRet != 0)
+					{
+						break;
+					}
 
-						SaveDDRBytes += ulOneTimeSize;
-						ulSaveWaveCnt += ulOneTimeCnt;
+					SaveDDRBytes += ulOneTimeSize;
+					ulSaveWaveCnt += ulOneTimeCnt;
 
 					ULONG ulLastRemainSize = ulRemainSize;
 					ulRemainSize = (ulOneTimeSize + ulRemainSize) - (ulOneTimeCnt * OneWaveSize);
@@ -1619,8 +1627,8 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
 				CurObject->m_pMainDlg->PrintLog(strTmp);
 
-				PcReadCompleted = (DDRWrCompleted && (SaveDDRBytes >= MaxDDRBytes));
-				if (hasOpenWaveFile)
+				PcReadCompleted = ((iRet == 0) && DDRWrCompleted && (SaveDDRBytes >= MaxDDRBytes));
+				if (IsWaveDataFileOpen())
 				{
 					if (PcReadCompleted)
 					{
@@ -1632,6 +1640,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					else
 					{
 						CloseOnlyWaveDataFile();
+						// Keep *.tmp intentionally when sampling is interrupted for manual triage/recovery.
 						CurObject->m_pMainDlg->PrintLog(_T("Sampling interrupted. Keep wave tmp files without publish."));
 					}
 				}
@@ -1730,7 +1739,7 @@ INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, const CString& TimeStamp, INT I
 	{
 		fp_l->Close();
 		::_wremove(path.lowTempPath.c_str());
-		return -4;
+		return -3;
 	}
 
 	if (outPath != NULL)
