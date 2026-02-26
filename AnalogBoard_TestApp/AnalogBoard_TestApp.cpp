@@ -6,6 +6,7 @@
 #include "framework.h"
 #include "AnalogBoard_TestApp.h"
 #include "AnalogBoard_TestAppDlg.h"
+#include <memory>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -71,9 +72,9 @@ BOOL CAnalogBoardTestAppApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CAnalogBoardTestAppDlg dlg;
-	m_pMainWnd = &dlg;
-	INT_PTR nResponse = dlg.DoModal();
+	auto dlg = std::make_unique<CAnalogBoardTestAppDlg>();
+	m_pMainWnd = dlg.get();
+	INT_PTR nResponse = dlg->DoModal();
 	if (nResponse == IDOK)
 	{
 		// TODO: Place code here to handle when the dialog is
@@ -89,6 +90,7 @@ BOOL CAnalogBoardTestAppApp::InitInstance()
 		TRACE(traceAppMsg, 0, "Warning: dialog creation failed, so application is terminating unexpectedly.\n");
 		TRACE(traceAppMsg, 0, "Warning: if you are using MFC controls on the dialog, you cannot #define _AFX_NO_MFC_CONTROLS_IN_DIALOGS.\n");
 	}
+	m_pMainWnd = nullptr;
 
 	// Delete the shell manager created above.
 	if (pShellManager != nullptr)

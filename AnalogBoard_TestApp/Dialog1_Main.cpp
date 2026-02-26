@@ -6,6 +6,7 @@
 #include "afxdialogex.h"
 #include "Dialog1_Main.h"
 #include "AnalogBoard_TestAppDlg.h"
+#include "WaveFilePublish.h"
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
@@ -29,7 +30,8 @@ void LoopTestProcessThread_EP2_EP4(LPVOID lpParam);
 void LoopTestProcessThread_EP6_GetData(LPVOID lpParam);
 INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize);
-INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, CString TimeStamp, INT Index);
+INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath);
+INT PublishWaveDataFile(const wave_file_publish::WaveFilePairPath& path);
 
 UINT editChSelect[] = {
 	IDC_CHECK_CH1,
@@ -56,7 +58,7 @@ UINT editTriggerRange[] = {
 IMPLEMENT_DYNAMIC(Dialog1_Main, CDialogEx)
 
 Dialog1_Main::Dialog1_Main(CAnalogBoardTestAppDlg* pParent /*=nullptr*/)
-	: CDialogEx(IDD_DIALOG1_MAIN, pParent), m_pMainDlg(pParent)
+	: CDialogEx(IDD_DIALOG1_MAIN, pParent), m_pMainDlg(pParent), m_bManualMode(false)
 {
 	/* Init Global Variables */
 #if 1
@@ -1134,6 +1136,48 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CString strTimeStamp_use;
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
+	wave_file_publish::WaveFilePairPath currentWaveFilePath;
+
+	auto IsWaveDataFileOpen = [&]() -> BOOL {
+		return (File_Low.m_hFile != CFile::hFileNull) || (File_High.m_hFile != CFile::hFileNull);
+	};
+
+	auto CloseOnlyWaveDataFile = [&]() {
+		if (!IsWaveDataFileOpen())
+		{
+			return;
+		}
+
+		if (File_Low.m_hFile != CFile::hFileNull)
+		{
+			File_Low.Flush();
+			File_Low.Close();
+		}
+		if (File_High.m_hFile != CFile::hFileNull)
+		{
+			File_High.Flush();
+			File_High.Close();
+		}
+	};
+
+	auto CloseAndPublishWaveDataFile = [&]() -> BOOL {
+		if (!IsWaveDataFileOpen())
+		{
+			return TRUE;
+		}
+
+		CloseOnlyWaveDataFile();
+		iRet = PublishWaveDataFile(currentWaveFilePath);
+		if (iRet != 0)
+		{
+			strTmp.Format(_T("Wave file publish failed(index=%d, err=%d)."), iIndex, iRet);
+			CurObject->m_pMainDlg->PrintLog(strTmp);
+			return FALSE;
+		}
+
+		return TRUE;
+	};
+
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
 
 	/* Calculate waveform data size */
@@ -1468,7 +1512,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
-							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;						
+							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
@@ -1476,9 +1520,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-							File_High.Close();
-							File_Low.Close();
-							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));				
+							if (!CloseAndPublishWaveDataFile())
+							{
+								break;
+							}
+							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
 						File_WriteCnt += File_OnetimeWriteCnt;
@@ -1486,14 +1532,22 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					while (File_WriteCnt < (INT)ulOneTimeCnt)
 					{
-						CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex);
+						iRet = CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex, &currentWaveFilePath);
+						if (iRet != 0)
+						{
+							strTmp.Format(_T("Create wave tmp file failed(index=%d, err=%d)."), iIndex, iRet);
+							CurObject->m_pMainDlg->PrintLog(strTmp);
+							break;
+						}
 
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-							File_High.Close();
-							File_Low.Close();
+							if (!CloseAndPublishWaveDataFile())
+							{
+								break;
+							}
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
@@ -1504,6 +1558,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						}
 
 						File_WriteCnt += File_OnetimeWriteCnt;
+					}
+					if (iRet != 0)
+					{
+						break;
 					}
 
 					SaveDDRBytes += ulOneTimeSize;
@@ -1566,15 +1624,29 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			}
 #endif
 
-			strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
-			CurObject->m_pMainDlg->PrintLog(strTmp);	
+				strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
+				CurObject->m_pMainDlg->PrintLog(strTmp);
 
-			/* Close the last file */	
-			File_Low.Close();
-			File_High.Close();
-			
-			/* Disenable start button */
-			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
+				PcReadCompleted = ((iRet == 0) && DDRWrCompleted && (SaveDDRBytes >= MaxDDRBytes));
+				if (IsWaveDataFileOpen())
+				{
+					if (PcReadCompleted)
+					{
+						if (!CloseAndPublishWaveDataFile())
+						{
+							break;
+						}
+					}
+					else
+					{
+						CloseOnlyWaveDataFile();
+						// Keep *.tmp intentionally when sampling is interrupted for manual triage/recovery.
+						CurObject->m_pMainDlg->PrintLog(_T("Sampling interrupted. Keep wave tmp files without publish."));
+					}
+				}
+
+				/* Disenable start button */
+				CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
 
 			/* Wait fpga write completed... */
 			INT timeout = 0;
@@ -1647,41 +1719,53 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
 }
 
-INT CreateWaveDataFile(CFile *fp_h, CFile* fp_l, CString TimeStamp, INT Index)
+INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath)
 {
-	CFileStatus status;
-	CString FileName[2];
-	CString strIndex;
-	INT iRet = 0;
-
-	strIndex.Format(_T("_fl_%d.bin"), Index);
-	FileName[0] = TimeStamp + strIndex;
-	strIndex.Format(_T("_fh_%d.bin"), Index);
-	FileName[1] = TimeStamp + strIndex;
-
-	//if (CFile::GetStatus(FileName[0], status))
-	//{		
-	//	fp_l = NULL;//File is exist，do nothing
-	//	iRet = -1;
-	//}
-	//else 
-	if (!fp_l->Open(FileName[0], CFile::modeCreate | CFile::modeWrite))
+	wave_file_publish::WaveFilePairPath path;
+	if (!wave_file_publish::BuildWaveFilePairPath(std::wstring(TimeStamp.GetString()), Index, &path))
 	{
-		iRet = -2;
+		return -1;
 	}
 
-	//if (CFile::GetStatus(FileName[1], status))
-	//{
-	//	fp_h = NULL;//File is exist，do nothing
-	//	iRet = -3;
-	//}
-	//else 
-	if (!fp_h->Open(FileName[1], CFile::modeCreate | CFile::modeWrite))
+	const CString lowTmpPath(path.lowTempPath.c_str());
+	const CString highTmpPath(path.highTempPath.c_str());
+
+	if (!fp_l->Open(lowTmpPath, CFile::modeCreate | CFile::modeWrite))
 	{
-		iRet = -4;
+		return -2;
 	}
 
-	return iRet;
+	if (!fp_h->Open(highTmpPath, CFile::modeCreate | CFile::modeWrite))
+	{
+		fp_l->Close();
+		::_wremove(path.lowTempPath.c_str());
+		return -3;
+	}
+
+	if (outPath != NULL)
+	{
+		*outPath = path;
+	}
+
+	return 0;
+}
+
+INT PublishWaveDataFile(const wave_file_publish::WaveFilePairPath& path)
+{
+	const wave_file_publish::PublishResult result = wave_file_publish::PublishWaveFilePair(path);
+	switch (result)
+	{
+	case wave_file_publish::PublishResult::kSuccess:
+		return 0;
+	case wave_file_publish::PublishResult::kInvalidArgument:
+		return -1;
+	case wave_file_publish::PublishResult::kLowRenameFailed:
+		return -2;
+	case wave_file_publish::PublishResult::kHighRenameFailed:
+		return -3;
+	default:
+		return -9;
+	}
 }
 
 INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
