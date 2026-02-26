@@ -1,0 +1,51 @@
+# Visual Studio cache/options
+.vs/
+*.user
+*.suo
+*.opensdf
+*.sdf
+*.cache
+*.access
+*.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleasePublic/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio generated files
+*.pch
+*.pchast
+*.idb
+*.pdb
+*.ilk
+*.aps
+*.ncb
+*.tlb
+*.tlh
+*.tli
+*.tmp
+*.rsp
+*.pgc
+*.pgd
+*.meta
+*.tlog
+*.obj
+*.sbr
+
+# Visual Studio Solution files
+*.sln.docstates
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
