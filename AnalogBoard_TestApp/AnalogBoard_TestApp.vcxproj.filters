@@ -42,6 +42,9 @@
     <ClInclude Include="CColorEdit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="WaveDataPublishLogic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AnalogBoard_TestApp.cpp">
@@ -60,6 +63,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CColorEdit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WaveDataPublishLogic.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

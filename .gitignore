@@ -49,3 +49,10 @@ bld/
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
+
+# Other files and directories
+.claude/
+.cursor/
+.codex/
+AGENTS.md
+docs/

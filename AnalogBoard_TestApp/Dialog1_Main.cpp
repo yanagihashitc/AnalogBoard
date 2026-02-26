@@ -6,6 +6,7 @@
 #include "afxdialogex.h"
 #include "Dialog1_Main.h"
 #include "AnalogBoard_TestAppDlg.h"
+#include "WaveDataPublishLogic.h"
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
@@ -29,7 +30,57 @@ void LoopTestProcessThread_EP2_EP4(LPVOID lpParam);
 void LoopTestProcessThread_EP6_GetData(LPVOID lpParam);
 INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize);
-INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, CString TimeStamp, INT Index);
+INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, const CString& TimeStamp, INT Index,
+	CString& LowTmpFileName, CString& HighTmpFileName, CString& LowFinalFileName, CString& HighFinalFileName);
+INT CloseAndRenameWaveDataFile(CFile* fp, const CString& TmpFileName, const CString& FinalFileName);
+void CleanupWaveDataFilePairOnError(CFile* fp_h, CFile* fp_l, const CString& HighTmpFileName, const CString& LowTmpFileName);
+// Publish closes fp_h/fp_l on both success and failure paths. Caller must recreate files before retry.
+INT PublishWaveDataFilePair(CFile* fp_h, CFile* fp_l, CString& HighTmpFileName, CString& LowTmpFileName,
+	CString& HighFinalFileName, CString& LowFinalFileName);
+
+namespace {
+
+std::wstring CStringToWString(const CString& value)
+{
+	return std::wstring(value.GetString());
+}
+
+class MfcPublishOps final : public wave_data_publish::IPublishOps
+{
+public:
+	MfcPublishOps(CFile* highFile, CFile* lowFile)
+		: highFile_(highFile), lowFile_(lowFile)
+	{
+	}
+
+	int CloseAndRenameLow(const std::wstring& tmpPath, const std::wstring& finalPath) override
+	{
+		return CloseAndRenameWaveDataFile(lowFile_, CString(tmpPath.c_str()), CString(finalPath.c_str()));
+	}
+
+	int CloseAndRenameHigh(const std::wstring& tmpPath, const std::wstring& finalPath) override
+	{
+		return CloseAndRenameWaveDataFile(highFile_, CString(tmpPath.c_str()), CString(finalPath.c_str()));
+	}
+
+	bool RollbackLowFile(const std::wstring& fromPath, const std::wstring& toPath) override
+	{
+		return MoveFileEx(CString(fromPath.c_str()), CString(toPath.c_str()),
+			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+	}
+
+	void CleanupOnError(const std::wstring& highTmpPath, const std::wstring& lowTmpPath) override
+	{
+		CleanupWaveDataFilePairOnError(highFile_, lowFile_,
+			CString(highTmpPath.c_str()), CString(lowTmpPath.c_str()));
+	}
+
+private:
+	CFile* highFile_;
+	CFile* lowFile_;
+};
+
+} // namespace
 
 UINT editChSelect[] = {
 	IDC_CHECK_CH1,
@@ -1129,6 +1180,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	size_t SaveDDRBytes = 0;
 	CFile File_Low;
 	CFile File_High;
+	CString CurrentLowTmpFileName;
+	CString CurrentHighTmpFileName;
+	CString CurrentLowFinalFileName;
+	CString CurrentHighFinalFileName;
 	CString strTmp;
 	CString strTimeStamp;
 	CString strTimeStamp_use;
@@ -1468,7 +1523,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
-							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;						
+							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
@@ -1476,9 +1531,15 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-							File_High.Close();
-							File_Low.Close();
-							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));				
+							iRet = PublishWaveDataFilePair(&File_High, &File_Low,
+								CurrentHighTmpFileName, CurrentLowTmpFileName, CurrentHighFinalFileName, CurrentLowFinalFileName);
+							if (iRet != 0)
+							{
+								strTmp.Format(_T("Publish wave data file failed. ErrorCode=%d"), iRet);
+								CurObject->m_pMainDlg->PrintLog(strTmp);
+								break; // Breaks out of while (g_bEP6ThreadFlag).
+							}
+							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
 						File_WriteCnt += File_OnetimeWriteCnt;
@@ -1486,14 +1547,27 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					while (File_WriteCnt < (INT)ulOneTimeCnt)
 					{
-						CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex);
+						iRet = CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex,
+							CurrentLowTmpFileName, CurrentHighTmpFileName, CurrentLowFinalFileName, CurrentHighFinalFileName);
+						if (iRet != 0)
+						{
+							strTmp.Format(_T("Create wave data file failed. ErrorCode=%d"), iRet);
+							CurObject->m_pMainDlg->PrintLog(strTmp);
+							break;
+						}
 
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
 							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-							File_High.Close();
-							File_Low.Close();
+							iRet = PublishWaveDataFilePair(&File_High, &File_Low,
+								CurrentHighTmpFileName, CurrentLowTmpFileName, CurrentHighFinalFileName, CurrentLowFinalFileName);
+							if (iRet != 0)
+							{
+								strTmp.Format(_T("Publish wave data file failed. ErrorCode=%d"), iRet);
+								CurObject->m_pMainDlg->PrintLog(strTmp);
+								break;
+							}
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
@@ -1504,6 +1578,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						}
 
 						File_WriteCnt += File_OnetimeWriteCnt;
+					}
+
+					if (iRet != 0)
+					{
+						break;
 					}
 
 					SaveDDRBytes += ulOneTimeSize;
@@ -1567,12 +1646,20 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 #endif
 
 			strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
-			CurObject->m_pMainDlg->PrintLog(strTmp);	
+			CurObject->m_pMainDlg->PrintLog(strTmp);
 
-			/* Close the last file */	
-			File_Low.Close();
-			File_High.Close();
-			
+			/* Close the last file */
+			if ((iRet == 0) && !CurrentLowTmpFileName.IsEmpty() && !CurrentHighTmpFileName.IsEmpty())
+			{
+				iRet = PublishWaveDataFilePair(&File_High, &File_Low,
+					CurrentHighTmpFileName, CurrentLowTmpFileName, CurrentHighFinalFileName, CurrentLowFinalFileName);
+				if (iRet != 0)
+				{
+					strTmp.Format(_T("Publish wave data file failed. ErrorCode=%d"), iRet);
+					CurObject->m_pMainDlg->PrintLog(strTmp);
+				}
+			}
+
 			/* Disenable start button */
 			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
 
@@ -1647,38 +1734,164 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
 }
 
-INT CreateWaveDataFile(CFile *fp_h, CFile* fp_l, CString TimeStamp, INT Index)
+INT CloseAndRenameWaveDataFile(CFile* fp, const CString& TmpFileName, const CString& FinalFileName)
 {
-	CFileStatus status;
-	CString FileName[2];
+	BOOL bCloseOk = TRUE;
+
+	if ((fp == NULL) || TmpFileName.IsEmpty() || FinalFileName.IsEmpty())
+	{
+		return -1;
+	}
+
+	TRY
+	{
+		fp->Flush();
+		fp->Close();
+	}
+	CATCH(CFileException, e)
+	{
+		bCloseOk = FALSE;
+	}
+	END_CATCH
+
+	if (!bCloseOk)
+	{
+		return -2;
+	}
+
+	if (!MoveFileEx(TmpFileName, FinalFileName, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	{
+		return -3;
+	}
+
+	return 0;
+}
+
+void CleanupWaveDataFilePairOnError(CFile* fp_h, CFile* fp_l, const CString& HighTmpFileName, const CString& LowTmpFileName)
+{
+	if (fp_h != NULL)
+	{
+		TRY
+		{
+			fp_h->Close();
+		}
+		CATCH(CFileException, e)
+		{
+		}
+		END_CATCH
+	}
+
+	if (fp_l != NULL)
+	{
+		TRY
+		{
+			fp_l->Close();
+		}
+		CATCH(CFileException, e)
+		{
+		}
+		END_CATCH
+	}
+
+	if (!HighTmpFileName.IsEmpty())
+	{
+		TRY
+		{
+			CFile::Remove(HighTmpFileName);
+		}
+		CATCH(CFileException, e)
+		{
+		}
+		END_CATCH
+	}
+
+	if (!LowTmpFileName.IsEmpty())
+	{
+		TRY
+		{
+			CFile::Remove(LowTmpFileName);
+		}
+		CATCH(CFileException, e)
+		{
+		}
+		END_CATCH
+	}
+}
+
+// Publish closes fp_h/fp_l on both success and failure paths. Caller must recreate files before retry.
+INT PublishWaveDataFilePair(CFile* fp_h, CFile* fp_l, CString& HighTmpFileName, CString& LowTmpFileName,
+	CString& HighFinalFileName, CString& LowFinalFileName)
+{
+	wave_data_publish::FilePairNames names;
+	MfcPublishOps ops(fp_h, fp_l);
+	INT iRet = 0;
+
+	names.highTmpFileName = CStringToWString(HighTmpFileName);
+	names.lowTmpFileName = CStringToWString(LowTmpFileName);
+	names.highFinalFileName = CStringToWString(HighFinalFileName);
+	names.lowFinalFileName = CStringToWString(LowFinalFileName);
+
+	iRet = wave_data_publish::PublishFilePair(names, ops);
+	if (iRet == 0)
+	{
+		LowTmpFileName.Empty();
+		HighTmpFileName.Empty();
+		LowFinalFileName.Empty();
+		HighFinalFileName.Empty();
+	}
+
+	return iRet;
+}
+
+INT CreateWaveDataFile(CFile *fp_h, CFile* fp_l, const CString& TimeStamp, INT Index,
+	CString& LowTmpFileName, CString& HighTmpFileName, CString& LowFinalFileName, CString& HighFinalFileName)
+{
 	CString strIndex;
 	INT iRet = 0;
 
 	strIndex.Format(_T("_fl_%d.bin"), Index);
-	FileName[0] = TimeStamp + strIndex;
+	LowFinalFileName = TimeStamp + strIndex;
 	strIndex.Format(_T("_fh_%d.bin"), Index);
-	FileName[1] = TimeStamp + strIndex;
+	HighFinalFileName = TimeStamp + strIndex;
 
-	//if (CFile::GetStatus(FileName[0], status))
-	//{		
-	//	fp_l = NULL;//File is exist，do nothing
-	//	iRet = -1;
-	//}
-	//else 
-	if (!fp_l->Open(FileName[0], CFile::modeCreate | CFile::modeWrite))
+	LowTmpFileName = LowFinalFileName + _T(".tmp");
+	HighTmpFileName = HighFinalFileName + _T(".tmp");
+
+	if (!fp_l->Open(LowTmpFileName, CFile::modeCreate | CFile::modeWrite))
 	{
 		iRet = -2;
+		LowTmpFileName.Empty();
+		HighTmpFileName.Empty();
+		LowFinalFileName.Empty();
+		HighFinalFileName.Empty();
+		return iRet;
 	}
 
-	//if (CFile::GetStatus(FileName[1], status))
-	//{
-	//	fp_h = NULL;//File is exist，do nothing
-	//	iRet = -3;
-	//}
-	//else 
-	if (!fp_h->Open(FileName[1], CFile::modeCreate | CFile::modeWrite))
+	if (!fp_h->Open(HighTmpFileName, CFile::modeCreate | CFile::modeWrite))
 	{
+		TRY
+		{
+			fp_l->Close();
+		}
+		CATCH(CFileException, e)
+		{
+		}
+		END_CATCH
+
+		TRY
+		{
+			CFile::Remove(LowTmpFileName);
+		}
+		CATCH(CFileException, e)
+		{
+		}
+		END_CATCH
 		iRet = -4;
+		LowTmpFileName.Empty();
+		HighTmpFileName.Empty();
+		LowFinalFileName.Empty();
+		HighFinalFileName.Empty();
+		return iRet;
 	}
 
 	return iRet;
