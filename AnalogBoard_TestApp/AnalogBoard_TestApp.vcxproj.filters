@@ -42,7 +42,7 @@
     <ClInclude Include="CColorEdit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WaveDataPublishLogic.h">
+    <ClInclude Include="WaveFilePublish.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -65,7 +65,7 @@
     <ClCompile Include="CColorEdit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WaveDataPublishLogic.cpp">
+    <ClCompile Include="WaveFilePublish.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
