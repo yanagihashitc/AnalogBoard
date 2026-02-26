@@ -11,6 +11,8 @@ set "COVERAGE_DIR=coverage"
 set "COVERAGE_XML=%COVERAGE_DIR%\coverage.xml"
 set "TEST_EXE=x64\%CONFIG%\AnalogBoard_UnitTest.exe"
 
+REM Project files are maintained as *.vcxproj.xml in this repository.
+REM This script always regenerates *.vcxproj from XML before building.
 echo [1/5] Preparing .vcxproj files from .vcxproj.xml...
 copy /Y "AnalogBoard_TestApp\AnalogBoard_TestApp.vcxproj.xml" "AnalogBoard_TestApp\AnalogBoard_TestApp.vcxproj" >nul
 if errorlevel 1 goto :error
@@ -33,7 +35,7 @@ if errorlevel 1 (
   goto :error
 )
 
-echo [3/5] Building DLL and UnitTest (%CONFIG%|%PLATFORM%)...
+echo [3/5] Building DLL and UnitTest (%CONFIG%/%PLATFORM%)...
 msbuild "%SOLUTION%" /t:AnalogBoard_Dll:Rebuild /p:Configuration=%CONFIG% /p:Platform=%PLATFORM% /m:1
 if errorlevel 1 goto :error
 msbuild "%SOLUTION%" /t:AnalogBoard_UnitTest:Rebuild /p:Configuration=%CONFIG% /p:Platform=%PLATFORM% /m:1
@@ -49,6 +51,7 @@ if not exist "%COVERAGE_DIR%" mkdir "%COVERAGE_DIR%"
 echo [4/5] Running coverage...
 OpenCppCoverage ^
   --sources "%CD%\AnalogBoard_Dll" ^
+  --sources "%CD%\AnalogBoard_TestApp" ^
   --excluded_sources "%CD%\AnalogBoard_UnitTest" ^
   --export_type cobertura:"%CD%\%COVERAGE_XML%" ^
   -- "%CD%\%TEST_EXE%"
@@ -56,7 +59,7 @@ if errorlevel 1 goto :error
 
 echo [5/5] Coverage summary...
 powershell -NoProfile -Command ^
-  "$p='%COVERAGE_XML%'; if (-not (Test-Path $p)) { throw 'coverage.xml not found.' }; [xml]$x=Get-Content $p; '{0:N2}%%' -f ([double]$x.coverage.'line-rate'*100)"
+  "$p='%COVERAGE_XML%'; if (-not (Test-Path $p)) { throw 'coverage.xml not found.' }; [xml]$x=Get-Content $p; $valid=[int]$x.coverage.'lines-valid'; if ($valid -le 0) { throw 'No valid lines were collected. Check --sources/--excluded_sources.' }; '{0:N2}%% ({1}/{2} lines)' -f ([double]$x.coverage.'line-rate'*100), [int]$x.coverage.'lines-covered', $valid"
 if errorlevel 1 goto :error
 
 echo.

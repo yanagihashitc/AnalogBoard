@@ -56,3 +56,7 @@ ehthumbs.db
 .codex/
 AGENTS.md
 docs/
+
+# Coverage artifacts
+coverage/
+LastCoverageResults.log
