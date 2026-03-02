@@ -2167,7 +2167,7 @@ void Dialog1_Main::OnBnClickedButtonImport()
 	GetDlgItemText(IDC_EDIT_IMPORT, strPath);
 	if (!file.Open(strPath, CFile::modeRead))
 	{
-		MessageBox(_T("Error, CSV file is open"), _T("Error"), MB_OK | MB_ICONERROR);
+		MessageBox(_T("Error, failed to open CSV file"), _T("Error"), MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -2985,7 +2985,20 @@ void Dialog1_Main::SaveCfgParametersToFile(CString FilePath, FPGAConfigI_REGMAP*
 
 	if (!file.Open(FilePath, CFile::modeCreate | CFile::modeWrite | CFile::typeText))
 	{
-		MessageBox(_T("Error, CSV file is open"), _T("Error"), MB_OK | MB_ICONERROR);
+		CString errorMessage;
+		if (FilePath.Right(8).CompareNoCase(_T("_cfg.txt")) == 0)
+		{
+			errorMessage = _T("Error, failed to create _cfg.txt file");
+		}
+		else if (FilePath.Right(4).CompareNoCase(_T(".csv")) == 0)
+		{
+			errorMessage = _T("Error, failed to open CSV file");
+		}
+		else
+		{
+			errorMessage = _T("Error, failed to open output file");
+		}
+		MessageBox(errorMessage, _T("Error"), MB_OK | MB_ICONERROR);
 		return;
 	}
 
