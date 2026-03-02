@@ -1137,11 +1137,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
 	wave_file_publish::WaveFilePairPath currentWaveFilePath;
-	ULONG phase0Ep6CallCount = 0;
-	ULONG phase0Ep6TimeoutCount = 0;
-	ULONG phase0FileWriteCallCount = 0;
-	ULONG phase0DdrPollCount = 0;
-	ULONG phase0DdrWaitPollCount = 0;
+	unsigned long long phase0Ep6CallCount = 0;
+	unsigned long long phase0Ep6TimeoutCount = 0;
+	unsigned long long phase0FileWriteCallCount = 0;
+	unsigned long long phase0DdrPollCount = 0;
+	unsigned long long phase0DdrWaitPollCount = 0;
 	unsigned long long phase0Ep6TransferBytes = 0;
 	unsigned long long phase0Ep6TotalMs = 0;
 	unsigned long long phase0FileWriteTotalMs = 0;
@@ -1431,6 +1431,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			phase0Ep6TransferBytes = 0;
 			phase0Ep6TotalMs = 0;
 			phase0FileWriteTotalMs = 0;
+			CurObject->m_pMainDlg->UsbLibInfo.EP6_ResetPhase0Metrics();
 
 			while (g_bEP6ThreadFlag)
 			{
@@ -1527,7 +1528,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					++phase0Ep6TimeoutCount;
 				}
 				strTmp.Format(
-					_T("[Phase0][APP] EP6_GetData size=%u elapsed_ms=%I64u ret=%d timeout_count=%u"),
+					_T("[Phase0][APP] EP6_GetData size=%u elapsed_ms=%I64u ret=%d timeout_count=%I64u"),
 					ulOneTimeSize,
 					static_cast<unsigned long long>(phase0Ep6ElapsedMs),
 					iRet,
@@ -1756,7 +1757,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			const unsigned long long phase0Ep6AvgMs = (phase0Ep6CallCount == 0) ? 0 : (phase0Ep6TotalMs / phase0Ep6CallCount);
 			const unsigned long long phase0FileWriteAvgMs = (phase0FileWriteCallCount == 0) ? 0 : (phase0FileWriteTotalMs / phase0FileWriteCallCount);
 			strTmp.Format(
-				_T("[Phase0][APP] Summary EP6 calls=%u bytes=%I64u total_ms=%I64u avg_ms=%I64u timeout=%u"),
+				_T("[Phase0][APP] Summary EP6 calls=%I64u bytes=%I64u total_ms=%I64u avg_ms=%I64u timeout=%I64u"),
 				phase0Ep6CallCount,
 				phase0Ep6TransferBytes,
 				phase0Ep6TotalMs,
@@ -1764,7 +1765,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				phase0Ep6TimeoutCount);
 			CurObject->m_pMainDlg->PrintLog(strTmp);
 			strTmp.Format(
-				_T("[Phase0][APP] Summary FileWrite calls=%u total_ms=%I64u avg_ms=%I64u DDR_poll=%u DDR_wait_poll=%u"),
+				_T("[Phase0][APP] Summary FileWrite calls=%I64u total_ms=%I64u avg_ms=%I64u DDR_poll=%I64u DDR_wait_poll=%I64u"),
 				phase0FileWriteCallCount,
 				phase0FileWriteTotalMs,
 				phase0FileWriteAvgMs,

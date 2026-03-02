@@ -8,6 +8,7 @@
 #include "AnalogBoard_TestAppDlg.h"
 #include "afxdialogex.h"
 #include <dbt.h>
+#include <deque>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -16,7 +17,12 @@
 namespace
 {
 	CCriticalSection g_logFileLock;
-	CStringArray g_logLineBuffer;
+	CCriticalSection g_logUiLock;
+	std::deque<CString> g_logLineBuffer;
+	std::deque<CString> g_pendingUiLogLines;
+	constexpr size_t kMaxBufferedLogLines = 10000;
+	constexpr UINT kWmAppDrainLogLines = WM_APP + 101;
+	bool g_runtimeLogFileInitialized = false;
 
 	CString BuildRuntimeLogFilePath()
 	{
@@ -37,36 +43,120 @@ namespace
 		return directoryPath + _T("\\AnalogBoard_TestApp.log");
 	}
 
-	void BufferLogLine(LPCTSTR line)
+	CString BuildFallbackRuntimeLogFilePath()
 	{
-		CSingleLock lock(&g_logFileLock, TRUE);
-		g_logLineBuffer.Add(line);
+		TCHAR tempPath[MAX_PATH] = {};
+		const DWORD tempPathLength = GetTempPath(_countof(tempPath), tempPath);
+		if (tempPathLength == 0 || tempPathLength >= _countof(tempPath))
+		{
+			return _T(".\\AnalogBoard_TestApp.log");
+		}
+
+		CString directoryPath(tempPath);
+		directoryPath.TrimRight(_T("\\/"));
+		return directoryPath + _T("\\AnalogBoard_TestApp.log");
 	}
 
-	void FlushBufferedLogLinesToRuntimeFile()
+	bool OpenRuntimeLogFile(CStdioFile& logFile, UINT openFlags, CFileException* fileException)
 	{
-		CSingleLock lock(&g_logFileLock, TRUE);
-		if (g_logLineBuffer.GetCount() == 0)
+		const CString logFilePath = BuildRuntimeLogFilePath();
+		if (logFile.Open(logFilePath, openFlags, fileException))
+		{
+			return true;
+		}
+
+		const CString fallbackLogFilePath = BuildFallbackRuntimeLogFilePath();
+		return logFile.Open(fallbackLogFilePath, openFlags, fileException);
+	}
+
+	void InitializeRuntimeLogFileForSessionLocked()
+	{
+		if (g_runtimeLogFileInitialized)
 		{
 			return;
 		}
 
 		CStdioFile logFile;
 		CFileException fileException;
-		const CString logFilePath = BuildRuntimeLogFilePath();
-		if (!logFile.Open(logFilePath, CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite | CFile::typeText | CFile::shareDenyNone, &fileException))
+		if (OpenRuntimeLogFile(logFile, CFile::modeCreate | CFile::modeWrite | CFile::typeText | CFile::shareDenyNone, &fileException))
+		{
+			logFile.Close();
+			g_runtimeLogFileInitialized = true;
+		}
+	}
+
+	void QueueUiLogLine(LPCTSTR line)
+	{
+		CSingleLock lock(&g_logUiLock, TRUE);
+		g_pendingUiLogLines.emplace_back(line);
+	}
+
+	void DrainQueuedUiLogLines(CAnalogBoardTestAppDlg* dialog)
+	{
+		std::deque<CString> pendingLines;
+		{
+			CSingleLock lock(&g_logUiLock, TRUE);
+			pendingLines.swap(g_pendingUiLogLines);
+		}
+
+		if (pendingLines.empty() || dialog == NULL)
+		{
+			return;
+		}
+
+		CWnd* pLogList = dialog->GetDlgItem(IDC_LIST1);
+		if (pLogList == NULL)
+		{
+			return;
+		}
+
+		for (const CString& line : pendingLines)
+		{
+			pLogList->SendMessage(LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(line.GetString()));
+		}
+		pLogList->SendMessage(WM_VSCROLL, SB_BOTTOM, 0);
+	}
+
+	void BufferLogLine(LPCTSTR line)
+	{
+		CSingleLock lock(&g_logFileLock, TRUE);
+		if (g_logLineBuffer.size() >= kMaxBufferedLogLines)
+		{
+			g_logLineBuffer.pop_front();
+		}
+		g_logLineBuffer.emplace_back(line);
+	}
+
+	void FlushBufferedLogLinesToRuntimeFile()
+	{
+		CSingleLock lock(&g_logFileLock, TRUE);
+		InitializeRuntimeLogFileForSessionLocked();
+		if (!g_runtimeLogFileInitialized || g_logLineBuffer.empty())
+		{
+			return;
+		}
+
+		CStdioFile logFile;
+		CFileException fileException;
+		if (!OpenRuntimeLogFile(logFile, CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite | CFile::typeText | CFile::shareDenyNone, &fileException))
 		{
 			return;
 		}
 
 		logFile.SeekToEnd();
-		for (INT_PTR i = 0; i < g_logLineBuffer.GetCount(); ++i)
+		for (const CString& line : g_logLineBuffer)
 		{
-			logFile.WriteString(g_logLineBuffer.GetAt(i));
+			logFile.WriteString(line);
 			logFile.WriteString(_T("\r\n"));
 		}
 		logFile.Close();
-		g_logLineBuffer.RemoveAll();
+		g_logLineBuffer.clear();
+	}
+
+	void InitializeRuntimeLogFileForSession()
+	{
+		CSingleLock lock(&g_logFileLock, TRUE);
+		InitializeRuntimeLogFileForSessionLocked();
 	}
 }
 
@@ -136,6 +226,7 @@ END_MESSAGE_MAP()
 BOOL CAnalogBoardTestAppDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
+	InitializeRuntimeLogFileForSession();
 
 	// Add "About..." menu item to system menu.
 
@@ -305,8 +396,8 @@ void CAnalogBoardTestAppDlg::PrintLog(LPCTSTR sting)
 	BufferLogLine(strBuf);
 	if (pMainDlg != NULL)
 	{
-		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(LB_ADDSTRING, 0, (LPARAM)(strBuf));
-		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(WM_VSCROLL, SB_LINEDOWN, 0);
+		QueueUiLogLine(strBuf);
+		pMainDlg->PostMessage(kWmAppDrainLogLines, 0, 0);
 	}
 }
 
@@ -318,7 +409,9 @@ void CAnalogBoardTestAppDlg::FlushBufferedLogsToFile()
 void CAnalogBoardTestAppDlg::OnClose() 
 {
 	UpdateData(TRUE);
+	DrainQueuedUiLogLines(this);
 	FlushBufferedLogsToFile();
+	pMainDlg = NULL;
 
 	/* Export default config*/
 	m_tabpage1_DataGet.ExportDefaultConfigFile();
@@ -383,6 +476,11 @@ WCHAR* CAnalogBoardTestAppDlg::strUSBLibError(INT nStatus)
 LRESULT CAnalogBoardTestAppDlg::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	INT iRet = 0;
+	if (message == kWmAppDrainLogLines)
+	{
+		DrainQueuedUiLogLines(this);
+		return 0;
+	}
 
 	if (message == WM_DEVICECHANGE)
 	{

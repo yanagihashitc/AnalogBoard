@@ -57,6 +57,7 @@ public:
 	INT EP2_SendData(BYTE* pSendData);
 	INT EP4_GetData(BYTE* pRevData);
 	INT EP6_GetData(BYTE* pRevData, UINT  DataSizeCount);
+	void EP6_ResetPhase0Metrics(void);
 	const char* DllVersion_Get(void);
 };
 
