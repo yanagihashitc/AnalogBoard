@@ -42,6 +42,8 @@ static CCyUSBEndPoint* m_pInEndpt6;
 
 /* EP2/4 Mutec */
 HANDLE m_hEP2EP4Mutex;
+static volatile LONG g_phase0Ep6CallCount = 0;
+static volatile LONG g_phase0Ep6TimeoutCount = 0;
 
 /*******************************************************************************
 * function define
@@ -415,6 +417,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	UINT	ulRecvDataSize = 0;//EP6 receive size
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
+	const ULONGLONG phase0StartTick = GetTickCount64();
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt6)
@@ -475,6 +478,25 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	pOneTimeBuffer = NULL;
 
 	ReleaseMutex(m_hEP2EP4Mutex);
+
+	const LONG phase0CallCount = InterlockedIncrement(&g_phase0Ep6CallCount);
+	LONG phase0TimeoutCount = InterlockedCompareExchange(&g_phase0Ep6TimeoutCount, 0, 0);
+	if (iRet == USB_ERR_TRANSFER_TIMEOUT)
+	{
+		phase0TimeoutCount = InterlockedIncrement(&g_phase0Ep6TimeoutCount);
+	}
+	const ULONGLONG phase0ElapsedMs = GetTickCount64() - phase0StartTick;
+	TCHAR phase0Log[256];
+	_stprintf_s(
+		phase0Log,
+		_T("[Phase0][DLL] EP6_GetData size=%u recv=%u ret=%d elapsed_ms=%I64u call_count=%ld timeout_count=%ld\r\n"),
+		DataSizeCount,
+		ulRecvDataSize,
+		iRet,
+		static_cast<unsigned long long>(phase0ElapsedMs),
+		phase0CallCount,
+		phase0TimeoutCount);
+	OutputDebugString(phase0Log);
 
 	return iRet;
 }

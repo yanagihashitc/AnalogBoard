@@ -45,6 +45,7 @@ public:
 	afx_msg void OnTcnSelchangeTabMain(NMHDR* pNMHDR, LRESULT* pResult);
 	
 	void PrintLog(LPCTSTR sting);
+	void FlushBufferedLogsToFile();
 	WCHAR* CAnalogBoardTestAppDlg::strUSBLibError(INT nStatus);
 	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 

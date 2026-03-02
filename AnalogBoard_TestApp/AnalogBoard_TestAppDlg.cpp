@@ -13,6 +13,63 @@
 #define new DEBUG_NEW
 #endif
 
+namespace
+{
+	CCriticalSection g_logFileLock;
+	CStringArray g_logLineBuffer;
+
+	CString BuildRuntimeLogFilePath()
+	{
+		TCHAR modulePath[MAX_PATH] = {};
+		GetModuleFileName(NULL, modulePath, _countof(modulePath));
+
+		CString directoryPath(modulePath);
+		const int lastSeparatorPos = directoryPath.ReverseFind(_T('\\'));
+		if (lastSeparatorPos >= 0)
+		{
+			directoryPath = directoryPath.Left(lastSeparatorPos);
+		}
+		else
+		{
+			directoryPath = _T(".");
+		}
+
+		return directoryPath + _T("\\AnalogBoard_TestApp.log");
+	}
+
+	void BufferLogLine(LPCTSTR line)
+	{
+		CSingleLock lock(&g_logFileLock, TRUE);
+		g_logLineBuffer.Add(line);
+	}
+
+	void FlushBufferedLogLinesToRuntimeFile()
+	{
+		CSingleLock lock(&g_logFileLock, TRUE);
+		if (g_logLineBuffer.GetCount() == 0)
+		{
+			return;
+		}
+
+		CStdioFile logFile;
+		CFileException fileException;
+		const CString logFilePath = BuildRuntimeLogFilePath();
+		if (!logFile.Open(logFilePath, CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite | CFile::typeText | CFile::shareDenyNone, &fileException))
+		{
+			return;
+		}
+
+		logFile.SeekToEnd();
+		for (INT_PTR i = 0; i < g_logLineBuffer.GetCount(); ++i)
+		{
+			logFile.WriteString(g_logLineBuffer.GetAt(i));
+			logFile.WriteString(_T("\r\n"));
+		}
+		logFile.Close();
+		g_logLineBuffer.RemoveAll();
+	}
+}
+
 CAnalogBoardTestAppDlg* pMainDlg;
 // CAboutDlg dialog used for App About
 
@@ -245,6 +302,7 @@ void CAnalogBoardTestAppDlg::PrintLog(LPCTSTR sting)
 	GetLocalTime(&curTime);
 
 	_stprintf_s(strBuf, _T("%04d%02d%02d %02d:%02d:%02d %03d>> %s"), curTime.wYear, curTime.wMonth, curTime.wDay, curTime.wHour, curTime.wMinute, curTime.wSecond, curTime.wMilliseconds, sting);
+	BufferLogLine(strBuf);
 	if (pMainDlg != NULL)
 	{
 		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(LB_ADDSTRING, 0, (LPARAM)(strBuf));
@@ -252,9 +310,15 @@ void CAnalogBoardTestAppDlg::PrintLog(LPCTSTR sting)
 	}
 }
 
+void CAnalogBoardTestAppDlg::FlushBufferedLogsToFile()
+{
+	FlushBufferedLogLinesToRuntimeFile();
+}
+
 void CAnalogBoardTestAppDlg::OnClose() 
 {
 	UpdateData(TRUE);
+	FlushBufferedLogsToFile();
 
 	/* Export default config*/
 	m_tabpage1_DataGet.ExportDefaultConfigFile();
