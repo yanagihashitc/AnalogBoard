@@ -101,7 +101,13 @@ bool BuildWaveFrameSplitView(const unsigned char* waveData, size_t frameSizeLow,
     }
 
     const size_t oneFrameSize = frameSizeLow + frameSizeHigh;
-    const size_t offset = oneFrameSize * static_cast<size_t>(frameIndex);
+    const size_t frameIndexSizeT = static_cast<size_t>(frameIndex);
+    if (frameIndexSizeT > ((std::numeric_limits<size_t>::max)() / oneFrameSize))
+    {
+        return false;
+    }
+
+    const size_t offset = oneFrameSize * frameIndexSizeT;
 
     outView->lowData = waveData + offset;
     outView->highData = outView->lowData + frameSizeLow;

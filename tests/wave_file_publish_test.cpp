@@ -540,6 +540,26 @@ void TestBuildWaveFrameSplitView_FrameSizeOverflow()
     AssertTrue(!ok, "BuildWaveFrameSplitView should fail on overflowed frame size");
 }
 
+void TestBuildWaveFrameSplitView_FrameOffsetMultiplicationOverflow()
+{
+    // Given: Frame geometry where frameSize * frameIndex overflows size_t
+    // When: Building frame split view
+    // Then: Function returns false to prevent wrapped frame offset
+    const unsigned char waveData[] = {0x10};
+    wave_file_publish::WaveFrameSplitView view{};
+    const size_t maxSize = (std::numeric_limits<size_t>::max)();
+    const int maxFrameIndex = (std::numeric_limits<int>::max)();
+    const size_t overflowFrameSize = (maxSize / static_cast<size_t>(maxFrameIndex)) + 1U;
+    const bool ok = wave_file_publish::BuildWaveFrameSplitView(
+        waveData,
+        overflowFrameSize,
+        0U,
+        maxFrameIndex,
+        &view);
+
+    AssertTrue(!ok, "BuildWaveFrameSplitView should fail when frame offset multiplication overflows");
+}
+
 void TestBuildWaveFrameSplitView_ThreeFrameSequentialOrder()
 {
     // Given: Three sequential frames in low-first/high-next layout
@@ -779,6 +799,7 @@ int main()
         TestBuildWaveFrameSplitView_LowSizeZero();
         TestBuildWaveFrameSplitView_HighSizeZero();
         TestBuildWaveFrameSplitView_FrameSizeOverflow();
+        TestBuildWaveFrameSplitView_FrameOffsetMultiplicationOverflow();
         TestBuildWaveFrameSplitView_ThreeFrameSequentialOrder();
         TestBuildWaveFrameSplitView_Aebf296Compatibility_ExhaustiveSmallGrid();
         TestDialogMainSourceContract_Aebf296LowHighOrder();

@@ -1513,13 +1513,25 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
 							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != 0)
+							{
+								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
+								CurObject->m_pMainDlg->PrintLog(strTmp);
+								break;
+							}
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != 0)
+							{
+								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
+								CurObject->m_pMainDlg->PrintLog(strTmp);
+								break;
+							}
 							if (!CloseAndPublishWaveDataFile())
 							{
 								break;
@@ -1543,7 +1555,13 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != 0)
+							{
+								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
+								CurObject->m_pMainDlg->PrintLog(strTmp);
+								break;
+							}
 							if (!CloseAndPublishWaveDataFile())
 							{
 								break;
@@ -1553,7 +1571,13 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != 0)
+							{
+								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
+								CurObject->m_pMainDlg->PrintLog(strTmp);
+								break;
+							}
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
