@@ -28,9 +28,9 @@ INT g_bStartSampling = 0;
 
 void LoopTestProcessThread_EP2_EP4(LPVOID lpParam);
 void LoopTestProcessThread_EP6_GetData(LPVOID lpParam);
-INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
+INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize);
-INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath);
+INT CreateWaveDataFile(CFile* fp_l, CFile* fp_h, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath);
 INT PublishWaveDataFile(const wave_file_publish::WaveFilePairPath& path);
 
 UINT editChSelect[] = {
@@ -1513,13 +1513,13 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
 							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							if (!CloseAndPublishWaveDataFile())
 							{
 								break;
@@ -1532,7 +1532,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					while (File_WriteCnt < (INT)ulOneTimeCnt)
 					{
-						iRet = CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex, &currentWaveFilePath);
+						iRet = CreateWaveDataFile(&File_Low, &File_High, strTimeStamp_use, ++iIndex, &currentWaveFilePath);
 						if (iRet != 0)
 						{
 							strTmp.Format(_T("Create wave tmp file failed(index=%d, err=%d)."), iIndex, iRet);
@@ -1543,7 +1543,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							if (!CloseAndPublishWaveDataFile())
 							{
 								break;
@@ -1553,7 +1553,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
@@ -1719,7 +1719,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
 }
 
-INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath)
+INT CreateWaveDataFile(CFile* fp_l, CFile* fp_h, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath)
 {
 	wave_file_publish::WaveFilePairPath path;
 	if (!wave_file_publish::BuildWaveFilePairPath(std::wstring(TimeStamp.GetString()), Index, &path))
@@ -1768,21 +1768,26 @@ INT PublishWaveDataFile(const wave_file_publish::WaveFilePairPath& path)
 	}
 }
 
-INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
+INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
 {
-	ULONG FrameSize = FrameSize_L + FrameSize_H;
 	INT iRet = 0;
 
 	for (int i = 0; i < WaveCnt; i++)
 	{
+		wave_file_publish::WaveFrameSplitView frameView;
+		if (!wave_file_publish::BuildWaveFrameSplitView(WaveData, (size_t)FrameSize_L, (size_t)FrameSize_H, i, &frameView))
+		{
+			return -1;
+		}
+
 		if ((fp_l != NULL) && (FrameSize_L != 0))
 		{
-			fp_l->Write(WaveData + ((size_t)i * (size_t)FrameSize), FrameSize_L);
+			fp_l->Write(frameView.lowData, FrameSize_L);
 		}
-		
+
 		if ((fp_h != NULL) && (FrameSize_H != 0))
 		{
-			fp_h->Write(WaveData + ((size_t)i * (size_t)FrameSize) + (size_t)FrameSize_L, FrameSize_H);
+			fp_h->Write(frameView.highData, FrameSize_H);
 		}
 	}
 
