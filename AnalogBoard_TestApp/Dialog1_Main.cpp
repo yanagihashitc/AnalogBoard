@@ -1137,6 +1137,14 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
 	wave_file_publish::WaveFilePairPath currentWaveFilePath;
+	unsigned long long phase0Ep6CallCount = 0;
+	unsigned long long phase0Ep6TimeoutCount = 0;
+	unsigned long long phase0FileWriteCallCount = 0;
+	unsigned long long phase0DdrPollCount = 0;
+	unsigned long long phase0DdrWaitPollCount = 0;
+	unsigned long long phase0Ep6TransferBytes = 0;
+	unsigned long long phase0Ep6TotalMs = 0;
+	unsigned long long phase0FileWriteTotalMs = 0;
 
 	auto IsWaveDataFileOpen = [&]() -> BOOL {
 		return (File_Low.m_hFile != CFile::hFileNull) || (File_High.m_hFile != CFile::hFileNull);
@@ -1227,6 +1235,28 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 	strTmp.Format(_T("One time max size = %dbyte"), ulOneTimeMaxSize);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
+
+	auto SaveWaveDataToFileWithPhase0Metrics = [&](PBYTE writeBuffer, INT writeWaveCount) -> INT
+	{
+		const ULONGLONG phase0WriteStartTick = GetTickCount64();
+		INT saveRet = SaveWaveDataToFile(&File_Low, &File_High, writeBuffer, OneWaveSize_L, OneWaveSize_H, writeWaveCount);
+		const ULONGLONG phase0WriteElapsedMs = GetTickCount64() - phase0WriteStartTick;
+		++phase0FileWriteCallCount;
+		phase0FileWriteTotalMs += phase0WriteElapsedMs;
+
+		const unsigned long long lowWriteBytes = static_cast<unsigned long long>(OneWaveSize_L) * static_cast<unsigned long long>(writeWaveCount);
+		const unsigned long long highWriteBytes = static_cast<unsigned long long>(OneWaveSize_H) * static_cast<unsigned long long>(writeWaveCount);
+		strTmp.Format(
+			_T("[Phase0][APP] SaveWaveDataToFile wave_cnt=%d low_bytes=%I64u high_bytes=%I64u elapsed_ms=%I64u ret=%d"),
+			writeWaveCount,
+			lowWriteBytes,
+			highWriteBytes,
+			static_cast<unsigned long long>(phase0WriteElapsedMs),
+			saveRet);
+		CurObject->m_pMainDlg->PrintLog(strTmp);
+
+		return saveRet;
+	};
 
 	do
 	{
@@ -1393,6 +1423,15 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			iUSBIndex = 1;
 			iIndex = 0;
 			ReadBuf = pEp6DataBuf1;
+			phase0Ep6CallCount = 0;
+			phase0Ep6TimeoutCount = 0;
+			phase0FileWriteCallCount = 0;
+			phase0DdrPollCount = 0;
+			phase0DdrWaitPollCount = 0;
+			phase0Ep6TransferBytes = 0;
+			phase0Ep6TotalMs = 0;
+			phase0FileWriteTotalMs = 0;
+			CurObject->m_pMainDlg->UsbLibInfo.EP6_ResetPhase0Metrics();
 
 			while (g_bEP6ThreadFlag)
 			{
@@ -1406,6 +1445,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				else
 				{
 					Sleep(0);
+					++phase0DdrPollCount;
 
 					if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
 					{
@@ -1477,7 +1517,24 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				}
 
 				/* Get data from Ep6 */
+				const ULONGLONG phase0Ep6StartTick = GetTickCount64();
 				iRet = CurObject->m_pMainDlg->UsbLibInfo.EP6_GetData(ReadBuf + ulRemainSize, ulOneTimeSize);
+				const ULONGLONG phase0Ep6ElapsedMs = GetTickCount64() - phase0Ep6StartTick;
+				++phase0Ep6CallCount;
+				phase0Ep6TransferBytes += static_cast<unsigned long long>(ulOneTimeSize);
+				phase0Ep6TotalMs += static_cast<unsigned long long>(phase0Ep6ElapsedMs);
+				if (iRet == USB_ERR_TRANSFER_TIMEOUT)
+				{
+					++phase0Ep6TimeoutCount;
+				}
+				strTmp.Format(
+					_T("[Phase0][APP] EP6_GetData size=%u elapsed_ms=%I64u ret=%d timeout_count=%I64u"),
+					ulOneTimeSize,
+					static_cast<unsigned long long>(phase0Ep6ElapsedMs),
+					iRet,
+					phase0Ep6TimeoutCount);
+				CurObject->m_pMainDlg->PrintLog(strTmp);
+
 				if (iRet != USB_SUCCESS)
 				{
 					strTmp.Format(_T("EP6 Read %u byte NG."), ulOneTimeSize);
@@ -1513,7 +1570,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
 							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFileWithPhase0Metrics(ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), File_OnetimeWriteCnt);
 							if (iRet != 0)
 							{
 								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
@@ -1525,7 +1582,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFileWithPhase0Metrics(ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), File_OnetimeWriteCnt);
 							if (iRet != 0)
 							{
 								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
@@ -1555,7 +1612,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFileWithPhase0Metrics(ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), File_OnetimeWriteCnt);
 							if (iRet != 0)
 							{
 								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
@@ -1571,7 +1628,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFileWithPhase0Metrics(ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), File_OnetimeWriteCnt);
 							if (iRet != 0)
 							{
 								strTmp.Format(_T("Save wave data failed(err=%d)."), iRet);
@@ -1676,6 +1733,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			INT timeout = 0;
 			while (TRUE)
 			{
+				++phase0DdrWaitPollCount;
 				Sleep(10);
 
 				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
@@ -1695,6 +1753,25 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					break;
 				}
 			}
+
+			const unsigned long long phase0Ep6AvgMs = (phase0Ep6CallCount == 0) ? 0 : (phase0Ep6TotalMs / phase0Ep6CallCount);
+			const unsigned long long phase0FileWriteAvgMs = (phase0FileWriteCallCount == 0) ? 0 : (phase0FileWriteTotalMs / phase0FileWriteCallCount);
+			strTmp.Format(
+				_T("[Phase0][APP] Summary EP6 calls=%I64u bytes=%I64u total_ms=%I64u avg_ms=%I64u timeout=%I64u"),
+				phase0Ep6CallCount,
+				phase0Ep6TransferBytes,
+				phase0Ep6TotalMs,
+				phase0Ep6AvgMs,
+				phase0Ep6TimeoutCount);
+			CurObject->m_pMainDlg->PrintLog(strTmp);
+			strTmp.Format(
+				_T("[Phase0][APP] Summary FileWrite calls=%I64u total_ms=%I64u avg_ms=%I64u DDR_poll=%I64u DDR_wait_poll=%I64u"),
+				phase0FileWriteCallCount,
+				phase0FileWriteTotalMs,
+				phase0FileWriteAvgMs,
+				phase0DdrPollCount,
+				phase0DdrWaitPollCount);
+			CurObject->m_pMainDlg->PrintLog(strTmp);
 
 			/* Manual Mode: Stop FPGA sampling */
 			if (CurObject->m_bManualMode == TRUE)
@@ -1741,6 +1818,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	g_bStartSampling = 0;
 
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
+	CurObject->m_pMainDlg->FlushBufferedLogsToFile();
 }
 
 INT CreateWaveDataFile(CFile* fp_l, CFile* fp_h, const CString& TimeStamp, INT Index, wave_file_publish::WaveFilePairPath* outPath)

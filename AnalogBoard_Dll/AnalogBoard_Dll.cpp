@@ -42,6 +42,33 @@ static CCyUSBEndPoint* m_pInEndpt6;
 
 /* EP2/4 Mutec */
 HANDLE m_hEP2EP4Mutex;
+static volatile LONG g_phase0Ep6CallCount = 0;
+static volatile LONG g_phase0Ep6TimeoutCount = 0;
+
+static INT LogPhase0Ep6MetricsAndReturn(UINT dataSizeCount, UINT recvDataSize, INT result, ULONGLONG startTick)
+{
+	const LONG phase0CallCount = InterlockedIncrement(&g_phase0Ep6CallCount);
+	LONG phase0TimeoutCount = InterlockedCompareExchange(&g_phase0Ep6TimeoutCount, 0, 0);
+	if (result == USB_ERR_TRANSFER_TIMEOUT)
+	{
+		phase0TimeoutCount = InterlockedIncrement(&g_phase0Ep6TimeoutCount);
+	}
+
+	const ULONGLONG phase0ElapsedMs = GetTickCount64() - startTick;
+	TCHAR phase0Log[256];
+	_stprintf_s(
+		phase0Log,
+		_T("[Phase0][DLL] EP6_GetData size=%u recv=%u ret=%d elapsed_ms=%I64u call_count=%ld timeout_count=%ld"),
+		dataSizeCount,
+		recvDataSize,
+		result,
+		static_cast<unsigned long long>(phase0ElapsedMs),
+		phase0CallCount,
+		phase0TimeoutCount);
+	OutputDebugString(phase0Log);
+
+	return result;
+}
 
 /*******************************************************************************
 * function define
@@ -415,16 +442,17 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	UINT	ulRecvDataSize = 0;//EP6 receive size
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
+	const ULONGLONG phase0StartTick = GetTickCount64();
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt6)
 	{
-		return USB_ERR_INVALID_ENDPOINTER;
+		return LogPhase0Ep6MetricsAndReturn(DataSizeCount, ulRecvDataSize, USB_ERR_INVALID_ENDPOINTER, phase0StartTick);
 	}
 
 	if (!pRevData)
 	{
-		return USB_ERR_PARAM;
+		return LogPhase0Ep6MetricsAndReturn(DataSizeCount, ulRecvDataSize, USB_ERR_PARAM, phase0StartTick);
 	}
 	//else if (_msize(pRevData) < DataSizeCount)
 	//{
@@ -433,7 +461,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 
 	if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, INFINITE))
 	{
-		return USB_ERR_UNAVAILABLE;
+		return LogPhase0Ep6MetricsAndReturn(DataSizeCount, ulRecvDataSize, USB_ERR_UNAVAILABLE, phase0StartTick);
 	}
 
 	inOvLap.hEvent = CreateEvent(NULL, false, false, _T("CYUSB_IN"));
@@ -442,7 +470,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	if (!pOneTimeBuffer)
 	{
 		ReleaseMutex(m_hEP2EP4Mutex);
-		return USB_ERR_ALLOCMEM_FAILED;
+		return LogPhase0Ep6MetricsAndReturn(DataSizeCount, ulRecvDataSize, USB_ERR_ALLOCMEM_FAILED, phase0StartTick);
 	}
 	memset(pOneTimeBuffer, 0, EP6_ONETIME_MAX_SIZE);
 
@@ -475,8 +503,13 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	pOneTimeBuffer = NULL;
 
 	ReleaseMutex(m_hEP2EP4Mutex);
+	return LogPhase0Ep6MetricsAndReturn(DataSizeCount, ulRecvDataSize, iRet, phase0StartTick);
+}
 
-	return iRet;
+void USB_Lib_Info::EP6_ResetPhase0Metrics(void)
+{
+	InterlockedExchange(&g_phase0Ep6CallCount, 0);
+	InterlockedExchange(&g_phase0Ep6TimeoutCount, 0);
 }
 
 /*******************************************************************************
