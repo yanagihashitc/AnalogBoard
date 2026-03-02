@@ -1,5 +1,7 @@
 #include "WaveFilePublish.h"
 
+#include <limits>
+
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -12,6 +14,16 @@ namespace
 bool HasValidPath(const std::wstring& path)
 {
     return !path.empty();
+}
+
+bool HasValidFrameSize(size_t frameSizeLow, size_t frameSizeHigh)
+{
+    if ((frameSizeLow == 0U) && (frameSizeHigh == 0U))
+    {
+        return false;
+    }
+
+    return frameSizeLow <= ((std::numeric_limits<size_t>::max)() - frameSizeHigh);
 }
 
 bool DefaultRename(const std::wstring& srcPath, const std::wstring& dstPath)
@@ -74,6 +86,35 @@ PublishResult PublishWaveFilePair(const WaveFilePairPath& path, const RenameFunc
     }
 
     return PublishResult::kSuccess;
+}
+
+bool BuildWaveFrameSplitView(const unsigned char* waveData, size_t frameSizeLow, size_t frameSizeHigh, int frameIndex, WaveFrameSplitView* outView)
+{
+    if ((waveData == nullptr) || (outView == nullptr))
+    {
+        return false;
+    }
+
+    if ((frameIndex < 0) || !HasValidFrameSize(frameSizeLow, frameSizeHigh))
+    {
+        return false;
+    }
+
+    const size_t oneFrameSize = frameSizeLow + frameSizeHigh;
+    const size_t frameIndexSizeT = static_cast<size_t>(frameIndex);
+    if (frameIndexSizeT > ((std::numeric_limits<size_t>::max)() / oneFrameSize))
+    {
+        return false;
+    }
+
+    const size_t offset = oneFrameSize * frameIndexSizeT;
+
+    outView->lowData = waveData + offset;
+    outView->highData = outView->lowData + frameSizeLow;
+    outView->lowSize = frameSizeLow;
+    outView->highSize = frameSizeHigh;
+
+    return true;
 }
 
 } // namespace wave_file_publish
