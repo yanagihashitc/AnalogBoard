@@ -242,6 +242,27 @@ std::filesystem::path FindDialogMainSourcePath()
     throw std::runtime_error("Dialog1_Main.cpp not found for source contract test");
 }
 
+std::filesystem::path FindSavePathValidationSourcePath()
+{
+    const std::vector<std::filesystem::path> candidates = {
+        std::filesystem::path("AnalogBoard_TestApp") / "SavePathValidation.cpp",
+        std::filesystem::path("..") / "AnalogBoard_TestApp" / "SavePathValidation.cpp",
+        std::filesystem::path("..") / ".." / "AnalogBoard_TestApp" / "SavePathValidation.cpp",
+        std::filesystem::path("..") / ".." / ".." / "AnalogBoard_TestApp" / "SavePathValidation.cpp",
+    };
+
+    for (const auto& candidate : candidates)
+    {
+        std::error_code ec;
+        if (std::filesystem::exists(candidate, ec))
+        {
+            return candidate;
+        }
+    }
+
+    throw std::runtime_error("SavePathValidation.cpp not found for source contract test");
+}
+
 void TestBuildWaveFilePairPath_Normal()
 {
     // Given: Valid prefix and index
@@ -799,6 +820,23 @@ void TestDialogMainSourceContract_SavePathValidation()
         "ValidateSavePathForUi should delegate to save_path_validation::ValidateSavePath");
 }
 
+void TestSavePathValidationSourceContract_ProbeDoesNotRequireDeletePermission()
+{
+    // Given: SavePathValidation source code in repository
+    // When: Inspecting write probe implementation details
+    // Then: Probe should not require delete-on-close permission and should cleanup best-effort
+    const std::filesystem::path sourcePath = FindSavePathValidationSourcePath();
+    const std::string source = ReadTextFile(sourcePath);
+    const std::string normalized = StripAsciiWhitespace(source);
+
+    AssertTrue(
+        CountOccurrences(normalized, "FILE_FLAG_DELETE_ON_CLOSE") == 0U,
+        "DefaultWriteProbe should not use FILE_FLAG_DELETE_ON_CLOSE");
+    AssertTrue(
+        CountOccurrences(normalized, "::DeleteFileW(probePath.c_str());") >= 1U,
+        "DefaultWriteProbe should perform best-effort cleanup after probing");
+}
+
 void TestPublishWaveFilePair_EndToEnd_Aebf296CompatibleContent()
 {
     // Given: aebf296-compatible two-frame payload and tmp paths
@@ -919,6 +957,7 @@ int main()
         TestValidateSavePath_NotDirectory();
         TestValidateSavePath_NotWritableByProbeFailure();
         TestDialogMainSourceContract_SavePathValidation();
+        TestSavePathValidationSourceContract_ProbeDoesNotRequireDeletePermission();
         TestPublishWaveFilePair_EndToEnd_Aebf296CompatibleContent();
         TestPublishWaveFilePair_EndToEnd_OverwriteExistingFinal();
     }

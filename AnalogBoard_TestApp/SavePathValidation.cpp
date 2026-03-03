@@ -92,7 +92,7 @@ bool DefaultWriteProbe(const std::wstring& directoryPath, std::wstring* outDetai
         FILE_SHARE_READ,
         nullptr,
         CREATE_NEW,
-        FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
+        FILE_ATTRIBUTE_TEMPORARY,
         nullptr);
 
     if (fileHandle == INVALID_HANDLE_VALUE)
@@ -109,6 +109,8 @@ bool DefaultWriteProbe(const std::wstring& directoryPath, std::wstring* outDetai
     const BOOL writeOk = ::WriteFile(fileHandle, &probeByte, 1U, &writtenBytes, nullptr);
     const DWORD writeError = ::GetLastError();
     ::CloseHandle(fileHandle);
+    // Best-effort cleanup. This can fail on shares where delete permission is intentionally denied.
+    ::DeleteFileW(probePath.c_str());
 
     if ((writeOk == FALSE) || (writtenBytes != 1U))
     {
@@ -161,4 +163,3 @@ ValidationResult ValidateSavePath(const std::wstring& rawPath, const WriteProbeF
     return { ValidationCode::kSuccess, L"" };
 }
 } // namespace save_path_validation
-

@@ -587,7 +587,12 @@ BOOL Dialog1_Main::OnInitDialog()
 	ImportDefaultConfigFile();
 	CString initialSavePath;
 	GetDlgItemText(IDC_EDIT_SAVEPATH, initialSavePath);
-	ValidateSavePathForUi(initialSavePath, FALSE);
+	CString trimmedInitialSavePath(initialSavePath);
+	trimmedInitialSavePath.Trim();
+	if (!trimmedInitialSavePath.IsEmpty())
+	{
+		ValidateSavePathForUi(initialSavePath, FALSE);
+	}
 
 	/* Update Gain result */
 	for (int i = 0; i < 13; i++)
@@ -2610,19 +2615,19 @@ void Dialog1_Main::OnBnClickedButtonImport()
 			}
 		}
 
-			/* Set save path to save waveform data */
-			if (line == 37)
+		/* Set save path to save waveform data */
+		if (line == 37)
+		{
+			cellValue = arrFields[1];
+			if (ValidateSavePathForUi(cellValue, TRUE) != E_OK)
 			{
-				cellValue = arrFields[1];
-				if (ValidateSavePathForUi(cellValue, TRUE) != E_OK)
-				{
-					break;
-				}
-				else
-				{
-					m_edit_savepath.SetWindowText(cellValue);
-				}
+				break;
 			}
+			else
+			{
+				m_edit_savepath.SetWindowText(cellValue);
+			}
+		}
 		
 		arrFields.RemoveAll();
 		line++;
