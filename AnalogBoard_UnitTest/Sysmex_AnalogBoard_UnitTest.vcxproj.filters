@@ -11,6 +11,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\AnalogBoard_TestApp\SavePathValidation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\tests\wave_file_publish_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -19,6 +22,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\AnalogBoard_TestApp\SavePathValidation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\AnalogBoard_TestApp\WaveFilePublish.h">
       <Filter>Header Files</Filter>
     </ClInclude>

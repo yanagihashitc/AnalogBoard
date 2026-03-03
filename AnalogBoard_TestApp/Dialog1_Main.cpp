@@ -7,6 +7,7 @@
 #include "Dialog1_Main.h"
 #include "AnalogBoard_TestAppDlg.h"
 #include "WaveFilePublish.h"
+#include "SavePathValidation.h"
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
@@ -504,6 +505,7 @@ ON_EN_CHANGE(IDC_EDIT_CH5_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh5GainMul
 ON_EN_CHANGE(IDC_EDIT_CH6_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh6GainMultip3)
 ON_EN_CHANGE(IDC_EDIT_CH7_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh7GainMultip3)
 ON_EN_CHANGE(IDC_EDIT_CH8_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh8GainMultip3)
+ON_EN_KILLFOCUS(IDC_EDIT_SAVEPATH, &Dialog1_Main::OnEnKillfocusEditSavepath)
 END_MESSAGE_MAP()
 
 
@@ -583,6 +585,14 @@ BOOL Dialog1_Main::OnInitDialog()
 
 	/* Import default config */
 	ImportDefaultConfigFile();
+	CString initialSavePath;
+	GetDlgItemText(IDC_EDIT_SAVEPATH, initialSavePath);
+	CString trimmedInitialSavePath(initialSavePath);
+	trimmedInitialSavePath.Trim();
+	if (!trimmedInitialSavePath.IsEmpty())
+	{
+		ValidateSavePathForUi(initialSavePath, FALSE);
+	}
 
 	/* Update Gain result */
 	for (int i = 0; i < 13; i++)
@@ -2186,11 +2196,8 @@ INT Dialog1_Main::UpdateConfigStruct(FPGAConfigI_REGMAP* packetConfig)
 	//strTmp.Format(_T("packetConfig->SavePath = %s"), packetConfig->SavePath);
 	m_pMainDlg->PrintLog(_T("packetConfig->SavePath = ") + packetConfig->SavePath);
 #endif
-	if (packetConfig->SavePath.GetLength() == 0)
+	if (ValidateSavePathForUi(packetConfig->SavePath, TRUE) != E_OK)
 	{
-		strTmp.Format(_T("SavePath cannot be NULL"));
-		m_pMainDlg->PrintLog(strTmp);
-		MessageBox(strTmp, _T("Error"), MB_OK | MB_ICONERROR);
 		return -1;
 	}
 
@@ -2612,11 +2619,8 @@ void Dialog1_Main::OnBnClickedButtonImport()
 		if (line == 37)
 		{
 			cellValue = arrFields[1];
-			if (cellValue.GetLength() == 0)
+			if (ValidateSavePathForUi(cellValue, TRUE) != E_OK)
 			{
-				strTmp.Format(_T("SavePath cannot be NULL"));
-				m_pMainDlg->PrintLog(strTmp);
-				MessageBox(strTmp, _T("Error"), MB_OK | MB_ICONERROR);
 				break;
 			}
 			else
@@ -2726,6 +2730,7 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 {
 	TCHAR           szFolderPath[MAX_PATH] = { 0 };
 	CString         strFolderPath = TEXT("");
+	BOOL			isPathSelected = FALSE;
 
 	UpdateData(TRUE);
 	BROWSEINFO      sInfo;
@@ -2741,6 +2746,7 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 		if (::SHGetPathFromIDList(lpidlBrowse, szFolderPath))
 		{
 			m_OutFile = szFolderPath;
+			isPathSelected = TRUE;
 		}
 	}
 	if (lpidlBrowse != NULL)
@@ -2749,6 +2755,10 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 	}
 
 	UpdateData(FALSE);
+	if (isPathSelected == TRUE)
+	{
+		ValidateSavePathForUi(m_OutFile, TRUE);
+	}
 }
 
 
@@ -3076,6 +3086,27 @@ void Dialog1_Main::EditCtrl_HighLight(CColorEdit* EditCtrl, BOOL HLFlag)
 		EditCtrl->Invalidate();
 		EditCtrl->UpdateWindow();
 	}
+}
+
+
+INT Dialog1_Main::ValidateSavePathForUi(const CString& savePath, BOOL showMessageBox)
+{
+	const save_path_validation::ValidationResult result =
+		save_path_validation::ValidateSavePath(std::wstring(savePath.GetString()));
+
+	if (result.code == save_path_validation::ValidationCode::kSuccess)
+	{
+		return E_OK;
+	}
+
+	const CString errorMessage(result.message.c_str());
+	m_pMainDlg->PrintLog(errorMessage);
+	if (showMessageBox)
+	{
+		MessageBox(errorMessage, _T("Error"), MB_OK | MB_ICONERROR);
+	}
+
+	return E_FALSE;
 }
 
 
@@ -3474,6 +3505,14 @@ void Dialog1_Main::OnEnChangeEditCh7GainMultip3()
 void Dialog1_Main::OnEnChangeEditCh8GainMultip3()
 {
 	CheckGain3andDisply(&packetConfig, 7);
+}
+
+
+void Dialog1_Main::OnEnKillfocusEditSavepath()
+{
+	CString savePath;
+	GetDlgItemText(IDC_EDIT_SAVEPATH, savePath);
+	ValidateSavePathForUi(savePath, TRUE);
 }
 
 void Dialog1_Main::CheckGain3andDisply(FPGAConfigI_REGMAP* Config, INT index)

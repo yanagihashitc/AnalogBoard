@@ -149,10 +149,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\AnalogBoard_TestApp\SavePathValidation.cpp" />
     <ClCompile Include="..\tests\wave_file_publish_test.cpp" />
     <ClCompile Include="..\AnalogBoard_TestApp\WaveFilePublish.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\AnalogBoard_TestApp\SavePathValidation.h" />
     <ClInclude Include="..\AnalogBoard_TestApp\WaveFilePublish.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

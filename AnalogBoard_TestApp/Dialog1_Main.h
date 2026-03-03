@@ -236,6 +236,7 @@ public:
 	INT RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer);
 	bool RegGet_SampleStartSt(PBYTE Ep4DataBuffer);
 	void EditCtrl_HighLight(CColorEdit* EditCtrl, BOOL HLFlag);
+	INT ValidateSavePathForUi(const CString& savePath, BOOL showMessageBox);
 	void SaveCfgParametersToFile(CString FilePath, FPGAConfigI_REGMAP* packetConfig, BOOL totalGainValue);
 	void UpdateRangeDisplay(FPGAConfigI_REGMAP* CfgStruct);
 	void SamplingUISet(bool OpenFlag, bool samplingmode);
@@ -287,5 +288,6 @@ public:
 	afx_msg void OnEnChangeEditCh6GainMultip3();
 	afx_msg void OnEnChangeEditCh7GainMultip3();
 	afx_msg void OnEnChangeEditCh8GainMultip3();
+	afx_msg void OnEnKillfocusEditSavepath();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };

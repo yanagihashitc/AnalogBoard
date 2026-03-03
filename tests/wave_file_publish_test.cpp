@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "../AnalogBoard_TestApp/WaveFilePublish.h"
+#include "../AnalogBoard_TestApp/SavePathValidation.h"
 
 namespace {
 
@@ -32,6 +33,17 @@ void AssertEqual(const std::wstring& actual, const std::wstring& expected, const
 }
 
 void AssertEqual(wave_file_publish::PublishResult actual, wave_file_publish::PublishResult expected, const char* message)
+{
+    if (actual != expected)
+    {
+        throw std::runtime_error(message);
+    }
+}
+
+void AssertEqual(
+    save_path_validation::ValidationCode actual,
+    save_path_validation::ValidationCode expected,
+    const char* message)
 {
     if (actual != expected)
     {
@@ -228,6 +240,27 @@ std::filesystem::path FindDialogMainSourcePath()
     }
 
     throw std::runtime_error("Dialog1_Main.cpp not found for source contract test");
+}
+
+std::filesystem::path FindSavePathValidationSourcePath()
+{
+    const std::vector<std::filesystem::path> candidates = {
+        std::filesystem::path("AnalogBoard_TestApp") / "SavePathValidation.cpp",
+        std::filesystem::path("..") / "AnalogBoard_TestApp" / "SavePathValidation.cpp",
+        std::filesystem::path("..") / ".." / "AnalogBoard_TestApp" / "SavePathValidation.cpp",
+        std::filesystem::path("..") / ".." / ".." / "AnalogBoard_TestApp" / "SavePathValidation.cpp",
+    };
+
+    for (const auto& candidate : candidates)
+    {
+        std::error_code ec;
+        if (std::filesystem::exists(candidate, ec))
+        {
+            return candidate;
+        }
+    }
+
+    throw std::runtime_error("SavePathValidation.cpp not found for source contract test");
 }
 
 void TestBuildWaveFilePairPath_Normal()
@@ -691,6 +724,119 @@ void TestDialogMainSourceContract_Aebf296LowHighOrder()
         "High output write should use frameView.highData");
 }
 
+void TestValidateSavePath_NormalDirectory()
+{
+    // Given: Existing writable temp directory
+    // When: Validating save path
+    // Then: Validation succeeds with kSuccess
+    const auto tempDir = std::filesystem::temp_directory_path();
+    const auto result = save_path_validation::ValidateSavePath(tempDir.wstring());
+
+    AssertEqual(result.code, save_path_validation::ValidationCode::kSuccess, "ValidateSavePath should accept writable temp directory");
+}
+
+void TestValidateSavePath_EmptyPath()
+{
+    // Given: Empty save path
+    // When: Validating save path
+    // Then: Validation fails with kEmptyPath
+    const auto result = save_path_validation::ValidateSavePath(L"");
+
+    AssertEqual(result.code, save_path_validation::ValidationCode::kEmptyPath, "ValidateSavePath should reject empty path");
+}
+
+void TestValidateSavePath_WhitespaceOnlyPath()
+{
+    // Given: Whitespace-only save path
+    // When: Validating save path
+    // Then: Validation fails with kEmptyPath
+    const auto result = save_path_validation::ValidateSavePath(L"   \t");
+
+    AssertEqual(result.code, save_path_validation::ValidationCode::kEmptyPath, "ValidateSavePath should reject whitespace-only path");
+}
+
+void TestValidateSavePath_ParentTraversal()
+{
+    // Given: Path containing parent traversal segment
+    // When: Validating save path
+    // Then: Validation fails with kParentTraversal
+    const auto result = save_path_validation::ValidateSavePath(L"C:\\tmp\\..\\capture");
+
+    AssertEqual(result.code, save_path_validation::ValidationCode::kParentTraversal, "ValidateSavePath should reject parent traversal");
+}
+
+void TestValidateSavePath_DirectoryNotFound()
+{
+    // Given: Non-existing directory path
+    // When: Validating save path
+    // Then: Validation fails with kDirectoryNotFound
+    const auto uniquePath = BuildUniquePrefixPath() + L"_missing_dir";
+    const auto result = save_path_validation::ValidateSavePath(uniquePath);
+
+    AssertEqual(result.code, save_path_validation::ValidationCode::kDirectoryNotFound, "ValidateSavePath should reject missing directory");
+}
+
+void TestValidateSavePath_NotDirectory()
+{
+    // Given: Existing file path
+    // When: Validating save path
+    // Then: Validation fails with kNotDirectory
+    const auto filePath = BuildUniquePrefixPath() + L"_savepath_file.txt";
+    ScopedFileCleanup cleanup;
+    cleanup.Add(filePath);
+    WriteBinaryFile(filePath, { 0x01, 0x02 });
+
+    const auto result = save_path_validation::ValidateSavePath(filePath);
+    AssertEqual(result.code, save_path_validation::ValidationCode::kNotDirectory, "ValidateSavePath should reject non-directory path");
+}
+
+void TestValidateSavePath_NotWritableByProbeFailure()
+{
+    // Given: Existing directory and write probe that always fails
+    // When: Validating save path
+    // Then: Validation fails with kNotWritable
+    const auto tempDir = std::filesystem::temp_directory_path();
+    const auto result = save_path_validation::ValidateSavePath(
+        tempDir.wstring(),
+        [](const std::wstring&, std::wstring*) { return false; });
+
+    AssertEqual(result.code, save_path_validation::ValidationCode::kNotWritable, "ValidateSavePath should report not writable when probe fails");
+}
+
+void TestDialogMainSourceContract_SavePathValidation()
+{
+    // Given: Dialog1_Main source code in repository
+    // When: Inspecting save path validation call sites
+    // Then: Save path validation should be invoked in Set Parameters and save path update path
+    const std::filesystem::path sourcePath = FindDialogMainSourcePath();
+    const std::string source = ReadTextFile(sourcePath);
+    const std::string normalized = StripAsciiWhitespace(source);
+
+    AssertTrue(
+        CountOccurrences(normalized, "ValidateSavePathForUi(") >= 5U,
+        "Dialog1_Main should call ValidateSavePathForUi in multiple save path entry points");
+    AssertTrue(
+        CountOccurrences(normalized, "save_path_validation::ValidateSavePath(std::wstring(savePath.GetString()))") >= 1U,
+        "ValidateSavePathForUi should delegate to save_path_validation::ValidateSavePath");
+}
+
+void TestSavePathValidationSourceContract_ProbeDoesNotRequireDeletePermission()
+{
+    // Given: SavePathValidation source code in repository
+    // When: Inspecting write probe implementation details
+    // Then: Probe should not require delete-on-close permission and should cleanup best-effort
+    const std::filesystem::path sourcePath = FindSavePathValidationSourcePath();
+    const std::string source = ReadTextFile(sourcePath);
+    const std::string normalized = StripAsciiWhitespace(source);
+
+    AssertTrue(
+        CountOccurrences(normalized, "FILE_FLAG_DELETE_ON_CLOSE") == 0U,
+        "DefaultWriteProbe should not use FILE_FLAG_DELETE_ON_CLOSE");
+    AssertTrue(
+        CountOccurrences(normalized, "::DeleteFileW(probePath.c_str());") >= 1U,
+        "DefaultWriteProbe should perform best-effort cleanup after probing");
+}
+
 void TestPublishWaveFilePair_EndToEnd_Aebf296CompatibleContent()
 {
     // Given: aebf296-compatible two-frame payload and tmp paths
@@ -803,6 +949,15 @@ int main()
         TestBuildWaveFrameSplitView_ThreeFrameSequentialOrder();
         TestBuildWaveFrameSplitView_Aebf296Compatibility_ExhaustiveSmallGrid();
         TestDialogMainSourceContract_Aebf296LowHighOrder();
+        TestValidateSavePath_NormalDirectory();
+        TestValidateSavePath_EmptyPath();
+        TestValidateSavePath_WhitespaceOnlyPath();
+        TestValidateSavePath_ParentTraversal();
+        TestValidateSavePath_DirectoryNotFound();
+        TestValidateSavePath_NotDirectory();
+        TestValidateSavePath_NotWritableByProbeFailure();
+        TestDialogMainSourceContract_SavePathValidation();
+        TestSavePathValidationSourceContract_ProbeDoesNotRequireDeletePermission();
         TestPublishWaveFilePair_EndToEnd_Aebf296CompatibleContent();
         TestPublishWaveFilePair_EndToEnd_OverwriteExistingFinal();
     }
