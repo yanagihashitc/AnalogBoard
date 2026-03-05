@@ -1155,6 +1155,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	unsigned long long phase0Ep6TransferBytes = 0;
 	unsigned long long phase0Ep6TotalMs = 0;
 	unsigned long long phase0FileWriteTotalMs = 0;
+	ULONG phase0LastDdrWriteCnt = 0;
+	ULONG phase0LastDdrReadCnt = 0;
+	INT phase0LastDdrWriteEnd = -1;
+	INT phase0LastDdrReadEnd = -1;
+	bool phase0HasDdrMetrics = false;
 
 	auto IsWaveDataFileOpen = [&]() -> BOOL {
 		return (File_Low.m_hFile != CFile::hFileNull) || (File_High.m_hFile != CFile::hFileNull);
@@ -1266,6 +1271,36 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 		CurObject->m_pMainDlg->PrintLog(strTmp);
 
 		return saveRet;
+	};
+
+	auto CapturePhase0DdrMetrics = [&](PBYTE ep4DataBuffer, bool forceLog) {
+		const ULONG currentDdrWriteCnt = CurObject->RegGet_DDRWaveCnt(ep4DataBuffer);
+		const ULONG currentDdrReadCnt = CurObject->RegGet_DDRReadCnt(ep4DataBuffer);
+		const INT currentDdrWriteEnd = CurObject->RegGet_DDRWriteEnd(ep4DataBuffer);
+		const INT currentDdrReadEnd = CurObject->RegGet_DDRReadEnd(ep4DataBuffer);
+		const bool shouldLog = forceLog ||
+			(!phase0HasDdrMetrics) ||
+			(currentDdrWriteCnt != phase0LastDdrWriteCnt) ||
+			(currentDdrReadCnt != phase0LastDdrReadCnt) ||
+			(currentDdrWriteEnd != phase0LastDdrWriteEnd) ||
+			(currentDdrReadEnd != phase0LastDdrReadEnd);
+
+		phase0LastDdrWriteCnt = currentDdrWriteCnt;
+		phase0LastDdrReadCnt = currentDdrReadCnt;
+		phase0LastDdrWriteEnd = currentDdrWriteEnd;
+		phase0LastDdrReadEnd = currentDdrReadEnd;
+		phase0HasDdrMetrics = true;
+
+		if (shouldLog)
+		{
+			strTmp.Format(
+				_T("[Phase0][APP] FPGA_DDR wr_cnt=%lu rd_cnt=%lu wr_end=%d rd_end=%d"),
+				phase0LastDdrWriteCnt,
+				phase0LastDdrReadCnt,
+				phase0LastDdrWriteEnd,
+				phase0LastDdrReadEnd);
+			CurObject->m_pMainDlg->PrintLog(strTmp);
+		}
 	};
 
 	do
@@ -1462,13 +1497,14 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
 						break;
 					}
+					CapturePhase0DdrMetrics(pEp4DataBuf, false);
 
 					/* Get DDR wave data size */
-					if (CurObject->RegGet_DDRWriteEnd(pEp4DataBuf) == 1)
+					if (phase0LastDdrWriteEnd == 1)
 					{
 						//Sleep(100);					
 						DDRWrCompleted = true;
-						DDRWaveBytes = (size_t)CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
+						DDRWaveBytes = static_cast<size_t>(phase0LastDdrWriteCnt);
 						if (DDRWaveBytes != 0)
 						{
 							DDRWaveBytes += 32;
@@ -1480,7 +1516,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					}
 					else
 					{
-						DDRWaveBytes = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);		
+						DDRWaveBytes = static_cast<size_t>(phase0LastDdrWriteCnt);		
 					
 						if (DDRWaveBytes == 0)
 						{
@@ -1751,8 +1787,9 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
 					break;
 				}
+				CapturePhase0DdrMetrics(pEp4DataBuf, false);
 
-				if (CurObject->RegGet_DDRWriteEnd(pEp4DataBuf) == 1)
+				if (phase0LastDdrWriteEnd == 1)
 				{
 					break;
 				}
@@ -1766,6 +1803,16 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 			const unsigned long long phase0Ep6AvgMs = (phase0Ep6CallCount == 0) ? 0 : (phase0Ep6TotalMs / phase0Ep6CallCount);
 			const unsigned long long phase0FileWriteAvgMs = (phase0FileWriteCallCount == 0) ? 0 : (phase0FileWriteTotalMs / phase0FileWriteCallCount);
+			if (phase0HasDdrMetrics)
+			{
+				strTmp.Format(
+					_T("[Phase0][APP] Summary FPGA_DDR wr_cnt=%lu rd_cnt=%lu wr_end=%d rd_end=%d"),
+					phase0LastDdrWriteCnt,
+					phase0LastDdrReadCnt,
+					phase0LastDdrWriteEnd,
+					phase0LastDdrReadEnd);
+				CurObject->m_pMainDlg->PrintLog(strTmp);
+			}
 			strTmp.Format(
 				_T("[Phase0][APP] Summary EP6 calls=%I64u bytes=%I64u total_ms=%I64u avg_ms=%I64u timeout=%I64u"),
 				phase0Ep6CallCount,
@@ -3049,6 +3096,20 @@ ULONG Dialog1_Main::RegGet_DDRWaveCnt(PBYTE Ep4DataBuffer)
 }
 
 
+ULONG Dialog1_Main::RegGet_DDRReadCnt(PBYTE Ep4DataBuffer)
+{
+	USHORT usData = 0;
+	ULONG DDRReadSize = 0;
+
+	usData = Reg_Read((UINT)FPGAREG_WAVE_RD_CNT_H, Ep4DataBuffer);
+	DDRReadSize = (ULONG)usData;
+	usData = Reg_Read((UINT)FPGAREG_WAVE_RD_CNT_L, Ep4DataBuffer);
+	DDRReadSize = (ULONG)((DDRReadSize << 16) | usData);
+
+	return DDRReadSize;
+}
+
+
 INT Dialog1_Main::RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer)
 {
 	USHORT usData = 0;
@@ -3056,6 +3117,16 @@ INT Dialog1_Main::RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer)
 	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
 
 	return (usData & 0x4) == 0x4 ? 1 : 0;
+}
+
+
+INT Dialog1_Main::RegGet_DDRReadEnd(PBYTE Ep4DataBuffer)
+{
+	USHORT usData = 0;
+
+	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
+
+	return (usData & 0x8) == 0x8 ? 1 : 0;
 }
 
 

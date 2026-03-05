@@ -13,6 +13,8 @@
 #define FPGAREG_FILTER_SEL		0x000014
 #define FPGAREG_WAVE_WR_CNT_L	0x000018
 #define FPGAREG_WAVE_WR_CNT_H	0x00001A
+#define FPGAREG_WAVE_RD_CNT_L	0x00001C
+#define FPGAREG_WAVE_RD_CNT_H	0x00001E
 #define FPGAREG_GAIN_DAT_CH1	0x000020
 #define FPGAREG_GAIN_SW_CH1_4	0x000040
 #define FPGAREG_GAIN_TRG		0x000050
@@ -233,7 +235,9 @@ public:
 	void RegSet_SelectGetDataMeas(UCHAR ManualMode, PBYTE Ep2DataBuffer);
 	void RegSet_GetWaveDataStart(BOOL StartFlag, PBYTE Ep2DataBuffer);	
 	ULONG RegGet_DDRWaveCnt(PBYTE Ep4DataBuffer);
+	ULONG RegGet_DDRReadCnt(PBYTE Ep4DataBuffer);
 	INT RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer);
+	INT RegGet_DDRReadEnd(PBYTE Ep4DataBuffer);
 	bool RegGet_SampleStartSt(PBYTE Ep4DataBuffer);
 	void EditCtrl_HighLight(CColorEdit* EditCtrl, BOOL HLFlag);
 	INT ValidateSavePathForUi(const CString& savePath, BOOL showMessageBox);
