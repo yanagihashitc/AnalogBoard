@@ -158,6 +158,7 @@ public:
 	CEdit m_edit_import;
 	CEdit m_edit_savepath;
 	bool m_hasSavePathWarning = false;
+	bool m_lastConfigImportSucceeded = false;
 	CButton m_CtrlBtnParSet;
 	CButton m_CtrlBtnDataGetStart;
 	CButton m_button_all_select;
@@ -196,7 +197,7 @@ public:
 
 	void UpdateTotalGain(INT CHID);
 	void UpdateChSelect();
-	void ImportDefaultConfigFile();
+	bool ImportDefaultConfigFile();
 	void ExportDefaultConfigFile();
 	INT UpdateConfigStruct(FPGAConfigI_REGMAP* myStructPtr);
 	void Reg_Write(UINT Address, USHORT Data, PBYTE Ep2DataBuffer);

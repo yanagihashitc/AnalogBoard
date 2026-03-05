@@ -818,7 +818,7 @@ BOOL Dialog1_Main::OnInitDialog()
 	m_pMainDlg->PrintLog(strtemp);
 
 	/* Import default config */
-	ImportDefaultConfigFile();
+	const bool defaultConfigImportSucceeded = ImportDefaultConfigFile();
 
 	/* Update Gain result */
 	for (int i = 0; i < 13; i++)
@@ -826,7 +826,11 @@ BOOL Dialog1_Main::OnInitDialog()
 		UpdateTotalGain(i);
 	}
 
-	ValidateSavePathUI(FALSE);
+	if (SavePathValidation::ShouldValidateStartupAfterConfigImport(defaultConfigImportSucceeded))
+	{
+		ValidateSavePathUI(
+			SavePathValidation::ShouldShowDialogForUiTrigger(SavePathValidation::UiValidationTrigger::kStartup));
+	}
 
 	/* Create USB buffer */
 	pEp2DataBuf = (PBYTE)malloc(EP2_DATA_BUFF_SIZE);
@@ -2632,12 +2636,18 @@ INT Dialog1_Main::UpdateConfigStruct(FPGAConfigI_REGMAP* packetConfig)
 	//strTmp.Format(_T("packetConfig->SavePath = %s"), packetConfig->SavePath);
 	m_pMainDlg->PrintLog(_T("packetConfig->SavePath = ") + packetConfig->SavePath);
 #endif
+	const bool shouldValidateSavePathForSetParameters =
+		SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kSetParameters);
 	CString normalizedSavePath;
-	if (!ValidateSavePathUI(TRUE, &normalizedSavePath))
+	if (shouldValidateSavePathForSetParameters
+		&& !ValidateSavePathUI(TRUE, &normalizedSavePath))
 	{
 		return -1;
 	}
-	packetConfig->SavePath = normalizedSavePath;
+	packetConfig->SavePath = SavePathValidation::ResolveSavePathForSetParameters(
+		strValue.GetString(),
+		normalizedSavePath.GetString(),
+		shouldValidateSavePathForSetParameters).c_str();
 
 	if (iErrFlag == E_FALSE)
 	{
@@ -2707,6 +2717,8 @@ void Dialog1_Main::OnBnClickedButtonImport()
 	int				count;
 	int				errorCode = 0;
 	int				line = 0;
+
+	m_lastConfigImportSucceeded = false;
 
 	char* old_locale = _strdup(setlocale(LC_CTYPE, NULL));
 	setlocale(LC_ALL, "ja_JP");
@@ -3095,12 +3107,13 @@ void Dialog1_Main::OnBnClickedButtonImport()
 	}
 	else
 	{
+		m_lastConfigImportSucceeded = true;
 		m_pMainDlg->PrintLog(_T("Parameter script import successful"));
 	}
 }
 
 
-void  Dialog1_Main::ImportDefaultConfigFile()
+bool Dialog1_Main::ImportDefaultConfigFile()
 {
 	UpdateData(TRUE);
 
@@ -3108,7 +3121,7 @@ void  Dialog1_Main::ImportDefaultConfigFile()
 
 	OnBnClickedButtonImport();
 
-	return;
+	return m_lastConfigImportSucceeded;
 }
 
 
@@ -3173,6 +3186,7 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 {
 	TCHAR           szFolderPath[MAX_PATH] = { 0 };
 	CString         strFolderPath = TEXT("");
+	bool            folderDialogCanceled = false;
 
 	UpdateData(TRUE);
 	BROWSEINFO      sInfo;
@@ -3190,13 +3204,24 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 			m_OutFile = szFolderPath;
 		}
 	}
+	else
+	{
+		folderDialogCanceled = true;
+	}
 	if (lpidlBrowse != NULL)
 	{
 		::CoTaskMemFree(lpidlBrowse);
 	}
 
 	UpdateData(FALSE);
-	ValidateSavePathUI(FALSE);
+	const SavePathValidation::UiValidationTrigger trigger =
+		folderDialogCanceled
+		? SavePathValidation::UiValidationTrigger::kFolderDialogCancel
+		: SavePathValidation::UiValidationTrigger::kFolderDialogConfirmed;
+	if (SavePathValidation::ShouldValidateForUiTrigger(trigger))
+	{
+		ValidateSavePathUI(SavePathValidation::ShouldShowDialogForUiTrigger(trigger));
+	}
 }
 
 
@@ -3813,7 +3838,13 @@ void Dialog1_Main::OnEnChangeEditCh8GainMultip3()
 void Dialog1_Main::OnEnChangeEditSavepath()
 {
 	// Heavy path validation (existence/writability probe) is deferred
-	// to confirmation actions such as parameter apply/start.
+	// to confirmation actions such as startup, folder selection, and parameter apply.
+	// Keep this branch so policy can enable text-changed validation later
+	// without changing message-map wiring.
+	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kTextChanged))
+	{
+		ValidateSavePathUI(FALSE);
+	}
 }
 
 void Dialog1_Main::CheckGain3andDisply(FPGAConfigI_REGMAP* Config, INT index)

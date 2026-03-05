@@ -206,6 +206,226 @@ void Test_T16_DefaultWriteProbeWithSeed_AllAttemptsCollide()
     TEST_ASSERT(lastError == ERROR_ALREADY_EXISTS, "T16 last error should be already exists");
 }
 
+void Test_T17_ShouldValidateForUiTrigger_Startup()
+{
+    // Given: Startup trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kStartup;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Startup must run validation.
+    TEST_ASSERT(shouldValidate, "T17 startup trigger must run validation");
+}
+
+void Test_T18_ShouldValidateForUiTrigger_FolderDialogCancel()
+{
+    // Given: Folder dialog cancel trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogCancel;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Cancel must also run validation.
+    TEST_ASSERT(shouldValidate, "T18 cancel trigger must run validation");
+}
+
+void Test_T19_ShouldNotValidateForUiTrigger_TextChanged()
+{
+    // Given: Edit text changed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kTextChanged;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Heavy validation remains deferred for text change.
+    TEST_ASSERT(!shouldValidate, "T19 text-changed trigger must not run validation");
+}
+
+void Test_T20_ShouldShowDialogForUiTrigger_Startup()
+{
+    // Given: Startup trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kStartup;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Startup must show warning dialog on invalid path.
+    TEST_ASSERT(shouldShowDialog, "T20 startup trigger must show dialog");
+}
+
+void Test_T21_ShouldShowDialogForUiTrigger_FolderDialogCancel()
+{
+    // Given: Folder dialog cancel trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogCancel;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Cancel must show warning dialog on invalid path.
+    TEST_ASSERT(shouldShowDialog, "T21 cancel trigger must show dialog");
+}
+
+void Test_T22_ShouldShowDialogForUiTrigger_FolderDialogConfirmed()
+{
+    // Given: Folder dialog confirmed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogConfirmed;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Confirmed folder must show dialog so user gets immediate feedback.
+    TEST_ASSERT(shouldShowDialog, "T22 confirmed trigger must show dialog");
+}
+
+void Test_T23_ShouldValidateForUiTrigger_SetParameters()
+{
+    // Given: SetParameters trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kSetParameters;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: SetParameters must run validation.
+    TEST_ASSERT(shouldValidate, "T23 SetParameters trigger must run validation");
+}
+
+void Test_T24_ShouldValidateForUiTrigger_FolderDialogConfirmed()
+{
+    // Given: Folder dialog confirmed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogConfirmed;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Confirmed folder must run validation.
+    TEST_ASSERT(shouldValidate, "T24 confirmed trigger must run validation");
+}
+
+void Test_T25_ShouldShowDialogForUiTrigger_SetParameters()
+{
+    // Given: SetParameters trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kSetParameters;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: SetParameters must show dialog on invalid path.
+    TEST_ASSERT(shouldShowDialog, "T25 SetParameters trigger must show dialog");
+}
+
+void Test_T26_ShouldNotShowDialogForUiTrigger_TextChanged()
+{
+    // Given: Text changed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kTextChanged;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Text change must not show dialog.
+    TEST_ASSERT(!shouldShowDialog, "T26 text-changed trigger must not show dialog");
+}
+
+void Test_T27_ShouldValidateStartupAfterSuccessfulConfigImport()
+{
+    // Given: Default config import completed successfully.
+    const bool importSucceeded = true;
+
+    // When: Startup validation policy is evaluated with import result.
+    const bool shouldValidate =
+        SavePathValidation::ShouldValidateStartupAfterConfigImport(importSucceeded);
+
+    // Then: Startup save-path validation must run.
+    TEST_ASSERT(shouldValidate, "T27 successful import must enable startup validation");
+}
+
+void Test_T28_ShouldNotValidateStartupAfterFailedConfigImport()
+{
+    // Given: Default config import failed before SavePath was reliably loaded.
+    const bool importSucceeded = false;
+
+    // When: Startup validation policy is evaluated with import result.
+    const bool shouldValidate =
+        SavePathValidation::ShouldValidateStartupAfterConfigImport(importSucceeded);
+
+    // Then: Startup save-path validation must be skipped.
+    TEST_ASSERT(!shouldValidate, "T28 failed import must skip startup validation");
+}
+
+void Test_T29_ResolveSavePathForSetParameters_UseNormalizedWhenValidated()
+{
+    // Given: Validation is enabled and normalized path is available.
+    const std::wstring rawUiPath = L"C:\\raw_path";
+    const std::wstring normalizedPath = L"C:\\normalized_path";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        true);
+
+    // Then: Normalized path must be selected.
+    TEST_ASSERT(resolved == normalizedPath, "T29 should use normalized path when validated");
+}
+
+void Test_T30_ResolveSavePathForSetParameters_FallbackToUiPathWhenValidationSkipped()
+{
+    // Given: Validation is skipped.
+    const std::wstring rawUiPath = L"C:\\raw_path";
+    const std::wstring normalizedPath = L"";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        false);
+
+    // Then: Raw UI path must be preserved.
+    TEST_ASSERT(resolved == rawUiPath, "T30 should fallback to UI path when validation is skipped");
+}
+
+void Test_T31_ResolveSavePathForSetParameters_FallbackToUiPathWhenNormalizedEmpty()
+{
+    // Given: Validation path is selected but normalized output is unexpectedly empty.
+    const std::wstring rawUiPath = L"C:\\raw_path";
+    const std::wstring normalizedPath = L"";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        true);
+
+    // Then: Raw UI path must be used as a defensive fallback.
+    TEST_ASSERT(resolved == rawUiPath, "T31 should fallback to UI path when normalized path is empty");
+}
+
+void Test_T32_ResolveSavePathForSetParameters_KeepEmptyUiPathWhenValidationSkipped()
+{
+    // Given: Validation is skipped and UI path is empty.
+    const std::wstring rawUiPath = L"";
+    const std::wstring normalizedPath = L"C:\\normalized_path";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        false);
+
+    // Then: Empty UI path should be preserved unchanged.
+    TEST_ASSERT(resolved == rawUiPath, "T32 should keep UI path even when it is empty");
+}
+
 int main()
 {
     std::printf("=== SavePathValidation Unit Tests ===\n\n");
@@ -218,6 +438,22 @@ int main()
     RUN_TEST(Test_T14_ContainsControlCharacter_Boundary31And32);
     RUN_TEST(Test_T15_DefaultWriteProbeWithSeed_RetryOnFileExists);
     RUN_TEST(Test_T16_DefaultWriteProbeWithSeed_AllAttemptsCollide);
+    RUN_TEST(Test_T17_ShouldValidateForUiTrigger_Startup);
+    RUN_TEST(Test_T18_ShouldValidateForUiTrigger_FolderDialogCancel);
+    RUN_TEST(Test_T19_ShouldNotValidateForUiTrigger_TextChanged);
+    RUN_TEST(Test_T20_ShouldShowDialogForUiTrigger_Startup);
+    RUN_TEST(Test_T21_ShouldShowDialogForUiTrigger_FolderDialogCancel);
+    RUN_TEST(Test_T22_ShouldShowDialogForUiTrigger_FolderDialogConfirmed);
+    RUN_TEST(Test_T23_ShouldValidateForUiTrigger_SetParameters);
+    RUN_TEST(Test_T24_ShouldValidateForUiTrigger_FolderDialogConfirmed);
+    RUN_TEST(Test_T25_ShouldShowDialogForUiTrigger_SetParameters);
+    RUN_TEST(Test_T26_ShouldNotShowDialogForUiTrigger_TextChanged);
+    RUN_TEST(Test_T27_ShouldValidateStartupAfterSuccessfulConfigImport);
+    RUN_TEST(Test_T28_ShouldNotValidateStartupAfterFailedConfigImport);
+    RUN_TEST(Test_T29_ResolveSavePathForSetParameters_UseNormalizedWhenValidated);
+    RUN_TEST(Test_T30_ResolveSavePathForSetParameters_FallbackToUiPathWhenValidationSkipped);
+    RUN_TEST(Test_T31_ResolveSavePathForSetParameters_FallbackToUiPathWhenNormalizedEmpty);
+    RUN_TEST(Test_T32_ResolveSavePathForSetParameters_KeepEmptyUiPathWhenValidationSkipped);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;
