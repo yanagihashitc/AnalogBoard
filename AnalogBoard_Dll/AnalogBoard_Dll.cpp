@@ -42,9 +42,15 @@ static CCyUSBEndPoint* m_pInEndpt6;
 
 /* EP2/4 Mutec */
 HANDLE m_hEP2EP4Mutex;
-// Diagnostic counters for EP6 debug logging. They are process-lifetime values.
+// Diagnostic counters for EP6 debug logging. They are reset on connect/disconnect.
 static LONG g_ep6CallCount = 0;
 static LONG g_ep6TimeoutCount = 0;
+
+static void ResetEp6DiagnosticCounters()
+{
+	::InterlockedExchange(&g_ep6CallCount, 0);
+	::InterlockedExchange(&g_ep6TimeoutCount, 0);
+}
 
 /*******************************************************************************
 * function define
@@ -239,6 +245,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 	}
 
 	isConnected = TRUE;
+	ResetEp6DiagnosticCounters();
 
 	if (m_pUSBDevice->BcdUSB == 0x200)
 	{
@@ -278,6 +285,7 @@ void USB_Lib_Info::USBBoard_Disconnect(void)
 		m_pInEndpt4 = NULL;
 		m_pInEndpt6 = NULL;
 		isConnected = FALSE;
+		ResetEp6DiagnosticCounters();
 	}
 }
 

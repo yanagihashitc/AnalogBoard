@@ -100,6 +100,8 @@ namespace WaveDataFileIO
         ULONG frameSizeHigh,
         INT waveCnt)
     {
+        // Pointer overload intentionally treats nullptr writer as "lane disabled".
+        // Callers can write only one lane by passing nullptr for the other writer.
         if (waveCnt < 0)
         {
             return kSaveWaveDataWriteLowFailed;
@@ -146,8 +148,53 @@ namespace WaveDataFileIO
     {
         bool success = false;
         bool retried = false;
+        int attemptCount = 0;
         DWORD lastError = ERROR_SUCCESS;
     };
+
+    inline bool MakeLowRollbackBackupPath(
+        LPCWSTR lowPath,
+        std::wstring* outBackupPath,
+        DWORD pid,
+        ULONGLONG tick,
+        int maxCandidates = 32)
+    {
+        if (lowPath == nullptr || outBackupPath == nullptr || maxCandidates <= 0)
+        {
+            ::SetLastError(ERROR_INVALID_PARAMETER);
+            return false;
+        }
+
+        for (int i = 0; i < maxCandidates; ++i)
+        {
+            std::wstring candidate = lowPath;
+            candidate += L".rollback.";
+            candidate += std::to_wstring(pid);
+            candidate += L".";
+            candidate += std::to_wstring(tick + static_cast<ULONGLONG>(i));
+            if (::GetFileAttributesW(candidate.c_str()) == INVALID_FILE_ATTRIBUTES)
+            {
+                *outBackupPath = candidate;
+                return true;
+            }
+        }
+
+        ::SetLastError(ERROR_ALREADY_EXISTS);
+        return false;
+    }
+
+    inline bool MakeLowRollbackBackupPath(
+        LPCWSTR lowPath,
+        std::wstring* outBackupPath,
+        int maxCandidates = 32)
+    {
+        return MakeLowRollbackBackupPath(
+            lowPath,
+            outBackupPath,
+            ::GetCurrentProcessId(),
+            ::GetTickCount64(),
+            maxCandidates);
+    }
 
     inline RenameAttemptResult RenameTempFileWithRetry(
         LPCWSTR tmpPath,
@@ -167,6 +214,7 @@ namespace WaveDataFileIO
             return result;
         }
 
+        ++result.attemptCount;
         if (::MoveFileExW(tmpPath, finalPath, MOVEFILE_REPLACE_EXISTING) != FALSE)
         {
             result.success = true;
@@ -184,6 +232,7 @@ namespace WaveDataFileIO
                 ::Sleep(retryWaitMs);
             }
 
+            ++result.attemptCount;
             if (::MoveFileExW(tmpPath, finalPath, MOVEFILE_REPLACE_EXISTING) != FALSE)
             {
                 result.success = true;
@@ -214,34 +263,6 @@ namespace WaveDataFileIO
         DWORD retryWaitMs = 100,
         int maxRetries = 1)
     {
-        auto MakeLowBackupPath = [](LPCWSTR lowPath, std::wstring* outBackupPath) -> bool
-        {
-            if (lowPath == nullptr || outBackupPath == nullptr)
-            {
-                ::SetLastError(ERROR_INVALID_PARAMETER);
-                return false;
-            }
-
-            const DWORD pid = ::GetCurrentProcessId();
-            const ULONGLONG tick = ::GetTickCount64();
-            for (int i = 0; i < 32; ++i)
-            {
-                std::wstring candidate = lowPath;
-                candidate += L".rollback.";
-                candidate += std::to_wstring(pid);
-                candidate += L".";
-                candidate += std::to_wstring(tick + static_cast<ULONGLONG>(i));
-                if (::GetFileAttributesW(candidate.c_str()) == INVALID_FILE_ATTRIBUTES)
-                {
-                    *outBackupPath = candidate;
-                    return true;
-                }
-            }
-
-            ::SetLastError(ERROR_ALREADY_EXISTS);
-            return false;
-        };
-
         PublishPairResult result = {};
         std::wstring lowBackupPath;
         bool lowBackupExists = false;
@@ -249,7 +270,7 @@ namespace WaveDataFileIO
         DWORD lowAttrs = ::GetFileAttributesW(finalPathLow);
         if (lowAttrs != INVALID_FILE_ATTRIBUTES && (lowAttrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
         {
-            if (!MakeLowBackupPath(finalPathLow, &lowBackupPath))
+            if (!MakeLowRollbackBackupPath(finalPathLow, &lowBackupPath))
             {
                 result.low.lastError = ::GetLastError();
                 return result;
@@ -376,12 +397,17 @@ namespace WaveDataFileIO
 
     inline bool IsCleanupTargetFileName(const std::wstring& fileName)
     {
-        if (!EndsWithCaseInsensitive(fileName, L".bin.tmp"))
+        if (EndsWithCaseInsensitive(fileName, L".bin.tmp"))
         {
-            return false;
+            return ContainsCaseInsensitive(fileName, L"_fl_") || ContainsCaseInsensitive(fileName, L"_fh_");
         }
 
-        return ContainsCaseInsensitive(fileName, L"_fl_") || ContainsCaseInsensitive(fileName, L"_fh_");
+        if (ContainsCaseInsensitive(fileName, L".bin.rollback."))
+        {
+            return ContainsCaseInsensitive(fileName, L"_fl_") || ContainsCaseInsensitive(fileName, L"_fh_");
+        }
+
+        return false;
     }
 
     inline CleanupTmpResult CleanupResidualBinTmpFiles(LPCWSTR directoryPath)
@@ -398,7 +424,7 @@ namespace WaveDataFileIO
             dir.push_back(L'\\');
         }
 
-        const std::wstring searchPath = dir + L"*.bin.tmp";
+        const std::wstring searchPath = dir + L"*";
 
         WIN32_FIND_DATAW findData = {};
         HANDLE hFind = ::FindFirstFileW(searchPath.c_str(), &findData);

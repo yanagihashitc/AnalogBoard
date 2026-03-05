@@ -3806,7 +3806,8 @@ void Dialog1_Main::OnEnChangeEditCh8GainMultip3()
 
 void Dialog1_Main::OnEnChangeEditSavepath()
 {
-	ValidateSavePathUI(FALSE);
+	// Heavy path validation (existence/writability probe) is deferred
+	// to confirmation actions such as parameter apply/start.
 }
 
 void Dialog1_Main::CheckGain3andDisply(FPGAConfigI_REGMAP* Config, INT index)

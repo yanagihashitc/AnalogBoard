@@ -128,6 +128,7 @@ inline bool ContainsReservedNameSegment(const std::wstring& path)
                     segment.pop_back();
                 }
 
+                // Skip drive roots such as "C:" so they are not treated as reserved basenames.
                 if (!segment.empty() && segment.back() != L':')
                 {
                     const size_t dotPos = segment.find(L'.');
