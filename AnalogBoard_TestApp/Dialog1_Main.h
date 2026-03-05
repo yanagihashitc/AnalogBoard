@@ -157,6 +157,7 @@ public:
 	CEdit m_edit_export;
 	CEdit m_edit_import;
 	CEdit m_edit_savepath;
+	bool m_hasSavePathWarning = false;
 	CButton m_CtrlBtnParSet;
 	CButton m_CtrlBtnDataGetStart;
 	CButton m_button_all_select;
@@ -213,11 +214,14 @@ public:
 	void RegSet_SetTRGValue(USHORT TRGValue, PBYTE Ep2DataBuffer);
 	void RegSet_SetTRGRange(INT RangeSel, FLOAT TRGRangeValue, PBYTE Ep2DataBuffer);
 	void RegSet_SelectGetDataMeas(UCHAR ManualMode, PBYTE Ep2DataBuffer);
-	void RegSet_GetWaveDataStart(BOOL StartFlag, PBYTE Ep2DataBuffer);	
+	void RegSet_GetWaveDataStart(BOOL StartFlag, PBYTE Ep2DataBuffer);
 	ULONG RegGet_DDRWaveCnt(PBYTE Ep4DataBuffer);
+	ULONG RegGet_DDRReadCnt(PBYTE Ep4DataBuffer);
 	INT RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer);
+	INT RegGet_DDRReadEnd(PBYTE Ep4DataBuffer);
 	bool RegGet_SampleStartSt(PBYTE Ep4DataBuffer);
 	void EditCtrl_HighLight(CColorEdit* EditCtrl, BOOL HLFlag);
+	bool ValidateSavePathUI(bool showDialog, CString* outNormalizedPath = nullptr);
 	void SaveCfgParametersToFile(CString FilePath, FPGAConfigI_REGMAP* packetConfig, BOOL totalGainValue);
 	void UpdateRangeDisplay(FPGAConfigI_REGMAP* CfgStruct);
 	void SamplingUISet(bool OpenFlag, bool samplingmode);
@@ -269,5 +273,6 @@ public:
 	afx_msg void OnEnChangeEditCh6GainMultip3();
 	afx_msg void OnEnChangeEditCh7GainMultip3();
 	afx_msg void OnEnChangeEditCh8GainMultip3();
+	afx_msg void OnEnChangeEditSavepath();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 };

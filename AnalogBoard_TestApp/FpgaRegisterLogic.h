@@ -219,11 +219,31 @@ inline ULONG RegGet_DDRWaveCnt(const BYTE* Ep4DataBuffer)
 	return DDRSize;
 }
 
+inline ULONG RegGet_DDRReadCnt(const BYTE* Ep4DataBuffer)
+{
+	USHORT usData = 0;
+	ULONG DDRSize = 0;
+
+	usData = Reg_Read((UINT)FPGAREG_WAVE_RD_CNT_H, Ep4DataBuffer);
+	DDRSize = (ULONG)usData;
+	usData = Reg_Read((UINT)FPGAREG_WAVE_RD_CNT_L, Ep4DataBuffer);
+	DDRSize = (ULONG)((DDRSize << 16) | usData);
+
+	return DDRSize;
+}
+
 inline INT RegGet_DDRWriteEnd(const BYTE* Ep4DataBuffer)
 {
 	USHORT usData = 0;
 	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
 	return (usData & 0x4) == 0x4 ? 1 : 0;
+}
+
+inline INT RegGet_DDRReadEnd(const BYTE* Ep4DataBuffer)
+{
+	USHORT usData = 0;
+	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
+	return (usData & 0x8) == 0x8 ? 1 : 0;
 }
 
 inline bool RegGet_SampleStartSt(const BYTE* Ep4DataBuffer)

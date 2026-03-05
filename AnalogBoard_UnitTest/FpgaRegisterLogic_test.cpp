@@ -593,6 +593,30 @@ void Test_RegGet_DDRWaveCnt_HighOnly()
 }
 
 /*******************************************************************************
+* Test: RegGet_DDRReadCnt
+*******************************************************************************/
+void Test_RegGet_DDRReadCnt_Zero()
+{
+    BYTE buffer[256] = { 0 };
+
+    ULONG result = FpgaRegLogic::RegGet_DDRReadCnt(buffer);
+
+    TEST_ASSERT_EQ(0, (INT)result, "DDRReadCnt zero");
+}
+
+void Test_RegGet_DDRReadCnt_KnownValue()
+{
+    BYTE buffer[256] = { 0 };
+
+    FpgaRegLogic::Reg_Write(FPGAREG_WAVE_RD_CNT_H, 0x0002, buffer);
+    FpgaRegLogic::Reg_Write(FPGAREG_WAVE_RD_CNT_L, 0x0304, buffer);
+
+    ULONG result = FpgaRegLogic::RegGet_DDRReadCnt(buffer);
+
+    TEST_ASSERT_EQ(0x00020304, (INT)result, "DDRReadCnt 0x00020304");
+}
+
+/*******************************************************************************
 * Test: RegGet_DDRWriteEnd
 *******************************************************************************/
 void Test_RegGet_DDRWriteEnd_NotDone()
@@ -641,6 +665,31 @@ void Test_RegGet_DDRWriteEnd_OnlyBit3()
     INT result = FpgaRegLogic::RegGet_DDRWriteEnd(buffer);
 
     TEST_ASSERT_EQ(0, result, "DDRWriteEnd bit3 only -> not done");
+}
+
+/*******************************************************************************
+* Test: RegGet_DDRReadEnd
+*******************************************************************************/
+void Test_RegGet_DDRReadEnd_NotDone()
+{
+    BYTE buffer[256] = { 0 };
+
+    FpgaRegLogic::Reg_Write(FPGAREG_FPGA_ST, 0x0000, buffer);
+
+    INT result = FpgaRegLogic::RegGet_DDRReadEnd(buffer);
+
+    TEST_ASSERT_EQ(0, result, "DDRReadEnd not done");
+}
+
+void Test_RegGet_DDRReadEnd_Done()
+{
+    BYTE buffer[256] = { 0 };
+
+    FpgaRegLogic::Reg_Write(FPGAREG_FPGA_ST, 0x0008, buffer);
+
+    INT result = FpgaRegLogic::RegGet_DDRReadEnd(buffer);
+
+    TEST_ASSERT_EQ(1, result, "DDRReadEnd done");
 }
 
 /*******************************************************************************
@@ -1564,12 +1613,16 @@ int main()
     RUN_TEST(Test_RegGet_DDRWaveCnt_Zero);
     RUN_TEST(Test_RegGet_DDRWaveCnt_KnownValue);
     RUN_TEST(Test_RegGet_DDRWaveCnt_HighOnly);
+    RUN_TEST(Test_RegGet_DDRReadCnt_Zero);
+    RUN_TEST(Test_RegGet_DDRReadCnt_KnownValue);
 
     // DDRWriteEnd
     RUN_TEST(Test_RegGet_DDRWriteEnd_NotDone);
     RUN_TEST(Test_RegGet_DDRWriteEnd_Done);
     RUN_TEST(Test_RegGet_DDRWriteEnd_OtherBitsSet);
     RUN_TEST(Test_RegGet_DDRWriteEnd_OnlyBit3);
+    RUN_TEST(Test_RegGet_DDRReadEnd_NotDone);
+    RUN_TEST(Test_RegGet_DDRReadEnd_Done);
 
     // SampleStartSt
     RUN_TEST(Test_RegGet_SampleStartSt_NotStarted);

@@ -26,6 +26,13 @@ if not %ERRORLEVEL% EQU 0 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
+if not %ERRORLEVEL% EQU 0 (
+    echo.
+    echo === Build FAILED (SavePathValidation_test) ===
+    exit /b 1
+)
+
 if not exist "%SCRIPT_DIR%x64\Debug" mkdir "%SCRIPT_DIR%x64\Debug"
 if not exist "%ROOT_DIR%\x64\Debug" mkdir "%ROOT_DIR%\x64\Debug"
 copy /Y "%SCRIPT_DIR%FpgaRegisterLogic_test.exe" "%SCRIPT_DIR%x64\Debug\AnalogBoard_UnitTest.exe" > nul
@@ -47,6 +54,13 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED (WaveDataFileIO_test) ===
+    exit /b 1
+)
+
+"%SCRIPT_DIR%SavePathValidation_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED (SavePathValidation_test) ===
     exit /b 1
 )
 

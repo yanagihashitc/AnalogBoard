@@ -10,6 +10,7 @@
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
 #include "FpgaRegisterLogic.h"
+#include "SavePathValidation.h"
 #include "WaveDataFileIO.h"
 
 #define LOG_SWITCH		0
@@ -172,82 +173,9 @@ namespace
 		curObject->m_pMainDlg->PrintLog(line);
 	}
 
-	bool IsAbsolutePath(const CString& path)
+	SavePathValidation::Result ValidateSavePathInternal(const CString& rawSavePath)
 	{
-		if (path.GetLength() >= 2 && path[1] == _T(':'))
-		{
-			return true;
-		}
-
-		if (path.GetLength() >= 2 && path[0] == _T('\\') && path[1] == _T('\\'))
-		{
-			return true;
-		}
-
-		return false;
-	}
-
-	bool ContainsPathTraversalToken(const CString& path)
-	{
-		const CString normalized = path;
-		if (normalized.Find(_T("..")) < 0)
-		{
-			return false;
-		}
-
-		if (normalized.Find(_T("..\\")) >= 0 || normalized.Find(_T("../")) >= 0)
-		{
-			return true;
-		}
-
-		if (normalized.Left(2) == _T(".."))
-		{
-			return true;
-		}
-
-		return false;
-	}
-
-	bool NormalizeSavePath(const CString& rawSavePath, CString* outNormalizedPath)
-	{
-		if (outNormalizedPath == nullptr)
-		{
-			return false;
-		}
-
-		CString trimmed = rawSavePath;
-		trimmed.Trim();
-		if (trimmed.IsEmpty())
-		{
-			return false;
-		}
-
-		if (!IsAbsolutePath(trimmed))
-		{
-			return false;
-		}
-
-		if (ContainsPathTraversalToken(trimmed))
-		{
-			return false;
-		}
-
-		TCHAR fullPath[MAX_PATH] = { 0 };
-		DWORD len = ::GetFullPathName(trimmed, MAX_PATH, fullPath, nullptr);
-		if (len == 0 || len >= MAX_PATH)
-		{
-			return false;
-		}
-
-		CString normalized(fullPath);
-		while (normalized.GetLength() > 3 &&
-			(normalized.Right(1) == _T("\\") || normalized.Right(1) == _T("/")))
-		{
-			normalized = normalized.Left(normalized.GetLength() - 1);
-		}
-
-		*outNormalizedPath = normalized;
-		return true;
+		return SavePathValidation::ValidateSavePath(std::wstring(rawSavePath.GetString()));
 	}
 
 	void CleanupResidualTmpFiles(Dialog1_Main* curObject, const CString& normalizedSavePath)
@@ -810,6 +738,7 @@ ON_EN_CHANGE(IDC_EDIT_CH5_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh5GainMul
 ON_EN_CHANGE(IDC_EDIT_CH6_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh6GainMultip3)
 ON_EN_CHANGE(IDC_EDIT_CH7_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh7GainMultip3)
 ON_EN_CHANGE(IDC_EDIT_CH8_GAIN_MULTIP_3, &Dialog1_Main::OnEnChangeEditCh8GainMultip3)
+ON_EN_CHANGE(IDC_EDIT_SAVEPATH, &Dialog1_Main::OnEnChangeEditSavepath)
 END_MESSAGE_MAP()
 
 
@@ -895,6 +824,8 @@ BOOL Dialog1_Main::OnInitDialog()
 	{
 		UpdateTotalGain(i);
 	}
+
+	ValidateSavePathUI(FALSE);
 
 	/* Create USB buffer */
 	pEp2DataBuf = (PBYTE)malloc(EP2_DATA_BUFF_SIZE);
@@ -1169,6 +1100,43 @@ void Dialog1_Main::OnBnClickedCheckCh11()
 void Dialog1_Main::OnBnClickedCheckCh12()
 {
 	UpdateChSelect();
+}
+
+bool Dialog1_Main::ValidateSavePathUI(bool showDialog, CString* outNormalizedPath)
+{
+	CString rawPath;
+	GetDlgItemText(IDC_EDIT_SAVEPATH, rawPath);
+	const SavePathValidation::Result validation = ValidateSavePathInternal(rawPath);
+
+	if (validation.code == SavePathValidation::kSavePathValidationOk)
+	{
+		if (outNormalizedPath != nullptr)
+		{
+			*outNormalizedPath = validation.normalizedPath.c_str();
+		}
+
+		if (m_hasSavePathWarning)
+		{
+			m_pMainDlg->PrintLog(_T("[SavePathWarning] cleared"));
+		}
+		m_hasSavePathWarning = false;
+		return true;
+	}
+
+	CString warningMessage(validation.message.c_str());
+	if (warningMessage.IsEmpty())
+	{
+		warningMessage = _T("SavePath validation failed.");
+	}
+
+	m_hasSavePathWarning = true;
+	m_pMainDlg->PrintLog(_T("[SavePathWarning] ") + warningMessage);
+	if (showDialog)
+	{
+		MessageBox(warningMessage, _T("Save Path Error"), MB_OK | MB_ICONERROR);
+	}
+
+	return false;
 }
 
 
@@ -1447,22 +1415,39 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CString currentTmpPathHigh;
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
+	ULONGLONG ep6CallCount = 0;
+	ULONGLONG ep6TotalElapsedMs = 0;
+	ULONGLONG ep6MaxElapsedMs = 0;
+	ULONGLONG ep6TransferBytes = 0;
+	ULONG ep6TimeoutCount = 0;
+	ULONGLONG saveFileCallCount = 0;
+	ULONGLONG saveFileTotalElapsedMs = 0;
+	ULONGLONG saveFileMaxElapsedMs = 0;
+	ULONG ddrStatusPollCount = 0;
+	ULONG ddrWriteWaitPollCount = 0;
+	ULONG latestWaveWrCnt = 0;
+	ULONG latestWaveRdCnt = 0;
+	INT latestDdrWrEnd = 0;
+	INT latestDdrRdEnd = 0;
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
 
-	if (!NormalizeSavePath(packetConfig.SavePath, &normalizedSavePath))
+	const SavePathValidation::Result savePathValidation =
+		ValidateSavePathInternal(packetConfig.SavePath);
+	if (savePathValidation.code != SavePathValidation::kSavePathValidationOk)
 	{
 		LogFileIoEvent(
 			CurObject,
-			_T("NormalizeSavePath"),
+			_T("ValidateSavePath"),
 			-1,
 			packetConfig.SavePath,
 			_T(""),
 			ERROR_INVALID_PARAMETER,
-			_T("SavePath must be normalized absolute path and must not include '..'"));
+			savePathValidation.message.c_str());
 		CurObject->m_pMainDlg->PrintLog(_T("SavePath validation failed. Stop sampling thread."));
 		goto FINALIZE_THREAD;
 	}
 
+	normalizedSavePath = savePathValidation.normalizedPath.c_str();
 	packetConfig.SavePath = normalizedSavePath;
 	CleanupResidualTmpFiles(CurObject, normalizedSavePath);
 
@@ -1683,6 +1668,58 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			currentFinalPathHigh.Empty();
 			currentTmpPathLow.Empty();
 			currentTmpPathHigh.Empty();
+			ep6CallCount = 0;
+			ep6TotalElapsedMs = 0;
+			ep6MaxElapsedMs = 0;
+			ep6TransferBytes = 0;
+			ep6TimeoutCount = 0;
+			saveFileCallCount = 0;
+			saveFileTotalElapsedMs = 0;
+			saveFileMaxElapsedMs = 0;
+			ddrStatusPollCount = 0;
+			ddrWriteWaitPollCount = 0;
+			latestWaveWrCnt = 0;
+			latestWaveRdCnt = 0;
+			latestDdrWrEnd = 0;
+			latestDdrRdEnd = 0;
+
+			auto SaveWaveDataWithMetrics = [&](
+				CFile* fileLow,
+				CFile* fileHigh,
+				PBYTE waveData,
+				INT waveCnt,
+				INT fileIndex) -> INT
+			{
+				const ULONGLONG startMs = ::GetTickCount64();
+				const INT saveResult = SaveWaveDataToFile(
+					fileLow,
+					fileHigh,
+					waveData,
+					OneWaveSize_L,
+					OneWaveSize_H,
+					waveCnt);
+				const ULONGLONG elapsedMs = ::GetTickCount64() - startMs;
+
+				++saveFileCallCount;
+				saveFileTotalElapsedMs += elapsedMs;
+				if (elapsedMs > saveFileMaxElapsedMs)
+				{
+					saveFileMaxElapsedMs = elapsedMs;
+				}
+
+				CString perfLine;
+				perfLine.Format(
+					_T("[PR01][FILE] call=%I64u index=%d waveCnt=%d bytes=%zu elapsedMs=%I64u result=%d"),
+					saveFileCallCount,
+					fileIndex,
+					waveCnt,
+					static_cast<size_t>(waveCnt) * static_cast<size_t>(OneWaveSize),
+					elapsedMs,
+					saveResult);
+				CurObject->m_pMainDlg->PrintLog(perfLine);
+
+				return saveResult;
+			};
 
 			while (g_bEP6ThreadFlag)
 			{
@@ -1703,12 +1740,18 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						break;
 					}
 
+					++ddrStatusPollCount;
+					latestWaveWrCnt = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
+					latestWaveRdCnt = CurObject->RegGet_DDRReadCnt(pEp4DataBuf);
+					latestDdrWrEnd = CurObject->RegGet_DDRWriteEnd(pEp4DataBuf);
+					latestDdrRdEnd = CurObject->RegGet_DDRReadEnd(pEp4DataBuf);
+
 					/* Get DDR wave data size */
-					if (CurObject->RegGet_DDRWriteEnd(pEp4DataBuf) == 1)
+					if (latestDdrWrEnd == 1)
 					{
-						//Sleep(100);					
+						//Sleep(100);
 						DDRWrCompleted = true;
-						DDRWaveBytes = (size_t)CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
+						DDRWaveBytes = (size_t)latestWaveWrCnt;
 						if (DDRWaveBytes != 0)
 						{
 							DDRWaveBytes += 32;
@@ -1720,8 +1763,8 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					}
 					else
 					{
-						DDRWaveBytes = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);		
-					
+						DDRWaveBytes = latestWaveWrCnt;
+
 						if (DDRWaveBytes == 0)
 						{
 							continue;
@@ -1767,7 +1810,30 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				}
 
 				/* Get data from Ep6 */
+				const ULONGLONG ep6StartMs = ::GetTickCount64();
 				iRet = CurObject->m_pMainDlg->UsbLibInfo.EP6_GetData(ReadBuf + ulRemainSize, ulOneTimeSize);
+				const ULONGLONG ep6ElapsedMs = ::GetTickCount64() - ep6StartMs;
+				++ep6CallCount;
+				ep6TotalElapsedMs += ep6ElapsedMs;
+				ep6TransferBytes += ulOneTimeSize;
+				if (ep6ElapsedMs > ep6MaxElapsedMs)
+				{
+					ep6MaxElapsedMs = ep6ElapsedMs;
+				}
+				if (iRet == USB_ERR_TRANSFER_TIMEOUT)
+				{
+					++ep6TimeoutCount;
+				}
+
+				strTmp.Format(
+					_T("[PR01][EP6] call=%I64u bytes=%u elapsedMs=%I64u result=%d timeoutCount=%lu"),
+					ep6CallCount,
+					ulOneTimeSize,
+					ep6ElapsedMs,
+					iRet,
+					ep6TimeoutCount);
+				CurObject->m_pMainDlg->PrintLog(strTmp);
+
 				if (iRet != USB_SUCCESS)
 				{
 					strTmp.Format(_T("EP6 Read %u byte NG."), ulOneTimeSize);
@@ -1803,7 +1869,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
 							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataWithMetrics(
+								&File_Low,
+								&File_High,
+								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
+								File_OnetimeWriteCnt,
+								iIndex);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -1818,7 +1889,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataWithMetrics(
+								&File_Low,
+								&File_High,
+								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
+								File_OnetimeWriteCnt,
+								iIndex);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -1883,7 +1959,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataWithMetrics(
+								&File_Low,
+								&File_High,
+								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
+								File_OnetimeWriteCnt,
+								iIndex);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -1917,7 +1998,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataWithMetrics(
+								&File_Low,
+								&File_High,
+								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
+								File_OnetimeWriteCnt,
+								iIndex);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -2059,7 +2145,13 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					break;
 				}
 
-				if (CurObject->RegGet_DDRWriteEnd(pEp4DataBuf) == 1)
+				++ddrWriteWaitPollCount;
+				latestWaveWrCnt = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
+				latestWaveRdCnt = CurObject->RegGet_DDRReadCnt(pEp4DataBuf);
+				latestDdrWrEnd = CurObject->RegGet_DDRWriteEnd(pEp4DataBuf);
+				latestDdrRdEnd = CurObject->RegGet_DDRReadEnd(pEp4DataBuf);
+
+				if (latestDdrWrEnd == 1)
 				{
 					break;
 				}
@@ -2070,6 +2162,26 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					break;
 				}
 			}
+
+			const ULONGLONG ep6AvgElapsedMs = (ep6CallCount > 0) ? (ep6TotalElapsedMs / ep6CallCount) : 0;
+			const ULONGLONG saveFileAvgElapsedMs = (saveFileCallCount > 0) ? (saveFileTotalElapsedMs / saveFileCallCount) : 0;
+			strTmp.Format(
+				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d"),
+				ep6CallCount,
+				ep6TransferBytes,
+				ep6TimeoutCount,
+				ep6AvgElapsedMs,
+				ep6MaxElapsedMs,
+				saveFileCallCount,
+				saveFileAvgElapsedMs,
+				saveFileMaxElapsedMs,
+				ddrStatusPollCount,
+				ddrWriteWaitPollCount,
+				latestWaveWrCnt,
+				latestWaveRdCnt,
+				latestDdrWrEnd,
+				latestDdrRdEnd);
+			CurObject->m_pMainDlg->PrintLog(strTmp);
 
 			/* Manual Mode: Stop FPGA sampling */
 			if (CurObject->m_bManualMode == TRUE)
@@ -2508,13 +2620,12 @@ INT Dialog1_Main::UpdateConfigStruct(FPGAConfigI_REGMAP* packetConfig)
 	//strTmp.Format(_T("packetConfig->SavePath = %s"), packetConfig->SavePath);
 	m_pMainDlg->PrintLog(_T("packetConfig->SavePath = ") + packetConfig->SavePath);
 #endif
-	if (packetConfig->SavePath.GetLength() == 0)
+	CString normalizedSavePath;
+	if (!ValidateSavePathUI(TRUE, &normalizedSavePath))
 	{
-		strTmp.Format(_T("SavePath cannot be NULL"));
-		m_pMainDlg->PrintLog(strTmp);
-		MessageBox(strTmp, _T("Error"), MB_OK | MB_ICONERROR);
 		return -1;
 	}
+	packetConfig->SavePath = normalizedSavePath;
 
 	if (iErrFlag == E_FALSE)
 	{
@@ -2962,6 +3073,8 @@ void Dialog1_Main::OnBnClickedButtonImport()
 		UpdateTotalGain(i);
 	}
 
+	ValidateSavePathUI(FALSE);
+
 	if (line != 38)
 	{
 		strTmp.Format(_T("The data of default_config.csv is incomplete and the parameter script import fails"));
@@ -3071,6 +3184,7 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 	}
 
 	UpdateData(FALSE);
+	ValidateSavePathUI(FALSE);
 }
 
 
@@ -3257,10 +3371,20 @@ ULONG Dialog1_Main::RegGet_DDRWaveCnt(PBYTE Ep4DataBuffer)
 	return FpgaRegLogic::RegGet_DDRWaveCnt(Ep4DataBuffer);
 }
 
+ULONG Dialog1_Main::RegGet_DDRReadCnt(PBYTE Ep4DataBuffer)
+{
+	return FpgaRegLogic::RegGet_DDRReadCnt(Ep4DataBuffer);
+}
+
 
 INT Dialog1_Main::RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer)
 {
 	return FpgaRegLogic::RegGet_DDRWriteEnd(Ep4DataBuffer);
+}
+
+INT Dialog1_Main::RegGet_DDRReadEnd(PBYTE Ep4DataBuffer)
+{
+	return FpgaRegLogic::RegGet_DDRReadEnd(Ep4DataBuffer);
 }
 
 
@@ -3672,6 +3796,11 @@ void Dialog1_Main::OnEnChangeEditCh7GainMultip3()
 void Dialog1_Main::OnEnChangeEditCh8GainMultip3()
 {
 	CheckGain3andDisply(&packetConfig, 7);
+}
+
+void Dialog1_Main::OnEnChangeEditSavepath()
+{
+	ValidateSavePathUI(FALSE);
 }
 
 void Dialog1_Main::CheckGain3andDisply(FPGAConfigI_REGMAP* Config, INT index)
