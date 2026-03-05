@@ -1,6 +1,0 @@
-feat: add FPGA DDR read/write metrics logging in phase 0
-
-- Add register definitions for DDR read count (FPGAREG_WAVE_RD_CNT_H/L)
-- Implement RegGet_DDRReadCnt and RegGet_DDRReadEnd to get read metrics
-- Add CapturePhase0DdrMetrics to track and log DDR state changes in phase 0
-- Add FPGA_FW/ to .gitignore
