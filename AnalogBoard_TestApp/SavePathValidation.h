@@ -377,17 +377,21 @@ inline bool ShouldValidateForUiTrigger(const UiValidationTrigger trigger)
     }
 }
 
+inline bool ShouldValidateStartupAfterConfigImport(const bool importSucceeded)
+{
+    return importSucceeded && ShouldValidateForUiTrigger(UiValidationTrigger::kStartup);
+}
+
 inline bool ShouldShowDialogForUiTrigger(const UiValidationTrigger trigger)
 {
     switch (trigger)
     {
     case UiValidationTrigger::kStartup:
+    case UiValidationTrigger::kFolderDialogConfirmed:
     case UiValidationTrigger::kFolderDialogCancel:
     case UiValidationTrigger::kSetParameters:
         return true;
-    case UiValidationTrigger::kFolderDialogConfirmed:
     case UiValidationTrigger::kTextChanged:
-        return false;
     default:
         return false;
     }

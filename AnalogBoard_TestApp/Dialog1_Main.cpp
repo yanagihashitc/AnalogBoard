@@ -818,7 +818,7 @@ BOOL Dialog1_Main::OnInitDialog()
 	m_pMainDlg->PrintLog(strtemp);
 
 	/* Import default config */
-	ImportDefaultConfigFile();
+	const bool defaultConfigImportSucceeded = ImportDefaultConfigFile();
 
 	/* Update Gain result */
 	for (int i = 0; i < 13; i++)
@@ -826,7 +826,7 @@ BOOL Dialog1_Main::OnInitDialog()
 		UpdateTotalGain(i);
 	}
 
-	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kStartup))
+	if (SavePathValidation::ShouldValidateStartupAfterConfigImport(defaultConfigImportSucceeded))
 	{
 		ValidateSavePathUI(
 			SavePathValidation::ShouldShowDialogForUiTrigger(SavePathValidation::UiValidationTrigger::kStartup));
@@ -2713,6 +2713,8 @@ void Dialog1_Main::OnBnClickedButtonImport()
 	int				errorCode = 0;
 	int				line = 0;
 
+	m_lastConfigImportSucceeded = false;
+
 	char* old_locale = _strdup(setlocale(LC_CTYPE, NULL));
 	setlocale(LC_ALL, "ja_JP");
 
@@ -3100,12 +3102,13 @@ void Dialog1_Main::OnBnClickedButtonImport()
 	}
 	else
 	{
+		m_lastConfigImportSucceeded = true;
 		m_pMainDlg->PrintLog(_T("Parameter script import successful"));
 	}
 }
 
 
-void  Dialog1_Main::ImportDefaultConfigFile()
+bool Dialog1_Main::ImportDefaultConfigFile()
 {
 	UpdateData(TRUE);
 
@@ -3113,7 +3116,7 @@ void  Dialog1_Main::ImportDefaultConfigFile()
 
 	OnBnClickedButtonImport();
 
-	return;
+	return m_lastConfigImportSucceeded;
 }
 
 

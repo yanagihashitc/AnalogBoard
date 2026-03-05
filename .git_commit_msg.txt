@@ -1,0 +1,5 @@
+fix: improve SavePath validation trigger logic and startup behavior
+
+- Skip startup validation if default config import fails to prevent false positives
+- Enable validation dialog when folder selection is confirmed for immediate feedback
+- Update unit tests to cover new validation trigger rules and config import scenarios

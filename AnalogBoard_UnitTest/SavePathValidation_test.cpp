@@ -271,7 +271,7 @@ void Test_T21_ShouldShowDialogForUiTrigger_FolderDialogCancel()
     TEST_ASSERT(shouldShowDialog, "T21 cancel trigger must show dialog");
 }
 
-void Test_T22_ShouldNotShowDialogForUiTrigger_FolderDialogConfirmed()
+void Test_T22_ShouldShowDialogForUiTrigger_FolderDialogConfirmed()
 {
     // Given: Folder dialog confirmed trigger.
     const SavePathValidation::UiValidationTrigger trigger =
@@ -280,8 +280,86 @@ void Test_T22_ShouldNotShowDialogForUiTrigger_FolderDialogConfirmed()
     // When: Dialog policy is evaluated.
     const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
 
-    // Then: Confirm path check stays non-modal.
-    TEST_ASSERT(!shouldShowDialog, "T22 confirmed trigger must not show dialog");
+    // Then: Confirmed folder must show dialog so user gets immediate feedback.
+    TEST_ASSERT(shouldShowDialog, "T22 confirmed trigger must show dialog");
+}
+
+void Test_T23_ShouldValidateForUiTrigger_SetParameters()
+{
+    // Given: SetParameters trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kSetParameters;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: SetParameters must run validation.
+    TEST_ASSERT(shouldValidate, "T23 SetParameters trigger must run validation");
+}
+
+void Test_T24_ShouldValidateForUiTrigger_FolderDialogConfirmed()
+{
+    // Given: Folder dialog confirmed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogConfirmed;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Confirmed folder must run validation.
+    TEST_ASSERT(shouldValidate, "T24 confirmed trigger must run validation");
+}
+
+void Test_T25_ShouldShowDialogForUiTrigger_SetParameters()
+{
+    // Given: SetParameters trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kSetParameters;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: SetParameters must show dialog on invalid path.
+    TEST_ASSERT(shouldShowDialog, "T25 SetParameters trigger must show dialog");
+}
+
+void Test_T26_ShouldNotShowDialogForUiTrigger_TextChanged()
+{
+    // Given: Text changed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kTextChanged;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Text change must not show dialog.
+    TEST_ASSERT(!shouldShowDialog, "T26 text-changed trigger must not show dialog");
+}
+
+void Test_T27_ShouldValidateStartupAfterSuccessfulConfigImport()
+{
+    // Given: Default config import completed successfully.
+    const bool importSucceeded = true;
+
+    // When: Startup validation policy is evaluated with import result.
+    const bool shouldValidate =
+        SavePathValidation::ShouldValidateStartupAfterConfigImport(importSucceeded);
+
+    // Then: Startup save-path validation must run.
+    TEST_ASSERT(shouldValidate, "T27 successful import must enable startup validation");
+}
+
+void Test_T28_ShouldNotValidateStartupAfterFailedConfigImport()
+{
+    // Given: Default config import failed before SavePath was reliably loaded.
+    const bool importSucceeded = false;
+
+    // When: Startup validation policy is evaluated with import result.
+    const bool shouldValidate =
+        SavePathValidation::ShouldValidateStartupAfterConfigImport(importSucceeded);
+
+    // Then: Startup save-path validation must be skipped.
+    TEST_ASSERT(!shouldValidate, "T28 failed import must skip startup validation");
 }
 
 int main()
@@ -301,7 +379,13 @@ int main()
     RUN_TEST(Test_T19_ShouldNotValidateForUiTrigger_TextChanged);
     RUN_TEST(Test_T20_ShouldShowDialogForUiTrigger_Startup);
     RUN_TEST(Test_T21_ShouldShowDialogForUiTrigger_FolderDialogCancel);
-    RUN_TEST(Test_T22_ShouldNotShowDialogForUiTrigger_FolderDialogConfirmed);
+    RUN_TEST(Test_T22_ShouldShowDialogForUiTrigger_FolderDialogConfirmed);
+    RUN_TEST(Test_T23_ShouldValidateForUiTrigger_SetParameters);
+    RUN_TEST(Test_T24_ShouldValidateForUiTrigger_FolderDialogConfirmed);
+    RUN_TEST(Test_T25_ShouldShowDialogForUiTrigger_SetParameters);
+    RUN_TEST(Test_T26_ShouldNotShowDialogForUiTrigger_TextChanged);
+    RUN_TEST(Test_T27_ShouldValidateStartupAfterSuccessfulConfigImport);
+    RUN_TEST(Test_T28_ShouldNotValidateStartupAfterFailedConfigImport);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;
