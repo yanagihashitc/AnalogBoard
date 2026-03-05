@@ -251,19 +251,21 @@ inline USHORT CalcGain3RegValue(double Gain3Value)
 /**********************************************************************************
 * Gain1/2 Switch Bit Encoding
 *
-* GainValue[ch][gain_index] vs strGainMultp[ch][gain_index][0/1] を比較して
-* ビットマスクを構築する。
+* Compare GainValue[ch][gain_index] with strGainMultp[ch][gain_index][0/1]
+* and build a bitmask.
 * gain_index 0 = Gain1, 1 = Gain2
-* strGainMultp[ch][j][0] にマッチ -> bit=0, [1] にマッチ -> bit=1
+* Match strGainMultp[ch][j][0] -> bit=0, match [1] -> bit=1
 *
-* ch1~12: 4チャンネルずつグループ化して16bitレジスタに書き込み
-*   各チャンネル4bit: [Gain1_bit, Gain2_bit, 0, 0] (上位から)
-*   実際は j=1->0 の順に処理: usTemp = (usTemp<<1)|bit_j1, (usTemp<<1)|bit_j0
-*   => bit_j1が上位、bit_j0が下位
-*   4チャンネルは i=3->0 の順に処理: usData = (usData<<4)|usTemp
-*   => ch[3]が最上位4bit、ch[0]が最下位4bit
+* ch1~12: Group channels in sets of 4 and write one 16-bit register.
+*   Per channel 4-bit field: [Gain1_bit, Gain2_bit, 0, 0] from MSB to LSB.
+*   j is processed as j=1->0:
+*     usTemp = (usTemp << 1) | bit_j1, then (usTemp << 1) | bit_j0
+*   So bit_j1 is the upper bit and bit_j0 is the lower bit.
+*   Channels are processed as i=3->0:
+*     usData = (usData << 4) | usTemp
+*   So ch[3] becomes the highest 4 bits and ch[0] the lowest 4 bits.
 *
-* ch13: 別途処理、Gain1/2のみ
+* ch13: handled separately, Gain1/2 only
 **********************************************************************************/
 inline USHORT BuildGainSwitchGroup(
 	const double GainValue[][5],
@@ -327,8 +329,8 @@ inline USHORT BuildGainSwitchCh13(
 
 /**********************************************************************************
 * Full EP2 Buffer Construction
-* OnBnClickedButtonParset のレジスタ書き込みシーケンスを再現する。
-* USB送信前のEP2バッファの内容を完全に決定論的に構築する。
+* Reproduce the register write sequence in OnBnClickedButtonParset.
+* Build the EP2 buffer content deterministically before USB transfer.
 **********************************************************************************/
 struct FpgaConfig {
 	double   GainCh[13][5];

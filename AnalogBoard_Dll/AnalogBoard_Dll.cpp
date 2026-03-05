@@ -123,7 +123,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 		/* CCyUSBDevice *m_pUSBDevice */
 		m_pUSBDevice = new CCyUSBDevice(Hwd, CYUSBDRV_GUID, false);
 	}
-	catch (bad_alloc & e)
+	catch (const bad_alloc&)
 	{
 		/* Memory alloct failed */
 		return USB_ERR_ALLOCMEM_FAILED;

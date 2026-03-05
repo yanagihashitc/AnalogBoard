@@ -10,6 +10,7 @@
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
 #include "FpgaRegisterLogic.h"
+#include "WaveDataFileIO.h"
 
 #define LOG_SWITCH		0
 
@@ -30,7 +31,310 @@ void LoopTestProcessThread_EP2_EP4(LPVOID lpParam);
 void LoopTestProcessThread_EP6_GetData(LPVOID lpParam);
 INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize);
-INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, CString TimeStamp, INT Index);
+INT CreateWaveDataFile(
+	CFile* fp_h,
+	CFile* fp_l,
+	const CString& TimeStamp,
+	INT Index,
+	CString* outFinalPath_l,
+	CString* outFinalPath_h,
+	CString* outTmpPath_l,
+	CString* outTmpPath_h,
+	DWORD* outLastError);
+
+namespace
+{
+	enum CreateWaveDataFileResult
+	{
+		CreateWaveDataFileOk = 0,
+		CreateWaveDataFileOpenLowFailed = -1001,
+		CreateWaveDataFileOpenHighFailed = -1002,
+	};
+
+	constexpr INT kUsbErrFileIo = -10020;
+	constexpr INT kUsbErrFileRename = -10021;
+
+	class CFileWriterAdapter
+	{
+	public:
+		explicit CFileWriterAdapter(CFile* file)
+			: file_(file)
+		{
+		}
+
+		bool Write(const BYTE* data, ULONG size)
+		{
+			if (file_ == nullptr || file_->m_hFile == CFile::hFileNull)
+			{
+				::SetLastError(ERROR_INVALID_HANDLE);
+				return false;
+			}
+
+			try
+			{
+				file_->Write(data, size);
+			}
+			catch (CFileException* ex)
+			{
+				const DWORD osError = static_cast<DWORD>(ex->m_lOsError);
+				::SetLastError(osError != ERROR_SUCCESS ? osError : ERROR_WRITE_FAULT);
+				ex->Delete();
+				return false;
+			}
+
+			return true;
+		}
+
+	private:
+		CFile* file_ = nullptr;
+	};
+
+	bool FlushAndCloseFile(CFile* file, DWORD* outLastError)
+	{
+		if (outLastError != nullptr)
+		{
+			*outLastError = ERROR_SUCCESS;
+		}
+
+		if (file == nullptr || file->m_hFile == CFile::hFileNull)
+		{
+			return true;
+		}
+
+		try
+		{
+			file->Flush();
+		}
+		catch (CFileException* ex)
+		{
+			const DWORD osError = static_cast<DWORD>(ex->m_lOsError);
+			if (outLastError != nullptr)
+			{
+				*outLastError = osError != ERROR_SUCCESS ? osError : ERROR_WRITE_FAULT;
+			}
+			ex->Delete();
+
+			try
+			{
+				file->Close();
+			}
+			catch (CFileException* closeEx)
+			{
+				closeEx->Delete();
+			}
+
+			return false;
+		}
+
+		try
+		{
+			file->Close();
+		}
+		catch (CFileException* ex)
+		{
+			const DWORD osError = static_cast<DWORD>(ex->m_lOsError);
+			if (outLastError != nullptr)
+			{
+				*outLastError = osError != ERROR_SUCCESS ? osError : ERROR_WRITE_FAULT;
+			}
+			ex->Delete();
+			return false;
+		}
+
+		return true;
+	}
+
+	void LogFileIoEvent(
+		Dialog1_Main* curObject,
+		LPCTSTR api,
+		INT index,
+		const CString& tmpPath,
+		const CString& finalPath,
+		DWORD lastError,
+		const CString& detail)
+	{
+		if (curObject == nullptr || curObject->m_pMainDlg == nullptr)
+		{
+			return;
+		}
+
+		CString line;
+		line.Format(
+			_T("[FileIO] api=%s index=%d tmpPath=%s finalPath=%s GetLastError=%lu %s"),
+			api,
+			index,
+			tmpPath.GetString(),
+			finalPath.GetString(),
+			lastError,
+			detail.GetString());
+		curObject->m_pMainDlg->PrintLog(line);
+	}
+
+	bool IsAbsolutePath(const CString& path)
+	{
+		if (path.GetLength() >= 2 && path[1] == _T(':'))
+		{
+			return true;
+		}
+
+		if (path.GetLength() >= 2 && path[0] == _T('\\') && path[1] == _T('\\'))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	bool ContainsPathTraversalToken(const CString& path)
+	{
+		const CString normalized = path;
+		if (normalized.Find(_T("..")) < 0)
+		{
+			return false;
+		}
+
+		if (normalized.Find(_T("..\\")) >= 0 || normalized.Find(_T("../")) >= 0)
+		{
+			return true;
+		}
+
+		if (normalized.Left(2) == _T(".."))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	bool NormalizeSavePath(const CString& rawSavePath, CString* outNormalizedPath)
+	{
+		if (outNormalizedPath == nullptr)
+		{
+			return false;
+		}
+
+		CString trimmed = rawSavePath;
+		trimmed.Trim();
+		if (trimmed.IsEmpty())
+		{
+			return false;
+		}
+
+		if (!IsAbsolutePath(trimmed))
+		{
+			return false;
+		}
+
+		if (ContainsPathTraversalToken(trimmed))
+		{
+			return false;
+		}
+
+		TCHAR fullPath[MAX_PATH] = { 0 };
+		DWORD len = ::GetFullPathName(trimmed, MAX_PATH, fullPath, nullptr);
+		if (len == 0 || len >= MAX_PATH)
+		{
+			return false;
+		}
+
+		CString normalized(fullPath);
+		while (normalized.GetLength() > 3 &&
+			(normalized.Right(1) == _T("\\") || normalized.Right(1) == _T("/")))
+		{
+			normalized = normalized.Left(normalized.GetLength() - 1);
+		}
+
+		*outNormalizedPath = normalized;
+		return true;
+	}
+
+	void CleanupResidualTmpFiles(Dialog1_Main* curObject, const CString& normalizedSavePath)
+	{
+		const WaveDataFileIO::CleanupTmpResult cleanupResult =
+			WaveDataFileIO::CleanupResidualBinTmpFiles(normalizedSavePath.GetString());
+
+		for (const WaveDataFileIO::CleanupFailureInfo& fail : cleanupResult.failures)
+		{
+			LogFileIoEvent(curObject, _T("DeleteFile"), -1, fail.path.c_str(), _T(""), fail.lastError, _T("startup tmp cleanup warning"));
+		}
+
+		CString detail;
+		detail.Format(_T("startup tmp cleanup count=%d failed=%d"), cleanupResult.deletedCount, cleanupResult.failedCount);
+		LogFileIoEvent(curObject, _T("startup_cleanup"), -1, normalizedSavePath, _T(""), ERROR_SUCCESS, detail);
+	}
+
+	INT FlushCloseAndPublishWavePair(
+		Dialog1_Main* curObject,
+		CFile* fileLow,
+		CFile* fileHigh,
+		const CString& tmpPathLow,
+		const CString& finalPathLow,
+		const CString& tmpPathHigh,
+		const CString& finalPathHigh,
+		INT index)
+	{
+		DWORD closeErrorLow = ERROR_SUCCESS;
+		DWORD closeErrorHigh = ERROR_SUCCESS;
+		if (!FlushAndCloseFile(fileLow, &closeErrorLow))
+		{
+			LogFileIoEvent(curObject, _T("Close"), index, tmpPathLow, finalPathLow, closeErrorLow, _T("close low failed"));
+			return kUsbErrFileIo;
+		}
+		LogFileIoEvent(curObject, _T("Close"), index, tmpPathLow, finalPathLow, ERROR_SUCCESS, _T("close low success"));
+
+		if (!FlushAndCloseFile(fileHigh, &closeErrorHigh))
+		{
+			LogFileIoEvent(curObject, _T("Close"), index, tmpPathHigh, finalPathHigh, closeErrorHigh, _T("close high failed"));
+			return kUsbErrFileIo;
+		}
+		LogFileIoEvent(curObject, _T("Close"), index, tmpPathHigh, finalPathHigh, ERROR_SUCCESS, _T("close high success"));
+
+		const WaveDataFileIO::PublishPairResult publishResult = WaveDataFileIO::PublishWavePairAtomic(
+			tmpPathLow.GetString(),
+			finalPathLow.GetString(),
+			tmpPathHigh.GetString(),
+			finalPathHigh.GetString(),
+			100);
+
+		if (publishResult.low.success)
+		{
+			CString detail;
+			detail.Format(_T("rename success retried=%d"), publishResult.low.retried ? 1 : 0);
+			LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathLow, finalPathLow, ERROR_SUCCESS, detail);
+		}
+		else
+		{
+			CString detail;
+			detail.Format(_T("rename fail retried=%d"), publishResult.low.retried ? 1 : 0);
+			LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathLow, finalPathLow, publishResult.low.lastError, detail);
+			return kUsbErrFileRename;
+		}
+
+		if (publishResult.high.success)
+		{
+			CString detail;
+			detail.Format(_T("rename success retried=%d"), publishResult.high.retried ? 1 : 0);
+			LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathHigh, finalPathHigh, ERROR_SUCCESS, detail);
+			return USB_SUCCESS;
+		}
+
+		CString highDetail;
+		highDetail.Format(_T("rename fail retried=%d"), publishResult.high.retried ? 1 : 0);
+		LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathHigh, finalPathHigh, publishResult.high.lastError, highDetail);
+
+		CString rollbackDetail;
+		rollbackDetail.Format(_T("rename rollback low deleted=%d"), publishResult.rollbackSucceeded ? 1 : 0);
+		LogFileIoEvent(
+			curObject,
+			_T("DeleteFile"),
+			index,
+			finalPathLow,
+			finalPathHigh,
+			publishResult.rollbackSucceeded ? ERROR_SUCCESS : publishResult.rollbackLastError,
+			rollbackDetail);
+		return kUsbErrFileRename;
+	}
+}
 
 UINT editChSelect[] = {
 	IDC_CHECK_CH1,
@@ -1133,9 +1437,31 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CString strTmp;
 	CString strTimeStamp;
 	CString strTimeStamp_use;
+	CString normalizedSavePath;
+	CString currentFinalPathLow;
+	CString currentFinalPathHigh;
+	CString currentTmpPathLow;
+	CString currentTmpPathHigh;
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
+
+	if (!NormalizeSavePath(packetConfig.SavePath, &normalizedSavePath))
+	{
+		LogFileIoEvent(
+			CurObject,
+			_T("NormalizeSavePath"),
+			-1,
+			packetConfig.SavePath,
+			_T(""),
+			ERROR_INVALID_PARAMETER,
+			_T("SavePath must be normalized absolute path and must not include '..'"));
+		CurObject->m_pMainDlg->PrintLog(_T("SavePath validation failed. Stop sampling thread."));
+		goto FINALIZE_THREAD;
+	}
+
+	packetConfig.SavePath = normalizedSavePath;
+	CleanupResidualTmpFiles(CurObject, normalizedSavePath);
 
 	/* Calculate waveform data size */
 	TrgRange = packetConfig.TriggerRange[0] + packetConfig.TriggerRange[1];
@@ -1350,6 +1676,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			iUSBIndex = 1;
 			iIndex = 0;
 			ReadBuf = pEp6DataBuf1;
+			currentFinalPathLow.Empty();
+			currentFinalPathHigh.Empty();
+			currentTmpPathLow.Empty();
+			currentTmpPathHigh.Empty();
 
 			while (g_bEP6ThreadFlag)
 			{
@@ -1469,42 +1799,140 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
-							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;						
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != USB_SUCCESS)
+							{
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
+								ErrExit = TRUE;
+								break;
+							}
+							CString writeDetail;
+							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-							File_High.Close();
-							File_Low.Close();
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != USB_SUCCESS)
+							{
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
+								ErrExit = TRUE;
+								break;
+							}
+							CString writeDetail;
+							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+
+							iRet = FlushCloseAndPublishWavePair(
+								CurObject,
+								&File_Low,
+								&File_High,
+								currentTmpPathLow,
+								currentFinalPathLow,
+								currentTmpPathHigh,
+								currentFinalPathHigh,
+								iIndex);
+							if (iRet != USB_SUCCESS)
+							{
+								ErrExit = TRUE;
+								break;
+							}
+							currentFinalPathLow.Empty();
+							currentFinalPathHigh.Empty();
+							currentTmpPathLow.Empty();
+							currentTmpPathHigh.Empty();
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));				
 						}
 
 						File_WriteCnt += File_OnetimeWriteCnt;
 					}
 
+					if (ErrExit == TRUE)
+					{
+						break;
+					}
+
 					while (File_WriteCnt < (INT)ulOneTimeCnt)
 					{
-						CreateWaveDataFile(&File_High, &File_Low, strTimeStamp_use, ++iIndex);
+						DWORD openLastError = ERROR_SUCCESS;
+						iRet = CreateWaveDataFile(
+							&File_High,
+							&File_Low,
+							strTimeStamp_use,
+							++iIndex,
+							&currentFinalPathLow,
+							&currentFinalPathHigh,
+							&currentTmpPathLow,
+							&currentTmpPathHigh,
+							&openLastError);
+						if (iRet != CreateWaveDataFileOk)
+						{
+							LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathLow, currentFinalPathLow, openLastError, _T("tmp open fail"));
+							ErrExit = TRUE;
+							break;
+						}
+						LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, _T("tmp open success"));
+						LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathHigh, currentFinalPathHigh, ERROR_SUCCESS, _T("tmp open success"));
 
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
-							File_High.Close();
-							File_Low.Close();
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != USB_SUCCESS)
+							{
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
+								ErrExit = TRUE;
+								break;
+							}
+							CString writeDetail;
+							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+
+							iRet = FlushCloseAndPublishWavePair(
+								CurObject,
+								&File_Low,
+								&File_High,
+								currentTmpPathLow,
+								currentFinalPathLow,
+								currentTmpPathHigh,
+								currentFinalPathHigh,
+								iIndex);
+							if (iRet != USB_SUCCESS)
+							{
+								ErrExit = TRUE;
+								break;
+							}
+							currentFinalPathLow.Empty();
+							currentFinalPathHigh.Empty();
+							currentTmpPathLow.Empty();
+							currentTmpPathHigh.Empty();
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
 						{
 							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							iRet = SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							if (iRet != USB_SUCCESS)
+							{
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
+								ErrExit = TRUE;
+								break;
+							}
+							CString writeDetail;
+							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
 						File_WriteCnt += File_OnetimeWriteCnt;
+					}
+
+					if (ErrExit == TRUE)
+					{
+						break;
 					}
 
 					SaveDDRBytes += ulOneTimeSize;
@@ -1570,9 +1998,17 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
 			CurObject->m_pMainDlg->PrintLog(strTmp);	
 
-			/* Close the last file */	
-			File_Low.Close();
-			File_High.Close();
+			/* Close the last file */
+			DWORD closeLastErrorLow = ERROR_SUCCESS;
+			DWORD closeLastErrorHigh = ERROR_SUCCESS;
+			if (!FlushAndCloseFile(&File_Low, &closeLastErrorLow))
+			{
+				LogFileIoEvent(CurObject, _T("Close"), iIndex, currentTmpPathLow, currentFinalPathLow, closeLastErrorLow, _T("close low failed at loop end"));
+			}
+			if (!FlushAndCloseFile(&File_High, &closeLastErrorHigh))
+			{
+				LogFileIoEvent(CurObject, _T("Close"), iIndex, currentTmpPathHigh, currentFinalPathHigh, closeLastErrorHigh, _T("close high failed at loop end"));
+			}
 			
 			/* Disenable start button */
 			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
@@ -1624,6 +2060,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 		} while (runtime);
 	} while (0);
 
+FINALIZE_THREAD:
 	/* Free ep6 read buffer */
 	if (pEp6DataBuf1)
 	{
@@ -1648,62 +2085,107 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
 }
 
-INT CreateWaveDataFile(CFile *fp_h, CFile* fp_l, CString TimeStamp, INT Index)
+INT CreateWaveDataFile(
+	CFile* fp_h,
+	CFile* fp_l,
+	const CString& TimeStamp,
+	INT Index,
+	CString* outFinalPath_l,
+	CString* outFinalPath_h,
+	CString* outTmpPath_l,
+	CString* outTmpPath_h,
+	DWORD* outLastError)
 {
-	CFileStatus status;
-	CString FileName[2];
 	CString strIndex;
-	INT iRet = 0;
+	if (outLastError != nullptr)
+	{
+		*outLastError = ERROR_SUCCESS;
+	}
 
+	if (fp_h == nullptr || fp_l == nullptr)
+	{
+		if (outLastError != nullptr)
+		{
+			*outLastError = ERROR_INVALID_PARAMETER;
+		}
+		return CreateWaveDataFileOpenLowFailed;
+	}
+
+	CString finalPathLow;
+	CString finalPathHigh;
 	strIndex.Format(_T("_fl_%d.bin"), Index);
-	FileName[0] = TimeStamp + strIndex;
+	finalPathLow = TimeStamp + strIndex;
 	strIndex.Format(_T("_fh_%d.bin"), Index);
-	FileName[1] = TimeStamp + strIndex;
+	finalPathHigh = TimeStamp + strIndex;
+	CString tmpPathLow = finalPathLow + _T(".tmp");
+	CString tmpPathHigh = finalPathHigh + _T(".tmp");
 
-	//if (CFile::GetStatus(FileName[0], status))
-	//{		
-	//	fp_l = NULL;//File is exist，do nothing
-	//	iRet = -1;
-	//}
-	//else 
-	if (!fp_l->Open(FileName[0], CFile::modeCreate | CFile::modeWrite))
+	if (outFinalPath_l != nullptr)
 	{
-		iRet = -2;
+		*outFinalPath_l = finalPathLow;
+	}
+	if (outFinalPath_h != nullptr)
+	{
+		*outFinalPath_h = finalPathHigh;
+	}
+	if (outTmpPath_l != nullptr)
+	{
+		*outTmpPath_l = tmpPathLow;
+	}
+	if (outTmpPath_h != nullptr)
+	{
+		*outTmpPath_h = tmpPathHigh;
 	}
 
-	//if (CFile::GetStatus(FileName[1], status))
-	//{
-	//	fp_h = NULL;//File is exist，do nothing
-	//	iRet = -3;
-	//}
-	//else 
-	if (!fp_h->Open(FileName[1], CFile::modeCreate | CFile::modeWrite))
+	if (!fp_l->Open(tmpPathLow, CFile::modeCreate | CFile::modeWrite))
 	{
-		iRet = -4;
+		if (outLastError != nullptr)
+		{
+			*outLastError = ::GetLastError();
+		}
+		return CreateWaveDataFileOpenLowFailed;
 	}
 
-	return iRet;
+	if (!fp_h->Open(tmpPathHigh, CFile::modeCreate | CFile::modeWrite))
+	{
+		const DWORD openError = ::GetLastError();
+		DWORD closeError = ERROR_SUCCESS;
+		FlushAndCloseFile(fp_l, &closeError);
+		::DeleteFile(tmpPathLow);
+		if (outLastError != nullptr)
+		{
+			*outLastError = openError;
+		}
+		return CreateWaveDataFileOpenHighFailed;
+	}
+
+	return CreateWaveDataFileOk;
 }
 
 INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
 {
-	ULONG FrameSize = FrameSize_L + FrameSize_H;
-	INT iRet = 0;
-
-	for (int i = 0; i < WaveCnt; i++)
+	if (fp_l == nullptr || fp_h == nullptr)
 	{
-		if ((fp_l != NULL) && (FrameSize_L != 0))
-		{
-			fp_l->Write(WaveData + ((size_t)i * (size_t)FrameSize), FrameSize_L);
-		}
-		
-		if ((fp_h != NULL) && (FrameSize_H != 0))
-		{
-			fp_h->Write(WaveData + ((size_t)i * (size_t)FrameSize) + (size_t)FrameSize_L, FrameSize_H);
-		}
+		::SetLastError(ERROR_INVALID_PARAMETER);
+		return kUsbErrFileIo;
 	}
 
-	return iRet;
+	CFileWriterAdapter writerLow(fp_l);
+	CFileWriterAdapter writerHigh(fp_h);
+	const INT saveResult = WaveDataFileIO::SaveWaveDataToFileImpl(
+		writerLow,
+		writerHigh,
+		WaveData,
+		FrameSize_L,
+		FrameSize_H,
+		WaveCnt);
+
+	if (saveResult != WaveDataFileIO::kSaveWaveDataOk)
+	{
+		return kUsbErrFileIo;
+	}
+
+	return USB_SUCCESS;
 }
 
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize)

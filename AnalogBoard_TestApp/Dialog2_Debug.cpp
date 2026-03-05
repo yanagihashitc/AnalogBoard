@@ -37,6 +37,9 @@ void Dialog2_Debug::DoDataExchange(CDataExchange* pDX)
 }
 
 
+// Windows notification macros use negative constants by design.
+#pragma warning(push)
+#pragma warning(disable : 26454)
 BEGIN_MESSAGE_MAP(Dialog2_Debug, CDialogEx)
 	ON_NOTIFY(NM_CUSTOMDRAW, IDC_LIST_EP2EP4_DATA, &Dialog2_Debug::OnNMCustomdrawListEp2ep4Data)
 	ON_NOTIFY(NM_DBLCLK, IDC_LIST_EP2EP4_DATA, &Dialog2_Debug::OnNMDblclkListEp2ep4Data)
@@ -50,6 +53,7 @@ BEGIN_MESSAGE_MAP(Dialog2_Debug, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_EXPORTEP6_SELECT, &Dialog2_Debug::OnBnClickedButtonExportep6Select)
 	ON_BN_CLICKED(IDC_BUTTON_EP6RX, &Dialog2_Debug::OnBnClickedButtonEp6rx)
 END_MESSAGE_MAP()
+#pragma warning(pop)
 
 
 // Dialog2_Debug message handlers
