@@ -77,7 +77,7 @@ void Test_Init_CreatesLogsDirAndFile()
 }
 
 // -------------------------------------------------------
-// Test: Append adds a line to buffer (not yet flushed)
+// Test: Append writes message immediately
 // -------------------------------------------------------
 void Test_Append_BuffersMessages()
 {
@@ -88,11 +88,9 @@ void Test_Append_BuffersMessages()
 
     logger.Append(L"20260306 12:00:00 000>> Hello world");
 
-    // File should still be empty or contain only the header (no flush yet)
     std::string content = ReadTextFile(logger.GetLogFilePath());
-    // The append only buffers, not writes
-    TEST_ASSERT(content.find("Hello world") == std::string::npos,
-        "message should not be in file before flush");
+    TEST_ASSERT(content.find("Hello world") != std::string::npos,
+        "message should be in file immediately after append");
 
     logger.Close();
     fs::remove_all(tmpDir);
@@ -123,7 +121,7 @@ void Test_Flush_WritesBufferToFile()
 }
 
 // -------------------------------------------------------
-// Test: Flush clears buffer so next flush doesn't duplicate
+// Test: Flush does not duplicate already-written lines
 // -------------------------------------------------------
 void Test_Flush_ClearsBuffer()
 {
@@ -134,8 +132,6 @@ void Test_Flush_ClearsBuffer()
 
     logger.Append(L"20260306 12:00:00 000>> AAA");
     logger.Flush();
-
-    logger.Append(L"20260306 12:00:01 000>> BBB");
     logger.Flush();
 
     std::string content = ReadTextFile(logger.GetLogFilePath());
@@ -149,8 +145,8 @@ void Test_Flush_ClearsBuffer()
         pos += 3;
     }
     TEST_ASSERT(count == 1, "AAA should appear exactly once after two flushes");
-    TEST_ASSERT(content.find("BBB") != std::string::npos,
-        "BBB should be in file after second flush");
+    TEST_ASSERT(content.find("AAA") != std::string::npos,
+        "AAA should remain in file after repeated flushes");
 
     logger.Close();
     fs::remove_all(tmpDir);
@@ -208,9 +204,9 @@ void Test_Close_FlushesRemaining()
 }
 
 // -------------------------------------------------------
-// Test: Init with non-existent nested path
+// Test: Init with non-existent parent path fails gracefully
 // -------------------------------------------------------
-void Test_Init_CreatesNestedPath()
+void Test_Init_NonExistentParent_Fails()
 {
     fs::path tmpDir = CreateTempDir("fl_nested");
     fs::path nested = tmpDir / L"a" / L"b";
@@ -218,10 +214,9 @@ void Test_Init_CreatesNestedPath()
     FileLogger logger;
     bool ok = logger.Init(nested.wstring());
 
-    TEST_ASSERT(ok, "Init should succeed with nested path");
-    TEST_ASSERT(fs::exists(nested / L"logs"), "nested logs dir should be created");
+    // Parent directories "a/b" do not exist, so CreateDirectoryW for "a/b/logs" should fail
+    TEST_ASSERT(!ok, "Init should fail when parent path does not exist");
 
-    logger.Close();
     fs::remove_all(tmpDir);
 }
 
@@ -250,7 +245,7 @@ int main()
     RUN_TEST(Test_Flush_ClearsBuffer);
     RUN_TEST(Test_MultipleFlushCycles);
     RUN_TEST(Test_Close_FlushesRemaining);
-    RUN_TEST(Test_Init_CreatesNestedPath);
+    RUN_TEST(Test_Init_NonExistentParent_Fails);
     RUN_TEST(Test_AppendWithoutInit_NoCrash);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n",

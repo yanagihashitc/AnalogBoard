@@ -1615,6 +1615,8 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 			if (ErrExit == TRUE)
 			{
+				/* Flush log immediately on error */
+				CurObject->m_pMainDlg->FlushLog();
 				break;
 			}
 

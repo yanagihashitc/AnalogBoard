@@ -1,41 +1,55 @@
 #ifndef FILE_LOGGER_H
 #define FILE_LOGGER_H
 
+#ifndef UNICODE
+#error "FileLogger requires UNICODE build"
+#endif
+
 #include <windows.h>
 #include <string>
-#include <vector>
-#include <fstream>
-#include <filesystem>
+#include <mutex>
 
 class FileLogger
 {
 public:
-	FileLogger() : m_initialized(false) {}
+	FileLogger() : m_initialized(false), m_fileHandle(INVALID_HANDLE_VALUE) {}
 
 	~FileLogger() { Close(); }
 
 	bool Init(const std::wstring& exeDir)
 	{
+		std::lock_guard<std::mutex> lock(m_mutex);
 		if (m_initialized) return true;
 
-		namespace fs = std::filesystem;
+		std::wstring logsDir = exeDir;
+		if (!logsDir.empty() && logsDir.back() != L'\\')
+			logsDir += L'\\';
+		logsDir += L"logs";
 
-		fs::path logsDir = fs::path(exeDir) / L"logs";
-		std::error_code ec;
-		fs::create_directories(logsDir, ec);
-		if (ec) return false;
+		if (!CreateDirectoryW(logsDir.c_str(), NULL))
+		{
+			if (GetLastError() != ERROR_ALREADY_EXISTS)
+				return false;
+		}
 
 		SYSTEMTIME st;
 		GetLocalTime(&st);
 		wchar_t fname[32];
-		swprintf_s(fname, L"%02d%02d%02d%02d%02d.log",
+		swprintf_s(fname, L"\\%02d%02d%02d%02d%02d.log",
 			st.wYear % 100, st.wMonth, st.wDay,
 			st.wHour, st.wMinute);
 
-		m_logFilePath = (logsDir / fname).wstring();
+		m_logFilePath = logsDir + fname;
 
-		m_ofs.open(m_logFilePath, std::ios::app);
-		if (!m_ofs.is_open()) return false;
+		m_fileHandle = CreateFileW(
+			m_logFilePath.c_str(),
+			FILE_APPEND_DATA,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			nullptr,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr);
+		if (m_fileHandle == INVALID_HANDLE_VALUE) return false;
 
 		m_initialized = true;
 		return true;
@@ -43,42 +57,63 @@ public:
 
 	void Append(const std::wstring& line)
 	{
+		std::lock_guard<std::mutex> lock(m_mutex);
 		if (!m_initialized) return;
-		m_buffer.push_back(line);
+		if (m_fileHandle == INVALID_HANDLE_VALUE) return;
+
+		int len = 0;
+		if (!line.empty())
+		{
+			len = WideCharToMultiByte(CP_UTF8, 0,
+				line.c_str(), (int)line.size(), nullptr, 0, nullptr, nullptr);
+		}
+
+		const int totalBytes = (len > 0) ? (len + 1) : 1; // include '\n'
+		std::string buffer(totalBytes, '\n');
+		if (len > 0)
+		{
+			const int converted = WideCharToMultiByte(CP_UTF8, 0,
+				line.c_str(), (int)line.size(), &buffer[0], len, nullptr, nullptr);
+			if (converted <= 0)
+			{
+				return;
+			}
+		}
+
+		DWORD written = 0;
+		WriteFile(m_fileHandle, buffer.data(), (DWORD)buffer.size(), &written, nullptr);
 	}
 
 	void Flush()
 	{
-		if (!m_initialized || m_buffer.empty()) return;
-
-		for (const auto& line : m_buffer)
+		std::lock_guard<std::mutex> lock(m_mutex);
+		if (!m_initialized) return;
+		if (m_fileHandle != INVALID_HANDLE_VALUE)
 		{
-			int len = WideCharToMultiByte(CP_UTF8, 0,
-				line.c_str(), (int)line.size(), nullptr, 0, nullptr, nullptr);
-			std::string utf8(len, '\0');
-			WideCharToMultiByte(CP_UTF8, 0,
-				line.c_str(), (int)line.size(), &utf8[0], len, nullptr, nullptr);
-			m_ofs << utf8 << "\n";
+			FlushFileBuffers(m_fileHandle);
 		}
-		m_ofs.flush();
-		m_buffer.clear();
 	}
 
 	void Close()
 	{
+		std::lock_guard<std::mutex> lock(m_mutex);
 		if (!m_initialized) return;
-		Flush();
-		m_ofs.close();
+		if (m_fileHandle != INVALID_HANDLE_VALUE)
+		{
+			FlushFileBuffers(m_fileHandle);
+			CloseHandle(m_fileHandle);
+			m_fileHandle = INVALID_HANDLE_VALUE;
+		}
 		m_initialized = false;
 	}
 
 	std::wstring GetLogFilePath() const { return m_logFilePath; }
 
 private:
+	std::mutex m_mutex;
 	bool m_initialized;
 	std::wstring m_logFilePath;
-	std::ofstream m_ofs;
-	std::vector<std::wstring> m_buffer;
+	HANDLE m_fileHandle;
 };
 
 #endif // FILE_LOGGER_H

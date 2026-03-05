@@ -56,6 +56,7 @@ public:
 	//bool m_bPnP_Arrival = FALSE;
 
 public:
-	FileLogger m_fileLogger;
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+
+private:
 };

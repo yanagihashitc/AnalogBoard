@@ -1,3 +1,76 @@
+Microsoft(R) C/C++ Optimizing Compiler Version 19.37.32826.1 for x64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+FpgaRegisterLogic_test.cpp
+FpgaRegisterLogic_test.cpp(1): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+FpgaRegisterLogic_test.cpp(838): warning C4819: ファイルは、現在のコード ページ (932) で表示できない文字を含んでいます。データの損失を防ぐために、ファイルを Unicode 形式で保存してください。
+FpgaRegisterLogic_test.cpp(1005): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1007): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(997): warning C4189: 'regVal': ローカル変数が初期化されましたが、参照されていません
+FpgaRegisterLogic_test.cpp(1032): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1034): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1025): warning C4189: 'regVal': ローカル変数が初期化されましたが、参照されていません
+FpgaRegisterLogic_test.cpp(1059): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1061): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1052): warning C4189: 'regVal': ローカル変数が初期化されましたが、参照されていません
+FpgaRegisterLogic_test.cpp(1084): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1088): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1090): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1165): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1197): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1217): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1232): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1383): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1392): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1420): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1447): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1477): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1502): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+FpgaRegisterLogic_test.cpp(1511): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+Microsoft (R) Incremental Linker Version 14.37.32826.1
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+/debug 
+/out:FpgaRegisterLogic_test.exe 
+/DEBUG 
+FpgaRegisterLogic_test.obj 
+Microsoft(R) C/C++ Optimizing Compiler Version 19.37.32826.1 for x64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+WaveDataFileIO_test.cpp
+Microsoft (R) Incremental Linker Version 14.37.32826.1
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+/debug 
+/out:WaveDataFileIO_test.exe 
+/DEBUG 
+bcrypt.lib 
+WaveDataFileIO_test.obj 
+Microsoft(R) C/C++ Optimizing Compiler Version 19.37.32826.1 for x64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+SavePathValidation_test.cpp
+Microsoft (R) Incremental Linker Version 14.37.32826.1
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+/debug 
+/out:SavePathValidation_test.exe 
+/DEBUG 
+SavePathValidation_test.obj 
+Microsoft(R) C/C++ Optimizing Compiler Version 19.37.32826.1 for x64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+FileLogger_test.cpp
+Microsoft (R) Incremental Linker Version 14.37.32826.1
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+/debug 
+/out:FileLogger_test.exe 
+/DEBUG 
+FileLogger_test.obj 
+
+=== Build succeeded. Running tests... ===
+
 === FpgaRegisterLogic Unit Tests ===
 
 [TEST] Test_Reg_Write_Basic
@@ -32,6 +105,8 @@
 [TEST] Test_BuildTrgChBitmask_Ch1
 [TEST] Test_BuildTrgChBitmask_Ch13
 [TEST] Test_BuildTrgChBitmask_Ch7
+[TEST] Test_BuildTrgChBitmask_InvalidZero
+[TEST] Test_BuildTrgChBitmask_InvalidOver13
 [TEST] Test_RegSet_SelectTRGCH
 [TEST] Test_CalcTrgValueRegValue_Zero
 [TEST] Test_CalcTrgValueRegValue_1800
@@ -50,10 +125,14 @@
 [TEST] Test_RegGet_DDRWaveCnt_Zero
 [TEST] Test_RegGet_DDRWaveCnt_KnownValue
 [TEST] Test_RegGet_DDRWaveCnt_HighOnly
+[TEST] Test_RegGet_DDRReadCnt_Zero
+[TEST] Test_RegGet_DDRReadCnt_KnownValue
 [TEST] Test_RegGet_DDRWriteEnd_NotDone
 [TEST] Test_RegGet_DDRWriteEnd_Done
 [TEST] Test_RegGet_DDRWriteEnd_OtherBitsSet
 [TEST] Test_RegGet_DDRWriteEnd_OnlyBit3
+[TEST] Test_RegGet_DDRReadEnd_NotDone
+[TEST] Test_RegGet_DDRReadEnd_Done
 [TEST] Test_RegGet_SampleStartSt_NotStarted
 [TEST] Test_RegGet_SampleStartSt_Started
 [TEST] Test_RegGet_SampleStartSt_OtherBits
@@ -68,6 +147,8 @@
 [TEST] Test_BuildGainSwitchGroup_HighFreqCh9to12
 [TEST] Test_BuildGainSwitchCh13_Option0
 [TEST] Test_BuildGainSwitchCh13_Option1
+[TEST] Test_BuildGainSwitchGroup_InvalidValueFallback
+[TEST] Test_BuildGainSwitchCh13_InvalidValueFallback
 [TEST] Test_ByteLevel_OffsetValue_AllChannels
 [TEST] Test_ByteLevel_ExtCtrlVol1_AllChannels
 [TEST] Test_ByteLevel_ExtCtrlVol2_AllChannels
@@ -79,4 +160,52 @@
 [TEST] Test_CalcExtCtrlVolRegValue_BoundaryValues
 [TEST] Test_CalcGain3RegValue_BoundaryValues
 
-=== Results: 409 tests, 409 passed, 0 failed ===
+=== Results: 417 tests, 417 passed, 0 failed ===
+=== WaveDataFileIO Unit Tests ===
+
+[TEST] Test_T0_SaveWaveDataToFileImpl_NullLowWriter_SkipsLow
+[TEST] Test_T0_SaveWaveDataToFileImpl_NullHighWriter_SkipsHigh
+[TEST] Test_T0_SaveWaveDataToFileImpl_NullLowWriter_ZeroLowFrameSize
+[TEST] Test_T1_BinaryFormatUnchanged_AllPairs
+[TEST] Test_T2_AtomicPublish_Success
+[TEST] Test_T2_AtomicPublish_FlRenameFail_TmpRemains
+[TEST] Test_T2_AtomicPublish_FhRenameFail_RollbackLow
+[TEST] Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow
+[TEST] Test_T2_AtomicPublish_FhRenameFail_BackupLocked_FinalLowRemains
+[TEST] Test_T3_PseudoIntegration_TmpOnlyThenPublishedPair
+[TEST] Test_T3_ForcedStop_TmpRemains_ExcludedFromDownstream
+[TEST] Test_T3_RestartCleanup_DeletesTargetPatternOnly
+[TEST] Test_T3_RestartCleanup_NoTarget_NoDelete
+[TEST] Test_T3_RestartCleanup_DeletesRollbackBackupPatternOnly
+[TEST] Test_T4_RenameTempFileWithRetry_MaxRetries3_AttemptCountMatches
+[TEST] Test_T4_DownstreamPolling_ErrorRateReduced
+  [T4] direct fail rate=1.0000 atomic fail rate=0.0000
+[TEST] Test_T11_Performance_500Files_Measurement
+  [T11] direct avg=13.166ms p95=22.279ms max=152.344ms | atomic avg=12.297ms p95=20.266ms max=45.048ms | retryRate=0.00000
+  [T11] degradation=-6.60%
+
+=== Results: 9420 tests, 9420 passed, 0 failed ===
+=== SavePathValidation Unit Tests ===
+
+[TEST] Test_T9_ValidateSavePath_ExistingDirectory_Succeeds
+[TEST] Test_T10_ValidateSavePath_NotFound_ReturnsExpectedError
+[TEST] Test_T11_ValidateSavePath_NotWritable_ReturnsExpectedError
+[TEST] Test_T12_ValidateSavePath_PathTraversal_ReturnsExpectedError
+[TEST] Test_T13_WarningClears_WhenPathBecomesValid
+[TEST] Test_T14_ContainsControlCharacter_Boundary31And32
+[TEST] Test_T15_DefaultWriteProbeWithSeed_RetryOnFileExists
+[TEST] Test_T16_DefaultWriteProbeWithSeed_AllAttemptsCollide
+
+=== Results: 23 tests, 23 passed, 0 failed ===
+=== FileLogger Tests ===
+
+[TEST] Test_Init_CreatesLogsDirAndFile
+[TEST] Test_Append_BuffersMessages
+[TEST] Test_Flush_WritesBufferToFile
+[TEST] Test_Flush_ClearsBuffer
+[TEST] Test_MultipleFlushCycles
+[TEST] Test_Close_FlushesRemaining
+[TEST] Test_Init_CreatesNestedPath
+[TEST] Test_AppendWithoutInit_NoCrash
+
+=== Results: 20 tests, 20 passed, 0 failed ===

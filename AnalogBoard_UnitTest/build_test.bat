@@ -37,7 +37,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileLogger_test^) ===
