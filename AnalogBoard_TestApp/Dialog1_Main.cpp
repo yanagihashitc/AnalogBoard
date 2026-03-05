@@ -9,6 +9,7 @@
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
+#include "FpgaRegisterLogic.h"
 
 #define LOG_SWITCH		0
 
@@ -27,7 +28,7 @@ INT g_bStartSampling = 0;
 
 void LoopTestProcessThread_EP2_EP4(LPVOID lpParam);
 void LoopTestProcessThread_EP6_GetData(LPVOID lpParam);
-INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
+INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize);
 INT CreateWaveDataFile(CFile* fp_h, CFile* fp_l, CString TimeStamp, INT Index);
 
@@ -1469,13 +1470,13 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulLastCanSaveCnt > ulOneTimeCnt)
 						{
 							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;						
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
 						{
 							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							File_High.Close();
 							File_Low.Close();
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));				
@@ -1491,7 +1492,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
 							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							File_High.Close();
 							File_Low.Close();
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
@@ -1499,7 +1500,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						else
 						{
 							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							SaveWaveDataToFile(&File_High, &File_Low, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
+							SaveWaveDataToFile(&File_Low, &File_High, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt);
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
@@ -1684,7 +1685,7 @@ INT CreateWaveDataFile(CFile *fp_h, CFile* fp_l, CString TimeStamp, INT Index)
 	return iRet;
 }
 
-INT SaveWaveDataToFile(CFile* fp_h, CFile* fp_l, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
+INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
 {
 	ULONG FrameSize = FrameSize_L + FrameSize_H;
 	INT iRet = 0;
@@ -2563,19 +2564,13 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 
 void Dialog1_Main::Reg_Write(UINT Address, USHORT Data, PBYTE Ep2RegBuffer)
 {
-	*(Ep2RegBuffer + Address) = Data & 0xFF;
-	*(Ep2RegBuffer + Address + 1) = (Data >> 8) & 0xFF;
+	FpgaRegLogic::Reg_Write(Address, Data, Ep2RegBuffer);
 }
 
 
 USHORT Dialog1_Main::Reg_Read(UINT Address, PBYTE Ep4RegBuffer)
 {
-	USHORT Data = 0;
-
-	Data = *(Ep4RegBuffer + Address + 1);
-	Data = (Data << 8) | *(Ep4RegBuffer + Address);
-
-	return Data;
+	return FpgaRegLogic::Reg_Read(Address, Ep4RegBuffer);
 }
 
 
@@ -2597,9 +2592,7 @@ void Dialog1_Main::RegSet_SetGainValue(double GainValue[13][5], PBYTE Ep2DataBuf
 		}
 		else
 		{
-			dData = (GainValue[i][2]);
-			dData = (-0.5 - dData) / accuracy + 0.5;
-			usData = (USHORT)dData + 0x200;
+			usData = FpgaRegLogic::CalcGain3RegValue(GainValue[i][2]);
 
 			Reg_Write((UINT)(FPGAREG_GAIN_DAT_CH1 + (i * 2)), usData, Ep2DataBuffer);
 		}
@@ -2671,200 +2664,97 @@ void Dialog1_Main::RegSet_SetGainValue(double GainValue[13][5], PBYTE Ep2DataBuf
 
 void Dialog1_Main::RegSet_SetOffsetValue(INT CHID, FLOAT OffsetValaue, PBYTE Ep2DataBuffer)
 {
-	double accuracy = 80.0 / 255.0;
-	double dData = (double)OffsetValaue - 1414.0;
-
-	dData = dData / accuracy + 0.5;
-	USHORT usData = (USHORT)dData;
-
-	Reg_Write((UINT)(FPGAREG_OFFSET_DAT_CH1 + (CHID * 2)), 255 - usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SetOffsetValue(CHID, OffsetValaue, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SetExtCtrlVol_1(INT CHID, USHORT ExtCtrlVolValaue, PBYTE Ep2DataBuffer)
 {
-	double accuracy = 5000.0 / 65535.0;
-	double dData = (double)(ExtCtrlVolValaue);
-
-	dData = dData / accuracy + 0.5;
-	USHORT usData = (USHORT)dData;
-
-	Reg_Write((UINT)(FPGAREG_DAC_DAT_CH9 + (CHID * 2)), usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SetExtCtrlVol_1(CHID, ExtCtrlVolValaue, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SetExtCtrlVol_2(INT CHID, USHORT ExtCtrlVolValaue, PBYTE Ep2DataBuffer)
 {
-	double accuracy = 5000.0 / 65535.0;
-	double dData = (double)ExtCtrlVolValaue;
-
-	dData = dData / accuracy + 0.5;
-	USHORT usData = (USHORT)dData;
-
-	Reg_Write((UINT)(FPGAREG_DAC_DAT_CH3 + (CHID * 2)), usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SetExtCtrlVol_2(CHID, ExtCtrlVolValaue, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_UpdateGainValue(PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 1;
-	Reg_Write((UINT)FPGAREG_GAIN_TRG, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_UpdateGainValue(Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_UpdateOffsetValue(PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 1;
-	Reg_Write((UINT)FPGAREG_OFFSET_TRG, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_UpdateOffsetValue(Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_UpdateExtCtrlVol(PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 1;
-	Reg_Write((UINT)FPGAREG_DAC_TRG, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_UpdateExtCtrlVol(Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SelectFirFilterFC(UCHAR FirFilterFC, PBYTE Ep2DataBuffer)
 {
-	INT	iRegIndex = (UINT)FPGAREG_FILTER_SEL;
-	USHORT usData = 0;
-
-	if (FirFilterFC == 0)
-	{
-		usData = 0;//Filter 15MHz, Resampling 40Msps
-	}
-	else
-	{
-		usData = 1;//Filter 25MHz, Resampling 60Msps 
-	}
-
-	Reg_Write((UINT)FPGAREG_FILTER_SEL, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SelectFirFilterFC(FirFilterFC, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SelectDataCH(UCHAR CHSelect[13], PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 0;
-
-	for (int i = 0; i < 13; i++)
-	{
-		if (CHSelect[i] == 1)
-		{
-			usData |= 1 << i;
-		}
-	}
-
-	Reg_Write((UINT)FPGAREG_DAT_CH_SEL, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SelectDataCH(CHSelect, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SelectTRGCH(UCHAR TRGCH, PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 0;
-
-	usData |= 1 << (TRGCH - 1);
-
-	Reg_Write((UINT)FPGAREG_TRG_SEL, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SelectTRGCH(TRGCH, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SetTRGValue(USHORT TRGValue, PBYTE Ep2DataBuffer)
 {
-	double accuracy = 2000.0 / 16383.0;
-	double dData = (double)TRGValue;
-
-	dData = dData / accuracy + 0.5;
-	USHORT usData = (USHORT)dData;
-
-	Reg_Write((UINT)FPGAREG_TRG_THR, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SetTRGValue(TRGValue, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SetTRGRange(INT RangeSel, FLOAT TRGRangeValue, PBYTE Ep2DataBuffer)
 {
-	UINT iRegIndex = 0;
-	USHORT usData = (USHORT)(TRGRangeValue * 40);
-
-	if (RangeSel == 0)//N
-	{
-		iRegIndex = (UINT)FPGAREG_TRG_RANGE_N;
-	}
-	else//P
-	{
-		iRegIndex = (UINT)FPGAREG_TRG_RANGE_P;
-	}
-
-	Reg_Write(iRegIndex, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SetTRGRange(RangeSel, TRGRangeValue, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_SelectGetDataMeas(UCHAR ManualMode, PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 0;
-
-	if (ManualMode == 0)
-	{
-		usData = 0;//Auto Mode
-	}
-	else
-	{
-		usData = 1;//Manual Mode
-	}
-
-	Reg_Write((UINT)FPGAREG_MEAS_MODE, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_SelectGetDataMeas(ManualMode, Ep2DataBuffer);
 }
 
 
 void Dialog1_Main::RegSet_GetWaveDataStart(BOOL StartFlag, PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 1;
-
-	if (StartFlag)
-	{
-		usData = 1;//Start
-	}
-	else
-	{
-		usData = 0;//Stop
-	}
-
-	Reg_Write((UINT)FPGAREG_MANUAL_MEAS_ON, usData, Ep2DataBuffer);
+	FpgaRegLogic::RegSet_GetWaveDataStart(StartFlag, Ep2DataBuffer);
 }
 
 
 ULONG Dialog1_Main::RegGet_DDRWaveCnt(PBYTE Ep4DataBuffer)
 {
-	USHORT usData = 0;
-	ULONG DDRSize = 0;
-
-	usData = Reg_Read((UINT)FPGAREG_WAVE_WR_CNT_H, Ep4DataBuffer);
-	DDRSize = (ULONG)usData;
-	usData = Reg_Read((UINT)FPGAREG_WAVE_WR_CNT_L, Ep4DataBuffer);
-	DDRSize = (ULONG)((DDRSize << 16) | usData);
-
-	return DDRSize;
+	return FpgaRegLogic::RegGet_DDRWaveCnt(Ep4DataBuffer);
 }
 
 
 INT Dialog1_Main::RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer)
 {
-	USHORT usData = 0;
-
-	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
-
-	return (usData & 0x4) == 0x4 ? 1 : 0;
+	return FpgaRegLogic::RegGet_DDRWriteEnd(Ep4DataBuffer);
 }
 
 
 bool Dialog1_Main::RegGet_SampleStartSt(PBYTE Ep4DataBuffer)
 {
-	USHORT usData = 0;
-
-	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
-
-	return (usData & 0x10) == 0x10 ? TRUE : FALSE;
+	return FpgaRegLogic::RegGet_SampleStartSt(Ep4DataBuffer);
 }
 
 

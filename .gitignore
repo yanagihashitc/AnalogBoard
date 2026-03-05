@@ -23,6 +23,9 @@ bld/
 [Ll]og/
 [Ll]ogs/
 
+# Executables
+*.exe
+
 # Visual Studio generated files
 *.pch
 *.pchast
@@ -49,3 +52,19 @@ bld/
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
+
+# Other files and directories
+.claude/
+.cursor/
+.codex/
+AGENTS.md
+docs/
+CLAUDE.md
+FPGA_FW/
+ref/
+
+# Coverage artifacts
+coverage/
+
+# log file
+*.log
