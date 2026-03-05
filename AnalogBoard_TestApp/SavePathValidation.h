@@ -12,6 +12,15 @@ constexpr int kSavePathInvalidOutputPath = -20001;
 constexpr int kSavePathOutputPathNotFound = -20002;
 constexpr int kSavePathOutputPathNotWritable = -20003;
 
+enum class UiValidationTrigger
+{
+    kStartup,
+    kFolderDialogConfirmed,
+    kFolderDialogCancel,
+    kSetParameters,
+    kTextChanged
+};
+
 struct Result
 {
     int code = kSavePathValidationOk;
@@ -350,6 +359,38 @@ inline std::wstring BuildWarningMessage(const Result& result)
         return L"";
     }
     return result.message;
+}
+
+inline bool ShouldValidateForUiTrigger(const UiValidationTrigger trigger)
+{
+    switch (trigger)
+    {
+    case UiValidationTrigger::kTextChanged:
+        return false;
+    case UiValidationTrigger::kStartup:
+    case UiValidationTrigger::kFolderDialogConfirmed:
+    case UiValidationTrigger::kFolderDialogCancel:
+    case UiValidationTrigger::kSetParameters:
+        return true;
+    default:
+        return true;
+    }
+}
+
+inline bool ShouldShowDialogForUiTrigger(const UiValidationTrigger trigger)
+{
+    switch (trigger)
+    {
+    case UiValidationTrigger::kStartup:
+    case UiValidationTrigger::kFolderDialogCancel:
+    case UiValidationTrigger::kSetParameters:
+        return true;
+    case UiValidationTrigger::kFolderDialogConfirmed:
+    case UiValidationTrigger::kTextChanged:
+        return false;
+    default:
+        return false;
+    }
 }
 
 } // namespace SavePathValidation

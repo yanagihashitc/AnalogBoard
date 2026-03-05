@@ -826,7 +826,11 @@ BOOL Dialog1_Main::OnInitDialog()
 		UpdateTotalGain(i);
 	}
 
-	ValidateSavePathUI(FALSE);
+	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kStartup))
+	{
+		ValidateSavePathUI(
+			SavePathValidation::ShouldShowDialogForUiTrigger(SavePathValidation::UiValidationTrigger::kStartup));
+	}
 
 	/* Create USB buffer */
 	pEp2DataBuf = (PBYTE)malloc(EP2_DATA_BUFF_SIZE);
@@ -2633,7 +2637,8 @@ INT Dialog1_Main::UpdateConfigStruct(FPGAConfigI_REGMAP* packetConfig)
 	m_pMainDlg->PrintLog(_T("packetConfig->SavePath = ") + packetConfig->SavePath);
 #endif
 	CString normalizedSavePath;
-	if (!ValidateSavePathUI(TRUE, &normalizedSavePath))
+	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kSetParameters)
+		&& !ValidateSavePathUI(TRUE, &normalizedSavePath))
 	{
 		return -1;
 	}
@@ -3173,6 +3178,7 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 {
 	TCHAR           szFolderPath[MAX_PATH] = { 0 };
 	CString         strFolderPath = TEXT("");
+	bool            folderDialogCanceled = false;
 
 	UpdateData(TRUE);
 	BROWSEINFO      sInfo;
@@ -3190,13 +3196,24 @@ void Dialog1_Main::OnBnClickedButtonSavepathSelect()
 			m_OutFile = szFolderPath;
 		}
 	}
+	else
+	{
+		folderDialogCanceled = true;
+	}
 	if (lpidlBrowse != NULL)
 	{
 		::CoTaskMemFree(lpidlBrowse);
 	}
 
 	UpdateData(FALSE);
-	ValidateSavePathUI(FALSE);
+	const SavePathValidation::UiValidationTrigger trigger =
+		folderDialogCanceled
+		? SavePathValidation::UiValidationTrigger::kFolderDialogCancel
+		: SavePathValidation::UiValidationTrigger::kFolderDialogConfirmed;
+	if (SavePathValidation::ShouldValidateForUiTrigger(trigger))
+	{
+		ValidateSavePathUI(SavePathValidation::ShouldShowDialogForUiTrigger(trigger));
+	}
 }
 
 
@@ -3813,7 +3830,11 @@ void Dialog1_Main::OnEnChangeEditCh8GainMultip3()
 void Dialog1_Main::OnEnChangeEditSavepath()
 {
 	// Heavy path validation (existence/writability probe) is deferred
-	// to confirmation actions such as parameter apply/start.
+	// to confirmation actions such as startup, folder selection, and parameter apply.
+	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kTextChanged))
+	{
+		ValidateSavePathUI(FALSE);
+	}
 }
 
 void Dialog1_Main::CheckGain3andDisply(FPGAConfigI_REGMAP* Config, INT index)

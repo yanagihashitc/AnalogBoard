@@ -206,6 +206,84 @@ void Test_T16_DefaultWriteProbeWithSeed_AllAttemptsCollide()
     TEST_ASSERT(lastError == ERROR_ALREADY_EXISTS, "T16 last error should be already exists");
 }
 
+void Test_T17_ShouldValidateForUiTrigger_Startup()
+{
+    // Given: Startup trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kStartup;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Startup must run validation.
+    TEST_ASSERT(shouldValidate, "T17 startup trigger must run validation");
+}
+
+void Test_T18_ShouldValidateForUiTrigger_FolderDialogCancel()
+{
+    // Given: Folder dialog cancel trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogCancel;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Cancel must also run validation.
+    TEST_ASSERT(shouldValidate, "T18 cancel trigger must run validation");
+}
+
+void Test_T19_ShouldNotValidateForUiTrigger_TextChanged()
+{
+    // Given: Edit text changed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kTextChanged;
+
+    // When: UI trigger policy is evaluated.
+    const bool shouldValidate = SavePathValidation::ShouldValidateForUiTrigger(trigger);
+
+    // Then: Heavy validation remains deferred for text change.
+    TEST_ASSERT(!shouldValidate, "T19 text-changed trigger must not run validation");
+}
+
+void Test_T20_ShouldShowDialogForUiTrigger_Startup()
+{
+    // Given: Startup trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kStartup;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Startup must show warning dialog on invalid path.
+    TEST_ASSERT(shouldShowDialog, "T20 startup trigger must show dialog");
+}
+
+void Test_T21_ShouldShowDialogForUiTrigger_FolderDialogCancel()
+{
+    // Given: Folder dialog cancel trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogCancel;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Cancel must show warning dialog on invalid path.
+    TEST_ASSERT(shouldShowDialog, "T21 cancel trigger must show dialog");
+}
+
+void Test_T22_ShouldNotShowDialogForUiTrigger_FolderDialogConfirmed()
+{
+    // Given: Folder dialog confirmed trigger.
+    const SavePathValidation::UiValidationTrigger trigger =
+        SavePathValidation::UiValidationTrigger::kFolderDialogConfirmed;
+
+    // When: Dialog policy is evaluated.
+    const bool shouldShowDialog = SavePathValidation::ShouldShowDialogForUiTrigger(trigger);
+
+    // Then: Confirm path check stays non-modal.
+    TEST_ASSERT(!shouldShowDialog, "T22 confirmed trigger must not show dialog");
+}
+
 int main()
 {
     std::printf("=== SavePathValidation Unit Tests ===\n\n");
@@ -218,6 +296,12 @@ int main()
     RUN_TEST(Test_T14_ContainsControlCharacter_Boundary31And32);
     RUN_TEST(Test_T15_DefaultWriteProbeWithSeed_RetryOnFileExists);
     RUN_TEST(Test_T16_DefaultWriteProbeWithSeed_AllAttemptsCollide);
+    RUN_TEST(Test_T17_ShouldValidateForUiTrigger_Startup);
+    RUN_TEST(Test_T18_ShouldValidateForUiTrigger_FolderDialogCancel);
+    RUN_TEST(Test_T19_ShouldNotValidateForUiTrigger_TextChanged);
+    RUN_TEST(Test_T20_ShouldShowDialogForUiTrigger_Startup);
+    RUN_TEST(Test_T21_ShouldShowDialogForUiTrigger_FolderDialogCancel);
+    RUN_TEST(Test_T22_ShouldNotShowDialogForUiTrigger_FolderDialogConfirmed);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;
