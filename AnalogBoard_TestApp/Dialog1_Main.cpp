@@ -1157,8 +1157,8 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	unsigned long long phase0FileWriteTotalMs = 0;
 	ULONG phase0LastDdrWriteCnt = 0;
 	ULONG phase0LastDdrReadCnt = 0;
-	INT phase0LastDdrWriteEnd = -1;
-	INT phase0LastDdrReadEnd = -1;
+	INT phase0LastDdrWriteEnd = 0;
+	INT phase0LastDdrReadEnd = 0;
 	bool phase0HasDdrMetrics = false;
 
 	auto IsWaveDataFileOpen = [&]() -> BOOL {
@@ -1276,8 +1276,9 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	auto CapturePhase0DdrMetrics = [&](PBYTE ep4DataBuffer, bool forceLog) {
 		const ULONG currentDdrWriteCnt = CurObject->RegGet_DDRWaveCnt(ep4DataBuffer);
 		const ULONG currentDdrReadCnt = CurObject->RegGet_DDRReadCnt(ep4DataBuffer);
-		const INT currentDdrWriteEnd = CurObject->RegGet_DDRWriteEnd(ep4DataBuffer);
-		const INT currentDdrReadEnd = CurObject->RegGet_DDRReadEnd(ep4DataBuffer);
+		const USHORT currentFpgaStatus = CurObject->Reg_Read((UINT)FPGAREG_FPGA_ST, ep4DataBuffer);
+		const INT currentDdrWriteEnd = ((currentFpgaStatus & 0x4) != 0) ? 1 : 0;
+		const INT currentDdrReadEnd = ((currentFpgaStatus & 0x8) != 0) ? 1 : 0;
 		const bool shouldLog = forceLog ||
 			(!phase0HasDdrMetrics) ||
 			(currentDdrWriteCnt != phase0LastDdrWriteCnt) ||
