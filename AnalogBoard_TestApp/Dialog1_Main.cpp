@@ -2754,7 +2754,7 @@ INT Dialog1_Main::RegGet_DDRWriteEnd(PBYTE Ep4DataBuffer)
 
 bool Dialog1_Main::RegGet_SampleStartSt(PBYTE Ep4DataBuffer)
 {
-	return FpgaRegLogic::RegGet_SampleStartSt(Ep4DataBuffer) != 0;
+	return FpgaRegLogic::RegGet_SampleStartSt(Ep4DataBuffer);
 }
 
 

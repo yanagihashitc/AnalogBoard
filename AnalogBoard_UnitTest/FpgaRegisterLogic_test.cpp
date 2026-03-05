@@ -393,6 +393,20 @@ void Test_BuildTrgChBitmask_Ch7()
     TEST_ASSERT_EQ(0x0040, result, "TrgCh 7 -> 0x0040");
 }
 
+void Test_BuildTrgChBitmask_InvalidZero()
+{
+    // TRGCH=0 は無効入力 -> 0を返す（ガード条件）
+    USHORT result = FpgaRegLogic::BuildTrgChBitmask(0);
+    TEST_ASSERT_EQ(0x0000, result, "TrgCh 0 (invalid) -> 0x0000");
+}
+
+void Test_BuildTrgChBitmask_InvalidOver13()
+{
+    // TRGCH=14 は無効入力 -> 0を返す（ガード条件）
+    USHORT result = FpgaRegLogic::BuildTrgChBitmask(14);
+    TEST_ASSERT_EQ(0x0000, result, "TrgCh 14 (invalid) -> 0x0000");
+}
+
 /*******************************************************************************
 * Test: RegSet_SelectTRGCH (buffer integration)
 *******************************************************************************/
@@ -1514,6 +1528,8 @@ int main()
     RUN_TEST(Test_BuildTrgChBitmask_Ch1);
     RUN_TEST(Test_BuildTrgChBitmask_Ch13);
     RUN_TEST(Test_BuildTrgChBitmask_Ch7);
+    RUN_TEST(Test_BuildTrgChBitmask_InvalidZero);
+    RUN_TEST(Test_BuildTrgChBitmask_InvalidOver13);
 
     // RegSet_SelectTRGCH
     RUN_TEST(Test_RegSet_SelectTRGCH);

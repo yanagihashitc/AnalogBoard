@@ -5,10 +5,11 @@
 * File name		:	FpgaRegisterLogic.h
 * File summary	:	FPGA register pure logic functions (no MFC dependency)
 *******************************************************************************/
-#ifndef _FPGA_REGISTER_LOGIC_H_
-#define _FPGA_REGISTER_LOGIC_H_
+#ifndef FPGA_REGISTER_LOGIC_H
+#define FPGA_REGISTER_LOGIC_H
 
 #include <cmath>
+#include "FpgaRegisterAddress.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -29,29 +30,6 @@ typedef unsigned char  UCHAR;
 #define FALSE 0
 #endif
 #endif
-
-/**********************************************************************************
-* FPGA Register Address Definitions
-**********************************************************************************/
-#define FPGAREG_FPGA_ST			0x000004
-#define FPGAREG_DAT_CH_SEL		0x000006
-#define FPGAREG_TRG_SEL			0x000008
-#define FPGAREG_TRG_THR			0x00000A
-#define FPGAREG_TRG_RANGE_N		0x00000C
-#define FPGAREG_TRG_RANGE_P		0x00000E
-#define FPGAREG_MEAS_MODE		0x000010
-#define FPGAREG_MANUAL_MEAS_ON	0x000012
-#define FPGAREG_FILTER_SEL		0x000014
-#define FPGAREG_WAVE_WR_CNT_L	0x000018
-#define FPGAREG_WAVE_WR_CNT_H	0x00001A
-#define FPGAREG_GAIN_DAT_CH1	0x000020
-#define FPGAREG_GAIN_SW_CH1_4	0x000040
-#define FPGAREG_GAIN_TRG		0x000050
-#define FPGAREG_OFFSET_DAT_CH1	0x000060
-#define FPGAREG_OFFSET_TRG		0x000080
-#define FPGAREG_DAC_DAT_CH3		0x000090
-#define FPGAREG_DAC_DAT_CH9		0x00009C
-#define FPGAREG_DAC_TRG			0x0000B0
 
 /**********************************************************************************
 * Pure Logic Functions
@@ -152,7 +130,7 @@ inline USHORT BuildChSelectBitmask(const UCHAR CHSelect[13])
 	return usData;
 }
 
-inline void RegSet_SelectDataCH(UCHAR CHSelect[13], PBYTE Ep2DataBuffer)
+inline void RegSet_SelectDataCH(const UCHAR CHSelect[13], PBYTE Ep2DataBuffer)
 {
 	USHORT usData = BuildChSelectBitmask(CHSelect);
 	Reg_Write((UINT)FPGAREG_DAT_CH_SEL, usData, Ep2DataBuffer);
@@ -160,6 +138,7 @@ inline void RegSet_SelectDataCH(UCHAR CHSelect[13], PBYTE Ep2DataBuffer)
 
 inline USHORT BuildTrgChBitmask(UCHAR TRGCH)
 {
+	if (TRGCH < 1 || TRGCH > 13) return 0;
 	USHORT usData = 0;
 	usData |= 1 << (TRGCH - 1);
 	return usData;
@@ -223,15 +202,7 @@ inline void RegSet_SelectGetDataMeas(UCHAR ManualMode, PBYTE Ep2DataBuffer)
 
 inline void RegSet_GetWaveDataStart(INT StartFlag, PBYTE Ep2DataBuffer)
 {
-	USHORT usData = 1;
-	if (StartFlag)
-	{
-		usData = 1; // Start
-	}
-	else
-	{
-		usData = 0; // Stop
-	}
+	USHORT usData = StartFlag ? 1 : 0;
 	Reg_Write((UINT)FPGAREG_MANUAL_MEAS_ON, usData, Ep2DataBuffer);
 }
 
@@ -255,19 +226,25 @@ inline INT RegGet_DDRWriteEnd(const BYTE* Ep4DataBuffer)
 	return (usData & 0x4) == 0x4 ? 1 : 0;
 }
 
-inline int RegGet_SampleStartSt(const BYTE* Ep4DataBuffer)
+inline bool RegGet_SampleStartSt(const BYTE* Ep4DataBuffer)
 {
 	USHORT usData = 0;
 	usData = Reg_Read((UINT)FPGAREG_FPGA_ST, Ep4DataBuffer);
-	return (usData & 0x10) == 0x10 ? TRUE : FALSE;
+	return (usData & 0x10) == 0x10;
 }
 
 inline USHORT CalcGain3RegValue(double Gain3Value)
 {
+	// Defensive clamp to avoid undefined conversion when caller passes out-of-range value.
+	if (Gain3Value > -0.5) Gain3Value = -0.5;
+	if (Gain3Value < -1.0) Gain3Value = -1.0;
+
 	double accuracy = 0.5 / 511.0;
 	double dData = Gain3Value;
 	dData = (-0.5 - dData) / accuracy + 0.5;
-	USHORT usData = (USHORT)dData + 0x200;
+	if (dData < 0.0) dData = 0.0;
+	if (dData > 511.0) dData = 511.0;
+	USHORT usData = static_cast<USHORT>(dData) + 0x200;
 	return usData;
 }
 
@@ -395,6 +372,7 @@ inline void BuildFullEp2Buffer(
 	}
 
 	// Gain trigger
+	// Preserve legacy sequence in OnBnClickedButtonParset: trigger is asserted here and again at the end.
 	Reg_Write((UINT)FPGAREG_GAIN_TRG, 0x1, ep2Buf);
 
 	// Offset (ch0~12)
@@ -402,6 +380,7 @@ inline void BuildFullEp2Buffer(
 	{
 		RegSet_SetOffsetValue(i, config.OffsetValue[i], ep2Buf);
 	}
+	// Preserve legacy sequence in OnBnClickedButtonParset: trigger is asserted here and again at the end.
 	Reg_Write((UINT)FPGAREG_OFFSET_TRG, 0x1, ep2Buf);
 
 	// ExtCtrlVol1 (5 channels)
@@ -409,6 +388,7 @@ inline void BuildFullEp2Buffer(
 	{
 		RegSet_SetExtCtrlVol_1(i, config.ExtCtrlVol1[i], ep2Buf);
 	}
+	// Preserve legacy sequence in OnBnClickedButtonParset: trigger is asserted here and again at the end.
 	Reg_Write((UINT)FPGAREG_DAC_TRG, 0x1, ep2Buf);
 
 	// ExtCtrlVol2 (6 channels)
@@ -421,9 +401,7 @@ inline void BuildFullEp2Buffer(
 	RegSet_SelectFirFilterFC(config.FirFilterFC, ep2Buf);
 
 	// Data CH select
-	UCHAR chSelect[13];
-	for (int i = 0; i < 13; i++) chSelect[i] = config.CHSelect[i];
-	RegSet_SelectDataCH(chSelect, ep2Buf);
+	RegSet_SelectDataCH(config.CHSelect, ep2Buf);
 
 	// Trigger CH
 	RegSet_SelectTRGCH(config.TriggerCh, ep2Buf);
@@ -446,4 +424,4 @@ inline void BuildFullEp2Buffer(
 
 } // namespace FpgaRegLogic
 
-#endif // !_FPGA_REGISTER_LOGIC_H_
+#endif // FPGA_REGISTER_LOGIC_H

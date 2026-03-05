@@ -1,9 +1,18 @@
 @echo off
+setlocal
+
 for %%I in ("%~dp0.") do set "SCRIPT_DIR=%%~fI\"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" > nul 2>&1
+set "RUN_WITH_VSDEVCMD=%ROOT_DIR%\scripts\run_with_vsdevcmd.bat"
+
+if not exist "%RUN_WITH_VSDEVCMD%" (
+    echo.
+    echo === Build FAILED: scripts\run_with_vsdevcmd.bat not found ===
+    exit /b 1
+)
+
 cd /d "%SCRIPT_DIR%"
-cl /EHsc /W4 /Zi /std:c++17 /I".." FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
 if %ERRORLEVEL% EQU 0 (
     if not exist "%SCRIPT_DIR%x64\Debug" mkdir "%SCRIPT_DIR%x64\Debug"
     if not exist "%ROOT_DIR%\x64\Debug" mkdir "%ROOT_DIR%\x64\Debug"
@@ -15,7 +24,14 @@ if %ERRORLEVEL% EQU 0 (
     echo === Build succeeded. Running tests... ===
     echo.
     "%SCRIPT_DIR%FpgaRegisterLogic_test.exe"
+    if errorlevel 1 (
+        echo.
+        echo === Tests FAILED ===
+        exit /b 1
+    )
+    exit /b 0
 ) else (
     echo.
     echo === Build FAILED ===
+    exit /b 1
 )
