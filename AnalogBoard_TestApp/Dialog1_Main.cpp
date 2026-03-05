@@ -2636,13 +2636,18 @@ INT Dialog1_Main::UpdateConfigStruct(FPGAConfigI_REGMAP* packetConfig)
 	//strTmp.Format(_T("packetConfig->SavePath = %s"), packetConfig->SavePath);
 	m_pMainDlg->PrintLog(_T("packetConfig->SavePath = ") + packetConfig->SavePath);
 #endif
+	const bool shouldValidateSavePathForSetParameters =
+		SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kSetParameters);
 	CString normalizedSavePath;
-	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kSetParameters)
+	if (shouldValidateSavePathForSetParameters
 		&& !ValidateSavePathUI(TRUE, &normalizedSavePath))
 	{
 		return -1;
 	}
-	packetConfig->SavePath = normalizedSavePath;
+	packetConfig->SavePath = SavePathValidation::ResolveSavePathForSetParameters(
+		strValue.GetString(),
+		normalizedSavePath.GetString(),
+		shouldValidateSavePathForSetParameters).c_str();
 
 	if (iErrFlag == E_FALSE)
 	{
@@ -3834,6 +3839,8 @@ void Dialog1_Main::OnEnChangeEditSavepath()
 {
 	// Heavy path validation (existence/writability probe) is deferred
 	// to confirmation actions such as startup, folder selection, and parameter apply.
+	// Keep this branch so policy can enable text-changed validation later
+	// without changing message-map wiring.
 	if (SavePathValidation::ShouldValidateForUiTrigger(SavePathValidation::UiValidationTrigger::kTextChanged))
 	{
 		ValidateSavePathUI(FALSE);

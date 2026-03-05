@@ -1,0 +1,7 @@
+fix: enhance SavePath resolution logic during parameter updates
+
+- Add `ResolveSavePathForSetParameters` to safely handle SavePath assignment
+- Ensure fallback to raw UI path if validation is skipped or normalization fails
+- Update `UpdateConfigStruct` in `Dialog1_Main.cpp` to use the new resolution logic
+- Add unit tests (T29-T32) to verify SavePath resolution behavior
+- Add comments clarifying `OnEnChangeEditSavepath` behavior

@@ -361,11 +361,27 @@ inline std::wstring BuildWarningMessage(const Result& result)
     return result.message;
 }
 
+inline std::wstring ResolveSavePathForSetParameters(
+    const std::wstring& rawUiPath,
+    const std::wstring& normalizedPath,
+    const bool validatedForSetParameters)
+{
+    // Defensive fallback: preserve the UI value when validation is skipped
+    // or when normalized output is unexpectedly empty.
+    if (!validatedForSetParameters || normalizedPath.empty())
+    {
+        return rawUiPath;
+    }
+    return normalizedPath;
+}
+
 inline bool ShouldValidateForUiTrigger(const UiValidationTrigger trigger)
 {
     switch (trigger)
     {
     case UiValidationTrigger::kTextChanged:
+        // Intentionally disabled to avoid per-keystroke filesystem probing.
+        // Keep this trigger for future policy toggles without UI wiring changes.
         return false;
     case UiValidationTrigger::kStartup:
     case UiValidationTrigger::kFolderDialogConfirmed:

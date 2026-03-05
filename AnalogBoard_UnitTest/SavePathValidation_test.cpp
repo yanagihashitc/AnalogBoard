@@ -362,6 +362,70 @@ void Test_T28_ShouldNotValidateStartupAfterFailedConfigImport()
     TEST_ASSERT(!shouldValidate, "T28 failed import must skip startup validation");
 }
 
+void Test_T29_ResolveSavePathForSetParameters_UseNormalizedWhenValidated()
+{
+    // Given: Validation is enabled and normalized path is available.
+    const std::wstring rawUiPath = L"C:\\raw_path";
+    const std::wstring normalizedPath = L"C:\\normalized_path";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        true);
+
+    // Then: Normalized path must be selected.
+    TEST_ASSERT(resolved == normalizedPath, "T29 should use normalized path when validated");
+}
+
+void Test_T30_ResolveSavePathForSetParameters_FallbackToUiPathWhenValidationSkipped()
+{
+    // Given: Validation is skipped.
+    const std::wstring rawUiPath = L"C:\\raw_path";
+    const std::wstring normalizedPath = L"";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        false);
+
+    // Then: Raw UI path must be preserved.
+    TEST_ASSERT(resolved == rawUiPath, "T30 should fallback to UI path when validation is skipped");
+}
+
+void Test_T31_ResolveSavePathForSetParameters_FallbackToUiPathWhenNormalizedEmpty()
+{
+    // Given: Validation path is selected but normalized output is unexpectedly empty.
+    const std::wstring rawUiPath = L"C:\\raw_path";
+    const std::wstring normalizedPath = L"";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        true);
+
+    // Then: Raw UI path must be used as a defensive fallback.
+    TEST_ASSERT(resolved == rawUiPath, "T31 should fallback to UI path when normalized path is empty");
+}
+
+void Test_T32_ResolveSavePathForSetParameters_KeepEmptyUiPathWhenValidationSkipped()
+{
+    // Given: Validation is skipped and UI path is empty.
+    const std::wstring rawUiPath = L"";
+    const std::wstring normalizedPath = L"C:\\normalized_path";
+
+    // When: SavePath assignment policy for SetParameters is evaluated.
+    const std::wstring resolved = SavePathValidation::ResolveSavePathForSetParameters(
+        rawUiPath,
+        normalizedPath,
+        false);
+
+    // Then: Empty UI path should be preserved unchanged.
+    TEST_ASSERT(resolved == rawUiPath, "T32 should keep UI path even when it is empty");
+}
+
 int main()
 {
     std::printf("=== SavePathValidation Unit Tests ===\n\n");
@@ -386,6 +450,10 @@ int main()
     RUN_TEST(Test_T26_ShouldNotShowDialogForUiTrigger_TextChanged);
     RUN_TEST(Test_T27_ShouldValidateStartupAfterSuccessfulConfigImport);
     RUN_TEST(Test_T28_ShouldNotValidateStartupAfterFailedConfigImport);
+    RUN_TEST(Test_T29_ResolveSavePathForSetParameters_UseNormalizedWhenValidated);
+    RUN_TEST(Test_T30_ResolveSavePathForSetParameters_FallbackToUiPathWhenValidationSkipped);
+    RUN_TEST(Test_T31_ResolveSavePathForSetParameters_FallbackToUiPathWhenNormalizedEmpty);
+    RUN_TEST(Test_T32_ResolveSavePathForSetParameters_KeepEmptyUiPathWhenValidationSkipped);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;
