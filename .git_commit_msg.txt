@@ -1,7 +1,0 @@
-refactor: replace FileLogger implementation with WinAPI and add thread safety
-
-- Replace std::ofstream with Windows API (CreateFile, WriteFile) for robust file handling
-- Add std::mutex to FileLogger to ensure thread-safe logging
-- Change FileLogger instance to a static global variable in AnalogBoard_TestAppDlg
-- Add immediate log flushing when LoopTestProcessThread_EP6_GetData encounters an error
-- Update build script to define UNICODE for FileLogger_test compilation
