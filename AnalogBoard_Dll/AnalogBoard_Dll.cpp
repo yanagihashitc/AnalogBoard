@@ -42,6 +42,15 @@ static CCyUSBEndPoint* m_pInEndpt6;
 
 /* EP2/4 Mutec */
 HANDLE m_hEP2EP4Mutex;
+// Diagnostic counters for EP6 debug logging. They are reset on connect/disconnect.
+static LONG g_ep6CallCount = 0;
+static LONG g_ep6TimeoutCount = 0;
+
+static void ResetEp6DiagnosticCounters()
+{
+	::InterlockedExchange(&g_ep6CallCount, 0);
+	::InterlockedExchange(&g_ep6TimeoutCount, 0);
+}
 
 /*******************************************************************************
 * function define
@@ -236,6 +245,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 	}
 
 	isConnected = TRUE;
+	ResetEp6DiagnosticCounters();
 
 	if (m_pUSBDevice->BcdUSB == 0x200)
 	{
@@ -275,6 +285,7 @@ void USB_Lib_Info::USBBoard_Disconnect(void)
 		m_pInEndpt4 = NULL;
 		m_pInEndpt6 = NULL;
 		isConnected = FALSE;
+		ResetEp6DiagnosticCounters();
 	}
 }
 
@@ -415,6 +426,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	UINT	ulRecvDataSize = 0;//EP6 receive size
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
+	const ULONGLONG callStartMs = ::GetTickCount64();
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt6)
@@ -465,6 +477,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 		else
 		{
 			iRet = USB_ERR_TRANSFER_TIMEOUT;
+			::InterlockedIncrement(&g_ep6TimeoutCount);
 			break;
 		}
 
@@ -475,6 +488,21 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	pOneTimeBuffer = NULL;
 
 	ReleaseMutex(m_hEP2EP4Mutex);
+
+	const LONG currentCallCount = ::InterlockedIncrement(&g_ep6CallCount);
+	const LONG currentTimeoutCount = ::InterlockedCompareExchange(&g_ep6TimeoutCount, 0, 0);
+	const ULONGLONG elapsedMs = ::GetTickCount64() - callStartMs;
+	char perfLog[256] = { 0 };
+	sprintf_s(
+		perfLog,
+		"[PR01][DLL][EP6] call=%ld requestBytes=%u recvBytes=%u elapsedMs=%llu result=%d timeoutCount=%ld\n",
+		currentCallCount,
+		DataSizeCount,
+		ulRecvDataSize,
+		elapsedMs,
+		iRet,
+		currentTimeoutCount);
+	::OutputDebugStringA(perfLog);
 
 	return iRet;
 }
