@@ -42,6 +42,7 @@ static CCyUSBEndPoint* m_pInEndpt6;
 
 /* EP2/4 Mutec */
 HANDLE m_hEP2EP4Mutex;
+// Diagnostic counters for EP6 debug logging. They are process-lifetime values.
 static LONG g_ep6CallCount = 0;
 static LONG g_ep6TimeoutCount = 0;
 

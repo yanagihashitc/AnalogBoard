@@ -11,6 +11,8 @@
 #include <set>
 #include <chrono>
 #include <algorithm>
+#include <atomic>
+#include <thread>
 
 #include "../AnalogBoard_TestApp/WaveDataFileIO.h"
 
@@ -620,6 +622,103 @@ void Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow()
     }
 }
 
+void Test_T2_AtomicPublish_FhRenameFail_BackupLocked_FinalLowRemains()
+{
+    // Given: Existing low file is backed up, and backup is locked before rollback restore.
+    const fs::path root = fs::temp_directory_path() / L"wave_data_io_tests" / L"tmp_wave_data_io_t2_fh_fail_backup_locked";
+    EnsureCleanDir(root);
+
+    const fs::path tmpFl = root / L"backup_locked_fl_1.bin.tmp";
+    const fs::path tmpFh = root / L"backup_locked_fh_1.bin.tmp";
+    const fs::path finalFl = root / L"backup_locked_fl_1.bin";
+    const fs::path finalFh = root / L"backup_locked_fh_1.bin";
+
+    const std::vector<unsigned char> existingLow = { 0xDE, 0xAD, 0xBE, 0xEF };
+    const std::vector<unsigned char> newLow = { 0x10, 0x20, 0x30 };
+
+    TEST_ASSERT(WriteBinaryFile(tmpFl, newLow), "Write low tmp");
+    TEST_ASSERT(WriteBinaryFile(tmpFh, { 0x40, 0x50, 0x60 }), "Write high tmp");
+    TEST_ASSERT(WriteBinaryFile(finalFl, existingLow), "Write existing low final");
+    TEST_ASSERT(WriteBinaryFile(finalFh, { 0x99 }), "Write existing high final");
+
+    HANDLE highLock = ::CreateFileW(
+        finalFh.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    TEST_ASSERT(highLock != INVALID_HANDLE_VALUE, "Lock final high file");
+
+    std::atomic<bool> stopWatcher(false);
+    std::atomic<bool> backupLocked(false);
+    HANDLE backupLock = INVALID_HANDLE_VALUE;
+    const std::wstring backupPrefix = finalFl.filename().wstring() + L".rollback.";
+
+    std::thread watcher([&]()
+    {
+        while (!stopWatcher.load())
+        {
+            std::error_code ec;
+            for (const auto& entry : fs::directory_iterator(root, ec))
+            {
+                if (ec || !entry.is_regular_file())
+                {
+                    continue;
+                }
+
+                const std::wstring fileName = entry.path().filename().wstring();
+                if (fileName.rfind(backupPrefix, 0) != 0)
+                {
+                    continue;
+                }
+
+                HANDLE candidate = ::CreateFileW(
+                    entry.path().c_str(),
+                    GENERIC_READ | GENERIC_WRITE,
+                    0,
+                    nullptr,
+                    OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL,
+                    nullptr);
+                if (candidate != INVALID_HANDLE_VALUE)
+                {
+                    backupLock = candidate;
+                    backupLocked.store(true);
+                    return;
+                }
+            }
+
+            ::Sleep(1);
+        }
+    });
+
+    // When: High publish fails after low publish.
+    const WaveDataFileIO::PublishPairResult result = WaveDataFileIO::PublishWavePairAtomic(
+        tmpFl.c_str(), finalFl.c_str(), tmpFh.c_str(), finalFh.c_str(), 10, 50);
+
+    stopWatcher.store(true);
+    if (watcher.joinable())
+    {
+        watcher.join();
+    }
+
+    // Then: Rollback fails but final low file should remain published.
+    TEST_ASSERT(!result.success, "Publish should fail when high rename fails");
+    TEST_ASSERT(result.low.success, "Low rename should succeed before high failure");
+    TEST_ASSERT(!result.high.success, "High rename should fail");
+    TEST_ASSERT(result.rollbackAttempted, "Rollback must be attempted");
+    TEST_ASSERT(backupLocked.load(), "Backup file should be locked by watcher");
+    TEST_ASSERT(!result.rollbackSucceeded, "Rollback should fail when backup is locked");
+    TEST_ASSERT(fs::exists(finalFl), "Final low should remain when restore fails");
+    TEST_ASSERT(ReadBinaryFile(finalFl) == newLow, "Final low should keep new low data");
+    TEST_ASSERT(fs::exists(tmpFh), "High tmp should remain when high rename fails");
+
+    if (backupLock != INVALID_HANDLE_VALUE)
+    {
+        ::CloseHandle(backupLock);
+    }
+    if (highLock != INVALID_HANDLE_VALUE)
+    {
+        ::CloseHandle(highLock);
+    }
+}
+
 void Test_T3_PseudoIntegration_TmpOnlyThenPublishedPair()
 {
     const fs::path root = fs::temp_directory_path() / L"wave_data_io_tests" / L"tmp_wave_data_io_t3_publish";
@@ -927,6 +1026,7 @@ int main()
     RUN_TEST(Test_T2_AtomicPublish_FlRenameFail_TmpRemains);
     RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_RollbackLow);
     RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow);
+    RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_BackupLocked_FinalLowRemains);
     RUN_TEST(Test_T3_PseudoIntegration_TmpOnlyThenPublishedPair);
     RUN_TEST(Test_T3_ForcedStop_TmpRemains_ExcludedFromDownstream);
     RUN_TEST(Test_T3_RestartCleanup_DeletesTargetPatternOnly);

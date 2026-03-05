@@ -60,7 +60,7 @@ inline bool ContainsControlCharacter(const std::wstring& path)
 {
     for (const wchar_t ch : path)
     {
-        if (ch >= 0 && ch <= 31)
+        if (static_cast<unsigned int>(ch) <= 31u)
         {
             return true;
         }
@@ -175,13 +175,12 @@ inline Result MakeError(const int code, const std::wstring& message)
     return result;
 }
 
-inline bool DefaultWriteProbe(const std::wstring& directoryPath, DWORD* outLastError)
+inline std::wstring BuildWriteProbePathForTest(
+    const std::wstring& directoryPath,
+    const DWORD processId,
+    const ULONGLONG tickBase,
+    const int attempt)
 {
-    if (outLastError != nullptr)
-    {
-        *outLastError = ERROR_SUCCESS;
-    }
-
     std::wstring probePath = directoryPath;
     if (!probePath.empty() && !IsPathSeparator(probePath.back()))
     {
@@ -189,45 +188,95 @@ inline bool DefaultWriteProbe(const std::wstring& directoryPath, DWORD* outLastE
     }
 
     probePath += L".__write_probe_";
-    probePath += std::to_wstring(::GetCurrentProcessId());
+    probePath += std::to_wstring(processId);
     probePath += L"_";
-    probePath += std::to_wstring(::GetTickCount64());
+    probePath += std::to_wstring(tickBase);
+    probePath += L"_";
+    probePath += std::to_wstring(attempt);
     probePath += L".tmp";
+    return probePath;
+}
 
-    HANDLE handle = ::CreateFileW(
-        probePath.c_str(),
-        GENERIC_WRITE,
-        FILE_SHARE_READ,
-        nullptr,
-        CREATE_NEW,
-        FILE_ATTRIBUTE_TEMPORARY,
-        nullptr);
-    if (handle == INVALID_HANDLE_VALUE)
+inline bool DefaultWriteProbeWithSeed(
+    const std::wstring& directoryPath,
+    DWORD* outLastError,
+    const DWORD processId,
+    const ULONGLONG tickBase,
+    const int maxAttempts)
+{
+    if (outLastError != nullptr)
+    {
+        *outLastError = ERROR_SUCCESS;
+    }
+    if (maxAttempts <= 0)
     {
         if (outLastError != nullptr)
         {
-            *outLastError = ::GetLastError();
+            *outLastError = ERROR_INVALID_PARAMETER;
         }
         return false;
     }
 
-    DWORD written = 0;
-    const BYTE marker = 0x5A;
-    const BOOL writeOk = ::WriteFile(handle, &marker, 1, &written, nullptr);
-    const DWORD writeLastError = writeOk ? ERROR_SUCCESS : ::GetLastError();
-    ::CloseHandle(handle);
-    ::DeleteFileW(probePath.c_str());
-
-    if (!writeOk || written != 1)
+    for (int attempt = 0; attempt < maxAttempts; ++attempt)
     {
-        if (outLastError != nullptr)
+        const std::wstring probePath = BuildWriteProbePathForTest(directoryPath, processId, tickBase, attempt);
+        HANDLE handle = ::CreateFileW(
+            probePath.c_str(),
+            GENERIC_WRITE,
+            FILE_SHARE_READ,
+            nullptr,
+            CREATE_NEW,
+            FILE_ATTRIBUTE_TEMPORARY,
+            nullptr);
+        if (handle == INVALID_HANDLE_VALUE)
         {
-            *outLastError = writeLastError != ERROR_SUCCESS ? writeLastError : ERROR_WRITE_FAULT;
+            const DWORD createError = ::GetLastError();
+            if (createError == ERROR_FILE_EXISTS || createError == ERROR_ALREADY_EXISTS)
+            {
+                continue;
+            }
+
+            if (outLastError != nullptr)
+            {
+                *outLastError = createError;
+            }
+            return false;
         }
-        return false;
+
+        DWORD written = 0;
+        const BYTE marker = 0x5A;
+        const BOOL writeOk = ::WriteFile(handle, &marker, 1, &written, nullptr);
+        const DWORD writeLastError = writeOk ? ERROR_SUCCESS : ::GetLastError();
+        ::CloseHandle(handle);
+        ::DeleteFileW(probePath.c_str());
+
+        if (!writeOk || written != 1)
+        {
+            if (outLastError != nullptr)
+            {
+                *outLastError = writeLastError != ERROR_SUCCESS ? writeLastError : ERROR_WRITE_FAULT;
+            }
+            return false;
+        }
+        return true;
     }
 
-    return true;
+    if (outLastError != nullptr)
+    {
+        *outLastError = ERROR_ALREADY_EXISTS;
+    }
+    return false;
+}
+
+inline bool DefaultWriteProbe(const std::wstring& directoryPath, DWORD* outLastError)
+{
+    constexpr int kProbeCreateMaxAttempts = 8;
+    return DefaultWriteProbeWithSeed(
+        directoryPath,
+        outLastError,
+        ::GetCurrentProcessId(),
+        ::GetTickCount64(),
+        kProbeCreateMaxAttempts);
 }
 
 inline Result ValidateSavePath(

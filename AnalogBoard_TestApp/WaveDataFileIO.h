@@ -153,7 +153,7 @@ namespace WaveDataFileIO
         LPCWSTR tmpPath,
         LPCWSTR finalPath,
         DWORD retryWaitMs = 100,
-        int retryCount = 1)
+        int maxRetries = 1)
     {
         RenameAttemptResult result = {};
         if (tmpPath == nullptr || finalPath == nullptr)
@@ -161,7 +161,7 @@ namespace WaveDataFileIO
             result.lastError = ERROR_INVALID_PARAMETER;
             return result;
         }
-        if (retryCount < 0)
+        if (maxRetries < 0)
         {
             result.lastError = ERROR_INVALID_PARAMETER;
             return result;
@@ -175,7 +175,8 @@ namespace WaveDataFileIO
         }
 
         result.lastError = ::GetLastError();
-        for (int retry = 0; retry < retryCount; ++retry)
+        // Total attempts = 1 initial try + maxRetries.
+        for (int retry = 0; retry < maxRetries; ++retry)
         {
             result.retried = true;
             if (retryWaitMs > 0)
@@ -211,7 +212,7 @@ namespace WaveDataFileIO
         LPCWSTR tmpPathHigh,
         LPCWSTR finalPathHigh,
         DWORD retryWaitMs = 100,
-        int retryCount = 1)
+        int maxRetries = 1)
     {
         auto MakeLowBackupPath = [](LPCWSTR lowPath, std::wstring* outBackupPath) -> bool
         {
@@ -263,7 +264,7 @@ namespace WaveDataFileIO
             lowBackupExists = true;
         }
 
-        result.low = RenameTempFileWithRetry(tmpPathLow, finalPathLow, retryWaitMs, retryCount);
+        result.low = RenameTempFileWithRetry(tmpPathLow, finalPathLow, retryWaitMs, maxRetries);
         if (!result.low.success)
         {
             if (lowBackupExists)
@@ -278,16 +279,10 @@ namespace WaveDataFileIO
             return result;
         }
 
-        result.high = RenameTempFileWithRetry(tmpPathHigh, finalPathHigh, retryWaitMs, retryCount);
+        result.high = RenameTempFileWithRetry(tmpPathHigh, finalPathHigh, retryWaitMs, maxRetries);
         if (!result.high.success)
         {
             result.rollbackAttempted = true;
-
-            const bool deletedLow = (::DeleteFileW(finalPathLow) != FALSE);
-            if (!deletedLow)
-            {
-                result.rollbackLastError = ::GetLastError();
-            }
 
             if (lowBackupExists)
             {
@@ -296,10 +291,15 @@ namespace WaveDataFileIO
                 {
                     result.rollbackLastError = ::GetLastError();
                 }
-                result.rollbackSucceeded = deletedLow && restoredLow;
+                result.rollbackSucceeded = restoredLow;
             }
             else
             {
+                const bool deletedLow = (::DeleteFileW(finalPathLow) != FALSE);
+                if (!deletedLow)
+                {
+                    result.rollbackLastError = ::GetLastError();
+                }
                 result.rollbackSucceeded = deletedLow;
             }
             return result;
