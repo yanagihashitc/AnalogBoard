@@ -69,3 +69,7 @@ coverage/
 
 # log file
 *.log
+
+# unit test temporary outputs
+tmp_wave_data_io_*/
+AnalogBoard_UnitTest/tmp_wave_data_io_*/
