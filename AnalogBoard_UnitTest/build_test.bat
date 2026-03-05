@@ -17,6 +17,7 @@ call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FpgaRegisterLogic_
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FpgaRegisterLogic_test^) ===
+    call :CleanupIntermediate
     exit /b 1
 )
 
@@ -24,6 +25,7 @@ call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." WaveDataFileIO_tes
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WaveDataFileIO_test^) ===
+    call :CleanupIntermediate
     exit /b 1
 )
 
@@ -31,6 +33,15 @@ call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." SavePathValidation
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(SavePathValidation_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(FileLogger_test^) ===
+    call :CleanupIntermediate
     exit /b 1
 )
 
@@ -48,6 +59,7 @@ echo.
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(FpgaRegisterLogic_test^) ===
+    call :CleanupIntermediate
     exit /b 1
 )
 
@@ -55,6 +67,7 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(WaveDataFileIO_test^) ===
+    call :CleanupIntermediate
     exit /b 1
 )
 
@@ -62,7 +75,27 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(SavePathValidation_test^) ===
+    call :CleanupIntermediate
     exit /b 1
 )
 
+"%SCRIPT_DIR%FileLogger_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(FileLogger_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call :CleanupIntermediate
+exit /b 0
+
+:CleanupIntermediate
+del /q "%SCRIPT_DIR%*.obj" > nul 2>&1
+del /q "%SCRIPT_DIR%*.ilk" > nul 2>&1
+del /q "%SCRIPT_DIR%*.pdb" > nul 2>&1
+del /q "%SCRIPT_DIR%vc140.pdb" > nul 2>&1
+for /d %%D in ("%SCRIPT_DIR%tmp_wave_data_io_*") do rd /s /q "%%~fD" > nul 2>&1
+for /d %%D in ("%ROOT_DIR%\tmp_wave_data_io_*") do rd /s /q "%%~fD" > nul 2>&1
+for /d %%D in ("%TEMP%\fl_*") do rd /s /q "%%~fD" > nul 2>&1
 exit /b 0

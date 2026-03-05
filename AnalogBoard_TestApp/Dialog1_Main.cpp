@@ -2205,6 +2205,9 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 			/* Set sampling UI status */
 			CurObject->SamplingUISet(TRUE, CurObject->m_bManualMode);
+
+			/* Flush log file after each measurement cycle */
+			CurObject->m_pMainDlg->FlushLog();
 		} while (runtime);
 	} while (0);
 
@@ -2231,6 +2234,7 @@ FINALIZE_THREAD:
 	g_bStartSampling = 0;
 
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
+	CurObject->m_pMainDlg->FlushLog();
 }
 
 INT CreateWaveDataFile(

@@ -139,6 +139,16 @@ BOOL CAnalogBoardTestAppDlg::OnInitDialog()
 		break;
 	}
 
+	// Initialize file logger: create logs/ folder next to the exe
+	{
+		TCHAR exePath[MAX_PATH];
+		GetModuleFileName(NULL, exePath, MAX_PATH);
+		CString exeDir(exePath);
+		int pos = exeDir.ReverseFind(_T('\\'));
+		if (pos >= 0) exeDir = exeDir.Left(pos);
+		m_fileLogger.Init(std::wstring(exeDir));
+	}
+
 	int iRet = UsbLibInfo.USBBoard_Connect(m_hWnd);
 
 	if (iRet == USB_SUCCESS)
@@ -252,14 +262,22 @@ void CAnalogBoardTestAppDlg::PrintLog(LPCTSTR sting)
 		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(LB_ADDSTRING, 0, (LPARAM)(strBuf));
 		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(WM_VSCROLL, SB_LINEDOWN, 0);
 	}
+	m_fileLogger.Append(std::wstring(strBuf));
 }
 
-void CAnalogBoardTestAppDlg::OnClose() 
+void CAnalogBoardTestAppDlg::FlushLog()
+{
+	m_fileLogger.Flush();
+}
+
+void CAnalogBoardTestAppDlg::OnClose()
 {
 	UpdateData(TRUE);
 
 	/* Export default config*/
 	m_tabpage1_DataGet.ExportDefaultConfigFile();
+
+	m_fileLogger.Close();
 
 	CDialogEx::OnClose();
 }
