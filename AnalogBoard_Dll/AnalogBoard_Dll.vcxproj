@@ -70,6 +70,7 @@
       <ModuleDefinitionFile>.\AnalogBoard_Dll.def</ModuleDefinitionFile>
       <AdditionalLibraryDirectories>..\CyLib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>CyAPI.lib;setupapi.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>

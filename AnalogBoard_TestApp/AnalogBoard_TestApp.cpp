@@ -71,9 +71,9 @@ BOOL CAnalogBoardTestAppApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CAnalogBoardTestAppDlg dlg;
-	m_pMainWnd = &dlg;
-	INT_PTR nResponse = dlg.DoModal();
+	CAnalogBoardTestAppDlg* pDlg = new CAnalogBoardTestAppDlg;
+	m_pMainWnd = pDlg;
+	INT_PTR nResponse = pDlg->DoModal();
 	if (nResponse == IDOK)
 	{
 		// TODO: Place code here to handle when the dialog is
@@ -89,6 +89,9 @@ BOOL CAnalogBoardTestAppApp::InitInstance()
 		TRACE(traceAppMsg, 0, "Warning: dialog creation failed, so application is terminating unexpectedly.\n");
 		TRACE(traceAppMsg, 0, "Warning: if you are using MFC controls on the dialog, you cannot #define _AFX_NO_MFC_CONTROLS_IN_DIALOGS.\n");
 	}
+
+	delete pDlg;
+	pDlg = nullptr;
 
 	// Delete the shell manager created above.
 	if (pShellManager != nullptr)

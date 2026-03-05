@@ -52,7 +52,7 @@ public:
 	CString m_ExportFile;
 	int GainTextID[13];
 	double strGainMultp[13][5][2];
-	bool m_bManualMode;
+	bool m_bManualMode = false;
 
 	CComboBox m_combox_trigch;
 	CComboBox m_combox_fir_filter_fc;

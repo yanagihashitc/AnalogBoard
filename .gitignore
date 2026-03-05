@@ -62,6 +62,7 @@ docs/
 CLAUDE.md
 FPGA_FW/
 ref/
+data/
 
 # Coverage artifacts
 coverage/
