@@ -6,6 +6,7 @@
 #include "Dialog1_Main.h"
 #include "Dialog2_Debug.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
+#include "FileLogger.h"
 
 #define REG_MAX_COUNT	89
 
@@ -45,6 +46,7 @@ public:
 	afx_msg void OnTcnSelchangeTabMain(NMHDR* pNMHDR, LRESULT* pResult);
 	
 	void PrintLog(LPCTSTR sting);
+	void FlushLog();
 	WCHAR* CAnalogBoardTestAppDlg::strUSBLibError(INT nStatus);
 	virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -55,4 +57,6 @@ public:
 
 public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
+
+private:
 };

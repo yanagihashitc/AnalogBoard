@@ -14,6 +14,7 @@
 #endif
 
 CAnalogBoardTestAppDlg* pMainDlg;
+static FileLogger g_fileLogger;
 // CAboutDlg dialog used for App About
 
 class CAboutDlg : public CDialogEx
@@ -139,6 +140,16 @@ BOOL CAnalogBoardTestAppDlg::OnInitDialog()
 		break;
 	}
 
+	// Initialize file logger: create logs/ folder next to the exe
+	{
+		TCHAR exePath[MAX_PATH];
+		GetModuleFileName(NULL, exePath, MAX_PATH);
+		CString exeDir(exePath);
+		int pos = exeDir.ReverseFind(_T('\\'));
+		if (pos >= 0) exeDir = exeDir.Left(pos);
+		g_fileLogger.Init(std::wstring(exeDir));
+	}
+
 	int iRet = UsbLibInfo.USBBoard_Connect(m_hWnd);
 
 	if (iRet == USB_SUCCESS)
@@ -242,24 +253,32 @@ void CAnalogBoardTestAppDlg::OnTcnSelchangeTabMain(NMHDR* pNMHDR, LRESULT* pResu
 
 void CAnalogBoardTestAppDlg::PrintLog(LPCTSTR sting)
 {
-	TCHAR strBuf[1024];
 	SYSTEMTIME curTime;
 	GetLocalTime(&curTime);
 
-	_stprintf_s(strBuf, _T("%04d%02d%02d %02d:%02d:%02d %03d>> %s"), curTime.wYear, curTime.wMonth, curTime.wDay, curTime.wHour, curTime.wMinute, curTime.wSecond, curTime.wMilliseconds, sting);
+	CString strBuf;
+	strBuf.Format(_T("%04d%02d%02d %02d:%02d:%02d %03d>> %s"), curTime.wYear, curTime.wMonth, curTime.wDay, curTime.wHour, curTime.wMinute, curTime.wSecond, curTime.wMilliseconds, sting);
 	if (pMainDlg != NULL)
 	{
-		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(LB_ADDSTRING, 0, (LPARAM)(strBuf));
+		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(LB_ADDSTRING, 0, (LPARAM)(LPCTSTR)strBuf);
 		pMainDlg->GetDlgItem(IDC_LIST1)->SendMessage(WM_VSCROLL, SB_LINEDOWN, 0);
 	}
+	g_fileLogger.Append(std::wstring((LPCTSTR)strBuf));
 }
 
-void CAnalogBoardTestAppDlg::OnClose() 
+void CAnalogBoardTestAppDlg::FlushLog()
+{
+	g_fileLogger.Flush();
+}
+
+void CAnalogBoardTestAppDlg::OnClose()
 {
 	UpdateData(TRUE);
 
 	/* Export default config*/
 	m_tabpage1_DataGet.ExportDefaultConfigFile();
+
+	g_fileLogger.Close();
 
 	CDialogEx::OnClose();
 }
