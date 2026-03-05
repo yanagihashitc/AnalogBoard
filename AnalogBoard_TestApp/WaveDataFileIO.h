@@ -91,10 +91,10 @@ namespace WaveDataFileIO
         FILE* file_ = nullptr;
     };
 
-    template <typename FileWriter>
+    template <typename FileWriterLow, typename FileWriterHigh>
     INT SaveWaveDataToFileImpl(
-        FileWriter& fpLow,
-        FileWriter& fpHigh,
+        FileWriterLow* fpLow,
+        FileWriterHigh* fpHigh,
         const BYTE* waveData,
         ULONG frameSizeLow,
         ULONG frameSizeHigh,
@@ -115,18 +115,31 @@ namespace WaveDataFileIO
         {
             const BYTE* frameTop = waveData + (static_cast<size_t>(i) * frameSize);
 
-            if (frameSizeLow > 0 && !fpLow.Write(frameTop, frameSizeLow))
+            if (frameSizeLow > 0 && fpLow != nullptr && !fpLow->Write(frameTop, frameSizeLow))
             {
                 return kSaveWaveDataWriteLowFailed;
             }
 
-            if (frameSizeHigh > 0 && !fpHigh.Write(frameTop + static_cast<size_t>(frameSizeLow), frameSizeHigh))
+            if (frameSizeHigh > 0 && fpHigh != nullptr &&
+                !fpHigh->Write(frameTop + static_cast<size_t>(frameSizeLow), frameSizeHigh))
             {
                 return kSaveWaveDataWriteHighFailed;
             }
         }
 
         return kSaveWaveDataOk;
+    }
+
+    template <typename FileWriterLow, typename FileWriterHigh>
+    INT SaveWaveDataToFileImpl(
+        FileWriterLow& fpLow,
+        FileWriterHigh& fpHigh,
+        const BYTE* waveData,
+        ULONG frameSizeLow,
+        ULONG frameSizeHigh,
+        INT waveCnt)
+    {
+        return SaveWaveDataToFileImpl(&fpLow, &fpHigh, waveData, frameSizeLow, frameSizeHigh, waveCnt);
     }
 
     struct RenameAttemptResult
@@ -139,10 +152,16 @@ namespace WaveDataFileIO
     inline RenameAttemptResult RenameTempFileWithRetry(
         LPCWSTR tmpPath,
         LPCWSTR finalPath,
-        DWORD retryWaitMs = 100)
+        DWORD retryWaitMs = 100,
+        int retryCount = 1)
     {
         RenameAttemptResult result = {};
         if (tmpPath == nullptr || finalPath == nullptr)
+        {
+            result.lastError = ERROR_INVALID_PARAMETER;
+            return result;
+        }
+        if (retryCount < 0)
         {
             result.lastError = ERROR_INVALID_PARAMETER;
             return result;
@@ -156,17 +175,23 @@ namespace WaveDataFileIO
         }
 
         result.lastError = ::GetLastError();
-        result.retried = true;
-        ::Sleep(retryWaitMs);
-
-        if (::MoveFileExW(tmpPath, finalPath, MOVEFILE_REPLACE_EXISTING) != FALSE)
+        for (int retry = 0; retry < retryCount; ++retry)
         {
-            result.success = true;
-            result.lastError = ERROR_SUCCESS;
-            return result;
-        }
+            result.retried = true;
+            if (retryWaitMs > 0)
+            {
+                ::Sleep(retryWaitMs);
+            }
 
-        result.lastError = ::GetLastError();
+            if (::MoveFileExW(tmpPath, finalPath, MOVEFILE_REPLACE_EXISTING) != FALSE)
+            {
+                result.success = true;
+                result.lastError = ERROR_SUCCESS;
+                return result;
+            }
+
+            result.lastError = ::GetLastError();
+        }
         return result;
     }
 
@@ -185,26 +210,104 @@ namespace WaveDataFileIO
         LPCWSTR finalPathLow,
         LPCWSTR tmpPathHigh,
         LPCWSTR finalPathHigh,
-        DWORD retryWaitMs = 100)
+        DWORD retryWaitMs = 100,
+        int retryCount = 1)
     {
-        PublishPairResult result = {};
+        auto MakeLowBackupPath = [](LPCWSTR lowPath, std::wstring* outBackupPath) -> bool
+        {
+            if (lowPath == nullptr || outBackupPath == nullptr)
+            {
+                ::SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+            }
 
-        result.low = RenameTempFileWithRetry(tmpPathLow, finalPathLow, retryWaitMs);
+            const DWORD pid = ::GetCurrentProcessId();
+            const ULONGLONG tick = ::GetTickCount64();
+            for (int i = 0; i < 32; ++i)
+            {
+                std::wstring candidate = lowPath;
+                candidate += L".rollback.";
+                candidate += std::to_wstring(pid);
+                candidate += L".";
+                candidate += std::to_wstring(tick + static_cast<ULONGLONG>(i));
+                if (::GetFileAttributesW(candidate.c_str()) == INVALID_FILE_ATTRIBUTES)
+                {
+                    *outBackupPath = candidate;
+                    return true;
+                }
+            }
+
+            ::SetLastError(ERROR_ALREADY_EXISTS);
+            return false;
+        };
+
+        PublishPairResult result = {};
+        std::wstring lowBackupPath;
+        bool lowBackupExists = false;
+
+        DWORD lowAttrs = ::GetFileAttributesW(finalPathLow);
+        if (lowAttrs != INVALID_FILE_ATTRIBUTES && (lowAttrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        {
+            if (!MakeLowBackupPath(finalPathLow, &lowBackupPath))
+            {
+                result.low.lastError = ::GetLastError();
+                return result;
+            }
+
+            if (::MoveFileExW(finalPathLow, lowBackupPath.c_str(), MOVEFILE_REPLACE_EXISTING) == FALSE)
+            {
+                result.low.lastError = ::GetLastError();
+                return result;
+            }
+
+            lowBackupExists = true;
+        }
+
+        result.low = RenameTempFileWithRetry(tmpPathLow, finalPathLow, retryWaitMs, retryCount);
         if (!result.low.success)
         {
+            if (lowBackupExists)
+            {
+                result.rollbackAttempted = true;
+                result.rollbackSucceeded = (::MoveFileExW(lowBackupPath.c_str(), finalPathLow, MOVEFILE_REPLACE_EXISTING) != FALSE);
+                if (!result.rollbackSucceeded)
+                {
+                    result.rollbackLastError = ::GetLastError();
+                }
+            }
             return result;
         }
 
-        result.high = RenameTempFileWithRetry(tmpPathHigh, finalPathHigh, retryWaitMs);
+        result.high = RenameTempFileWithRetry(tmpPathHigh, finalPathHigh, retryWaitMs, retryCount);
         if (!result.high.success)
         {
             result.rollbackAttempted = true;
-            result.rollbackSucceeded = (::DeleteFileW(finalPathLow) != FALSE);
-            if (!result.rollbackSucceeded)
+
+            const bool deletedLow = (::DeleteFileW(finalPathLow) != FALSE);
+            if (!deletedLow)
             {
                 result.rollbackLastError = ::GetLastError();
             }
+
+            if (lowBackupExists)
+            {
+                const bool restoredLow = (::MoveFileExW(lowBackupPath.c_str(), finalPathLow, MOVEFILE_REPLACE_EXISTING) != FALSE);
+                if (!restoredLow)
+                {
+                    result.rollbackLastError = ::GetLastError();
+                }
+                result.rollbackSucceeded = deletedLow && restoredLow;
+            }
+            else
+            {
+                result.rollbackSucceeded = deletedLow;
+            }
             return result;
+        }
+
+        if (lowBackupExists)
+        {
+            ::DeleteFileW(lowBackupPath.c_str());
         }
 
         result.success = true;

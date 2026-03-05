@@ -129,22 +129,61 @@ void EnsureCleanDir(const fs::path& path)
     fs::create_directories(path, ec);
 }
 
+bool IsRepoRootCandidate(const fs::path& dir)
+{
+    std::error_code ec;
+    const bool hasGit = fs::exists(dir / L".git", ec);
+    if (hasGit)
+    {
+        return true;
+    }
+
+    const bool hasSolution = fs::exists(dir / L"AnalogBoard_TestApp.sln", ec);
+    const bool hasAppDir = fs::exists(dir / L"AnalogBoard_TestApp", ec);
+    const bool hasUnitDir = fs::exists(dir / L"AnalogBoard_UnitTest", ec);
+    return hasSolution && hasAppDir && hasUnitDir;
+}
+
+fs::path FindRepoRootFrom(const fs::path& startDir)
+{
+    fs::path dir = startDir;
+    for (int i = 0; i < 12; ++i)
+    {
+        if (IsRepoRootCandidate(dir))
+        {
+            return dir;
+        }
+
+        if (!dir.has_parent_path())
+        {
+            break;
+        }
+
+        const fs::path parent = dir.parent_path();
+        if (parent == dir)
+        {
+            break;
+        }
+        dir = parent;
+    }
+
+    return fs::path();
+}
+
 fs::path DetectRepoRoot()
 {
     wchar_t exePath[MAX_PATH] = { 0 };
     ::GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-    fs::path dir = fs::path(exePath).parent_path();
-
-    for (int i = 0; i < 8; ++i)
+    const fs::path fromExe = FindRepoRootFrom(fs::path(exePath).parent_path());
+    if (!fromExe.empty())
     {
-        if (fs::exists(dir / L"data" / L"sample_data"))
-        {
-            return dir;
-        }
-        if (dir.has_parent_path())
-        {
-            dir = dir.parent_path();
-        }
+        return fromExe;
+    }
+
+    const fs::path fromCurrent = FindRepoRootFrom(fs::current_path());
+    if (!fromCurrent.empty())
+    {
+        return fromCurrent;
     }
 
     return fs::current_path();
@@ -286,6 +325,79 @@ PerfStats ComputePerfStats(const std::vector<double>& valuesMs)
     const size_t p95Index = static_cast<size_t>(std::floor(static_cast<double>(sorted.size() - 1) * 0.95));
     stats.p95Ms = sorted[p95Index];
     return stats;
+}
+
+class BufferWriter
+{
+public:
+    bool Write(const BYTE* data, ULONG size)
+    {
+        if (size == 0)
+        {
+            return true;
+        }
+        if (data == nullptr)
+        {
+            return false;
+        }
+
+        bytes_.insert(bytes_.end(), data, data + size);
+        return true;
+    }
+
+    const std::vector<BYTE>& Bytes() const
+    {
+        return bytes_;
+    }
+
+private:
+    std::vector<BYTE> bytes_;
+};
+
+void Test_T0_SaveWaveDataToFileImpl_NullLowWriter_SkipsLow()
+{
+    const BYTE waveData[] = {
+        0x01, 0x02, 0xA1, 0xA2, 0xA3,
+        0x03, 0x04, 0xB1, 0xB2, 0xB3
+    };
+
+    BufferWriter highWriter;
+    BufferWriter* lowWriter = nullptr;
+    const INT result = WaveDataFileIO::SaveWaveDataToFileImpl(
+        lowWriter,
+        &highWriter,
+        waveData,
+        2,
+        3,
+        2);
+
+    TEST_ASSERT(result == WaveDataFileIO::kSaveWaveDataOk, "T0 null low writer should be skipped");
+
+    const std::vector<BYTE> expectedHigh = { 0xA1, 0xA2, 0xA3, 0xB1, 0xB2, 0xB3 };
+    TEST_ASSERT(highWriter.Bytes() == expectedHigh, "T0 high writer must receive high payload only");
+}
+
+void Test_T0_SaveWaveDataToFileImpl_NullHighWriter_SkipsHigh()
+{
+    const BYTE waveData[] = {
+        0x11, 0x12, 0xC1, 0xC2, 0xC3,
+        0x13, 0x14, 0xD1, 0xD2, 0xD3
+    };
+
+    BufferWriter lowWriter;
+    BufferWriter* highWriter = nullptr;
+    const INT result = WaveDataFileIO::SaveWaveDataToFileImpl(
+        &lowWriter,
+        highWriter,
+        waveData,
+        2,
+        3,
+        2);
+
+    TEST_ASSERT(result == WaveDataFileIO::kSaveWaveDataOk, "T0 null high writer should be skipped");
+
+    const std::vector<BYTE> expectedLow = { 0x11, 0x12, 0x13, 0x14 };
+    TEST_ASSERT(lowWriter.Bytes() == expectedLow, "T0 low writer must receive low payload only");
 }
 
 void Test_T1_BinaryFormatUnchanged_AllPairs()
@@ -460,6 +572,47 @@ void Test_T2_AtomicPublish_FhRenameFail_RollbackLow()
     TEST_ASSERT(result.rollbackAttempted, "Rollback must be attempted");
     TEST_ASSERT(!fs::exists(finalFl), "Low final must be deleted by rollback");
     TEST_ASSERT(fs::exists(tmpFh), "High tmp should remain");
+
+    if (lock != INVALID_HANDLE_VALUE)
+    {
+        ::CloseHandle(lock);
+    }
+}
+
+void Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow()
+{
+    const fs::path root = fs::temp_directory_path() / L"wave_data_io_tests" / L"tmp_wave_data_io_t2_fh_fail_restore";
+    EnsureCleanDir(root);
+
+    const fs::path tmpFl = root / L"restore_fl_1.bin.tmp";
+    const fs::path tmpFh = root / L"restore_fh_1.bin.tmp";
+    const fs::path finalFl = root / L"restore_fl_1.bin";
+    const fs::path finalFh = root / L"restore_fh_1.bin";
+
+    const std::vector<unsigned char> existingLow = { 0xDE, 0xAD, 0xBE, 0xEF };
+    const std::vector<unsigned char> newLow = { 0x10, 0x20, 0x30 };
+
+    TEST_ASSERT(WriteBinaryFile(tmpFl, newLow), "Write low tmp");
+    TEST_ASSERT(WriteBinaryFile(tmpFh, { 0x40, 0x50, 0x60 }), "Write high tmp");
+    TEST_ASSERT(WriteBinaryFile(finalFl, existingLow), "Write existing low final");
+    TEST_ASSERT(WriteBinaryFile(finalFh, { 0x99 }), "Write existing high final");
+
+    HANDLE lock = ::CreateFileW(
+        finalFh.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    TEST_ASSERT(lock != INVALID_HANDLE_VALUE, "Lock final high file");
+
+    const WaveDataFileIO::PublishPairResult result = WaveDataFileIO::PublishWavePairAtomic(
+        tmpFl.c_str(), finalFl.c_str(), tmpFh.c_str(), finalFh.c_str(), 100);
+
+    TEST_ASSERT(!result.success, "Publish should fail when high rename fails");
+    TEST_ASSERT(result.low.success, "Low rename should succeed before high failure");
+    TEST_ASSERT(!result.high.success, "High rename should fail");
+    TEST_ASSERT(result.rollbackAttempted, "Rollback must be attempted");
+    TEST_ASSERT(result.rollbackSucceeded, "Rollback should restore existing low");
+    TEST_ASSERT(fs::exists(finalFl), "Existing low final should remain after rollback");
+    TEST_ASSERT(ReadBinaryFile(finalFl) == existingLow, "Existing low final content must be preserved");
+    TEST_ASSERT(!fs::exists(tmpFl), "Low tmp should be consumed by low rename");
+    TEST_ASSERT(fs::exists(tmpFh), "High tmp should remain when high rename fails");
 
     if (lock != INVALID_HANDLE_VALUE)
     {
@@ -767,10 +920,13 @@ int main()
 {
     std::printf("=== WaveDataFileIO Unit Tests ===\n\n");
 
+    RUN_TEST(Test_T0_SaveWaveDataToFileImpl_NullLowWriter_SkipsLow);
+    RUN_TEST(Test_T0_SaveWaveDataToFileImpl_NullHighWriter_SkipsHigh);
     RUN_TEST(Test_T1_BinaryFormatUnchanged_AllPairs);
     RUN_TEST(Test_T2_AtomicPublish_Success);
     RUN_TEST(Test_T2_AtomicPublish_FlRenameFail_TmpRemains);
     RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_RollbackLow);
+    RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow);
     RUN_TEST(Test_T3_PseudoIntegration_TmpOnlyThenPublishedPair);
     RUN_TEST(Test_T3_ForcedStop_TmpRemains_ExcludedFromDownstream);
     RUN_TEST(Test_T3_RestartCleanup_DeletesTargetPatternOnly);

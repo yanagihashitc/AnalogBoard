@@ -53,6 +53,8 @@ namespace
 
 	constexpr INT kUsbErrFileIo = -10020;
 	constexpr INT kUsbErrFileRename = -10021;
+	constexpr DWORD kRenameRetryWaitMs = 100;
+	constexpr int kRenameRetryCount = 3;
 
 	class CFileWriterAdapter
 	{
@@ -294,7 +296,8 @@ namespace
 			finalPathLow.GetString(),
 			tmpPathHigh.GetString(),
 			finalPathHigh.GetString(),
-			100);
+			kRenameRetryWaitMs,
+			kRenameRetryCount);
 
 		if (publishResult.low.success)
 		{
@@ -1998,7 +2001,38 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
 			CurObject->m_pMainDlg->PrintLog(strTmp);	
 
-			/* Close the last file */
+			const bool hasPendingWavePair =
+				!currentTmpPathLow.IsEmpty() &&
+				!currentFinalPathLow.IsEmpty() &&
+				!currentTmpPathHigh.IsEmpty() &&
+				!currentFinalPathHigh.IsEmpty();
+
+			/* Publish the last not-full pair if loop ended normally. */
+			if (ErrExit == FALSE && hasPendingWavePair)
+			{
+				iRet = FlushCloseAndPublishWavePair(
+					CurObject,
+					&File_Low,
+					&File_High,
+					currentTmpPathLow,
+					currentFinalPathLow,
+					currentTmpPathHigh,
+					currentFinalPathHigh,
+					iIndex);
+				if (iRet != USB_SUCCESS)
+				{
+					ErrExit = TRUE;
+				}
+				else
+				{
+					currentFinalPathLow.Empty();
+					currentFinalPathHigh.Empty();
+					currentTmpPathLow.Empty();
+					currentTmpPathHigh.Empty();
+				}
+			}
+
+			/* Close any remaining handles (error path / safety). */
 			DWORD closeLastErrorLow = ERROR_SUCCESS;
 			DWORD closeLastErrorHigh = ERROR_SUCCESS;
 			if (!FlushAndCloseFile(&File_Low, &closeLastErrorLow))
@@ -2164,17 +2198,13 @@ INT CreateWaveDataFile(
 
 INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
 {
-	if (fp_l == nullptr || fp_h == nullptr)
-	{
-		::SetLastError(ERROR_INVALID_PARAMETER);
-		return kUsbErrFileIo;
-	}
-
 	CFileWriterAdapter writerLow(fp_l);
 	CFileWriterAdapter writerHigh(fp_h);
+	CFileWriterAdapter* writerLowPtr = (fp_l != nullptr) ? &writerLow : nullptr;
+	CFileWriterAdapter* writerHighPtr = (fp_h != nullptr) ? &writerHigh : nullptr;
 	const INT saveResult = WaveDataFileIO::SaveWaveDataToFileImpl(
-		writerLow,
-		writerHigh,
+		writerLowPtr,
+		writerHighPtr,
 		WaveData,
 		FrameSize_L,
 		FrameSize_H,
