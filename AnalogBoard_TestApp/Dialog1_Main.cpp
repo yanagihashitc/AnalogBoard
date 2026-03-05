@@ -57,7 +57,6 @@ namespace
 	constexpr DWORD kRenameRetryWaitMs = 100;
 	// Total attempts = 1 initial attempt + kRenameMaxRetries.
 	constexpr int kRenameMaxRetries = 3;
-	constexpr ULONGLONG kEp6DetailLogInterval = 64;
 
 	class CFileWriterAdapter
 	{
@@ -1827,20 +1826,14 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					++ep6TimeoutCount;
 				}
 
-				const bool shouldLogEp6Detail =
-					(iRet != USB_SUCCESS) ||
-					((ep6CallCount % kEp6DetailLogInterval) == 0);
-				if (shouldLogEp6Detail)
-				{
-					strTmp.Format(
-						_T("[PR01][EP6] call=%I64u bytes=%u elapsedMs=%I64u result=%d timeoutCount=%lu"),
-						ep6CallCount,
-						ulOneTimeSize,
-						ep6ElapsedMs,
-						iRet,
-						ep6TimeoutCount);
-					CurObject->m_pMainDlg->PrintLog(strTmp);
-				}
+				strTmp.Format(
+					_T("[PR01][EP6] call=%I64u bytes=%u elapsedMs=%I64u result=%d timeoutCount=%lu"),
+					ep6CallCount,
+					ulOneTimeSize,
+					ep6ElapsedMs,
+					iRet,
+					ep6TimeoutCount);
+				CurObject->m_pMainDlg->PrintLog(strTmp);
 
 				if (iRet != USB_SUCCESS)
 				{
