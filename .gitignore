@@ -57,6 +57,7 @@ ehthumbs.db
 AGENTS.md
 docs/
 CLAUDE.md
+FPGA_FW/
 
 # Coverage artifacts
 coverage/
