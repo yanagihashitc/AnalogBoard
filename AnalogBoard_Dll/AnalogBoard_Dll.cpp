@@ -17,6 +17,7 @@
 #include <tchar.h>
 #include <new>
 #include "AnalogBoard_Dll.h"
+#include "UsbTransferHelpers.h"
 #include "..\CyLib\header\CyAPI.h"
 
 #ifdef _DEBUG
@@ -67,6 +68,8 @@ USB_Lib_Info::USB_Lib_Info(void)
 
 USB_Lib_Info::~USB_Lib_Info(void)
 {
+	m_ep6TransferBuffer.Reset();
+
 	if (m_pUSBDevice)
 	{
 		if (m_pUSBDevice->DeviceCount() != 0)
@@ -246,6 +249,11 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 	isConnected = TRUE;
 	ResetEp6DiagnosticCounters();
+	if (!m_ep6TransferBuffer.EnsureSize(EP6_ONETIME_MAX_SIZE))
+	{
+		USBBoard_Disconnect();
+		return USB_ERR_ALLOCMEM_FAILED;
+	}
 
 	if (m_pUSBDevice->BcdUSB == 0x200)
 	{
@@ -263,6 +271,8 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 *******************************************************************************/
 void USB_Lib_Info::USBBoard_Disconnect(void)
 {
+	m_ep6TransferBuffer.Reset();
+
 	if (m_pUSBDevice)
 	{
 		if (m_pUSBDevice->DeviceCount() != 0)
@@ -321,12 +331,19 @@ INT USB_Lib_Info::EP2_SendData(BYTE* pSendData)
 	}
 
 	/* Wait for Ep4 end */
-	if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, INFINITE))
+	if (UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep2) &&
+		WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
 	{
 		return USB_ERR_UNAVAILABLE;
 	}
 
-	outOvLap.hEvent = CreateEvent(NULL, false, false, _T("CYUSB_OUT"));
+	UsbTransferHelpers::ScopedHandle<> eventHandle(::CreateEvent(NULL, false, false, _T("CYUSB_OUT")));
+	if (!eventHandle.IsValid())
+	{
+		ReleaseMutex(m_hEP2EP4Mutex);
+		return USB_ERR_UNAVAILABLE;
+	}
+	UsbTransferHelpers::ResetOverlappedWithEvent(&outOvLap, eventHandle.Get());
 
 	/* Send Ep2 data packet 128*16 byte */
 	if (m_pOutEndpt2->XferData(pSendData, lOneTimeSize, FALSE))
@@ -375,12 +392,19 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 		return USB_ERR_PARAM;//Rev buffer size is not enough
 	}
 
-	if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, INFINITE))
+	if (UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep4) &&
+		WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
 	{
 		return USB_ERR_UNAVAILABLE;
 	}
 
-	inOvLap.hEvent = CreateEvent(NULL, false, false, _T("CYUSB_IN"));
+	UsbTransferHelpers::ScopedHandle<> eventHandle(::CreateEvent(NULL, false, false, _T("CYUSB_IN")));
+	if (!eventHandle.IsValid())
+	{
+		ReleaseMutex(m_hEP2EP4Mutex);
+		return USB_ERR_UNAVAILABLE;
+	}
+	UsbTransferHelpers::ResetOverlappedWithEvent(&inOvLap, eventHandle.Get());
 
 	pOneTimeBuffer = (PBYTE)malloc(lOneTimeSize);
 	if (!pOneTimeBuffer)
@@ -443,20 +467,22 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	//	return USB_ERR_PARAM;//Rev buffer size is not enough
 	//}
 
-	if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, INFINITE))
+	UsbTransferHelpers::ScopedHandle<> eventHandle(::CreateEvent(NULL, false, false, _T("CYUSB_IN")));
+	if (!eventHandle.IsValid())
 	{
 		return USB_ERR_UNAVAILABLE;
 	}
+	UsbTransferHelpers::ResetOverlappedWithEvent(&inOvLap, eventHandle.Get());
 
-	inOvLap.hEvent = CreateEvent(NULL, false, false, _T("CYUSB_IN"));
-
-	pOneTimeBuffer = (PBYTE)malloc(EP6_ONETIME_MAX_SIZE);
-	if (!pOneTimeBuffer)
+	if (!m_ep6TransferBuffer.EnsureSize(EP6_ONETIME_MAX_SIZE))
 	{
-		ReleaseMutex(m_hEP2EP4Mutex);
 		return USB_ERR_ALLOCMEM_FAILED;
 	}
-	memset(pOneTimeBuffer, 0, EP6_ONETIME_MAX_SIZE);
+	pOneTimeBuffer = m_ep6TransferBuffer.Data();
+	if (!pOneTimeBuffer)
+	{
+		return USB_ERR_ALLOCMEM_FAILED;
+	}
 
 	while (ulRecvDataSize < DataSizeCount)
 	{
@@ -483,11 +509,6 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 
 		ulRecvDataSize += lOneTimeSize;
 	}
-
-	free(pOneTimeBuffer);
-	pOneTimeBuffer = NULL;
-
-	ReleaseMutex(m_hEP2EP4Mutex);
 
 	const LONG currentCallCount = ::InterlockedIncrement(&g_ep6CallCount);
 	const LONG currentTimeoutCount = ::InterlockedCompareExchange(&g_ep6TimeoutCount, 0, 0);

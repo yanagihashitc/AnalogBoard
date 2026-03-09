@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "UsbTransferHelpers.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,6 +60,9 @@ public:
 	INT EP4_GetData(BYTE* pRevData);
 	INT EP6_GetData(BYTE* pRevData, UINT  DataSizeCount);
 	const char* DllVersion_Get(void);
+
+private:
+	UsbTransferHelpers::ReusableTransferBuffer m_ep6TransferBuffer;
 };
 
 #ifdef __cplusplus

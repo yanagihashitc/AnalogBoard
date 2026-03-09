@@ -53,6 +53,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." UsbTransferHelpers_test.cpp /Fe:UsbTransferHelpers_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(UsbTransferHelpers_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 if not exist "%SCRIPT_DIR%x64\Debug" mkdir "%SCRIPT_DIR%x64\Debug"
 if not exist "%ROOT_DIR%\x64\Debug" mkdir "%ROOT_DIR%\x64\Debug"
 copy /Y "%SCRIPT_DIR%FpgaRegisterLogic_test.exe" "%SCRIPT_DIR%x64\Debug\AnalogBoard_UnitTest.exe" > nul
@@ -99,6 +107,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(FileLogger_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%UsbTransferHelpers_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(UsbTransferHelpers_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
