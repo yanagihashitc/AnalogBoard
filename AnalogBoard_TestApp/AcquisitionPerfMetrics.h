@@ -27,6 +27,8 @@ namespace AcquisitionPerfMetrics
         }
     };
 
+    // Single-thread only. The collector stores plain counters and expects
+    // updates/reset to happen on the acquisition thread.
     struct CycleMetrics
     {
         TransferMetrics ep6;

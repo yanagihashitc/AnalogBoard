@@ -1674,8 +1674,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				CFile* fileLow,
 				CFile* fileHigh,
 				PBYTE waveData,
-				INT waveCnt,
-				INT fileIndex) -> INT
+				INT waveCnt) -> INT
 			{
 				const ULONGLONG startMs = ::GetTickCount64();
 				const INT saveResult = SaveWaveDataToFile(
@@ -1687,7 +1686,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					waveCnt);
 				const ULONGLONG elapsedMs = ::GetTickCount64() - startMs;
 
-				UNREFERENCED_PARAMETER(fileIndex);
 				cycleMetrics.RecordSaveTransfer(
 					elapsedMs,
 					static_cast<ULONGLONG>(waveCnt) * static_cast<ULONGLONG>(OneWaveSize));
@@ -1726,7 +1724,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					{
 						//Sleep(100);
 						DDRWrCompleted = true;
-						DDRWaveBytes = (size_t)cycleMetrics.latestWaveWrCnt;
+						DDRWaveBytes = static_cast<size_t>(cycleMetrics.latestWaveWrCnt);
 						if (DDRWaveBytes != 0)
 						{
 							DDRWaveBytes += 32;
@@ -1741,7 +1739,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					}
 					else
 					{
-						DDRWaveBytes = (size_t)cycleMetrics.latestWaveWrCnt;
+						DDRWaveBytes = static_cast<size_t>(cycleMetrics.latestWaveWrCnt);
 
 						if (DDRWaveBytes == 0)
 						{
@@ -1842,8 +1840,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								&File_Low,
 								&File_High,
 								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
+								File_OnetimeWriteCnt);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -1862,8 +1859,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								&File_Low,
 								&File_High,
 								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
+								File_OnetimeWriteCnt);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -1932,8 +1928,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								&File_Low,
 								&File_High,
 								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
+								File_OnetimeWriteCnt);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
@@ -1971,8 +1966,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								&File_Low,
 								&File_High,
 								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
+								File_OnetimeWriteCnt);
 							if (iRet != USB_SUCCESS)
 							{
 								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));

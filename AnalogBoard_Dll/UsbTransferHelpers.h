@@ -9,6 +9,11 @@ namespace UsbTransferHelpers
 {
     constexpr DWORD kEp2Ep4MutexWaitTimeoutMs = 5000;
 
+    inline bool IsValidHandle(HANDLE handle)
+    {
+        return handle != nullptr && handle != INVALID_HANDLE_VALUE;
+    }
+
     enum class TransferEndpoint
     {
         Ep2,
@@ -18,7 +23,10 @@ namespace UsbTransferHelpers
 
     inline bool RequiresEp2Ep4Mutex(TransferEndpoint endpoint)
     {
-        return endpoint != TransferEndpoint::Ep6;
+        // CyAPI endpoint independence has not been proven for this device/session,
+        // so every transfer path stays behind the shared mutex.
+        UNREFERENCED_PARAMETER(endpoint);
+        return true;
     }
 
     inline void ResetOverlappedWithEvent(OVERLAPPED* overlapped, HANDLE eventHandle)
@@ -32,11 +40,27 @@ namespace UsbTransferHelpers
         overlapped->hEvent = eventHandle;
     }
 
+    template <typename ReleaseFunc>
+    inline bool ReleaseMutexIfOwned(bool ownsMutex, HANDLE mutexHandle, ReleaseFunc releaseFunc)
+    {
+        if (!ownsMutex || !IsValidHandle(mutexHandle))
+        {
+            return false;
+        }
+
+        return releaseFunc(mutexHandle) != FALSE;
+    }
+
+    inline bool ReleaseMutexIfOwned(bool ownsMutex, HANDLE mutexHandle)
+    {
+        return ReleaseMutexIfOwned(ownsMutex, mutexHandle, ::ReleaseMutex);
+    }
+
     struct WinHandleCloser
     {
         void operator()(HANDLE handle) const
         {
-            if (handle != nullptr && handle != INVALID_HANDLE_VALUE)
+            if (IsValidHandle(handle))
             {
                 ::CloseHandle(handle);
             }
@@ -89,7 +113,7 @@ namespace UsbTransferHelpers
 
         bool IsValid() const
         {
-            return handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE;
+            return IsValidHandle(handle_);
         }
 
         void Reset(HANDLE newHandle = nullptr)
@@ -106,6 +130,8 @@ namespace UsbTransferHelpers
         Closer closer_ = Closer();
     };
 
+    // Not internally synchronized. Callers must hold external synchronization
+    // before mixing EnsureSize/Data/Reset across threads.
     class ReusableTransferBuffer
     {
     public:
@@ -135,6 +161,22 @@ namespace UsbTransferHelpers
             delete[] buffer_;
             buffer_ = newBuffer;
             capacity_ = requiredSize;
+            return true;
+        }
+
+        bool ZeroFill(size_t sizeToClear)
+        {
+            if (sizeToClear == 0)
+            {
+                return true;
+            }
+
+            if (buffer_ == nullptr || capacity_ < sizeToClear)
+            {
+                return false;
+            }
+
+            ::ZeroMemory(buffer_, sizeToClear);
             return true;
         }
 

@@ -68,6 +68,13 @@ USB_Lib_Info::USB_Lib_Info(void)
 
 USB_Lib_Info::~USB_Lib_Info(void)
 {
+	bool ownsSharedMutex = false;
+	if (UsbTransferHelpers::IsValidHandle(m_hEP2EP4Mutex))
+	{
+		ownsSharedMutex =
+			(WAIT_OBJECT_0 == WaitForSingleObject(m_hEP2EP4Mutex, INFINITE));
+	}
+
 	m_ep6TransferBuffer.Reset();
 
 	if (m_pUSBDevice)
@@ -91,6 +98,8 @@ USB_Lib_Info::~USB_Lib_Info(void)
 		m_pInEndpt4 = NULL;
 		m_pInEndpt6 = NULL;
 	}
+
+	UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 
 	if (m_hEP2EP4Mutex != NULL)
 	{
@@ -271,6 +280,13 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 *******************************************************************************/
 void USB_Lib_Info::USBBoard_Disconnect(void)
 {
+	bool ownsSharedMutex = false;
+	if (UsbTransferHelpers::IsValidHandle(m_hEP2EP4Mutex))
+	{
+		ownsSharedMutex =
+			(WAIT_OBJECT_0 == WaitForSingleObject(m_hEP2EP4Mutex, INFINITE));
+	}
+
 	m_ep6TransferBuffer.Reset();
 
 	if (m_pUSBDevice)
@@ -297,6 +313,8 @@ void USB_Lib_Info::USBBoard_Disconnect(void)
 		isConnected = FALSE;
 		ResetEp6DiagnosticCounters();
 	}
+
+	UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 }
 
 /*******************************************************************************
@@ -314,6 +332,8 @@ INT USB_Lib_Info::EP2_SendData(BYTE* pSendData)
 	INT		iRet = USB_SUCCESS;
 	LONG	lOneTimeSize = EP2_DATA_BUFF_SIZE;//EP2 send size
 	OVERLAPPED outOvLap;//The structure contains information used in asynchronous input and output (I/O)
+	const bool requiresSharedMutex = UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep2);
+	bool ownsSharedMutex = false;
 
 	/* Endpoint is null or not */
 	if (!m_pOutEndpt2)
@@ -331,16 +351,20 @@ INT USB_Lib_Info::EP2_SendData(BYTE* pSendData)
 	}
 
 	/* Wait for Ep4 end */
-	if (UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep2) &&
-		WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
+	if (requiresSharedMutex)
 	{
-		return USB_ERR_UNAVAILABLE;
+		if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
+		{
+			return USB_ERR_UNAVAILABLE;
+		}
+
+		ownsSharedMutex = true;
 	}
 
 	UsbTransferHelpers::ScopedHandle<> eventHandle(::CreateEvent(NULL, false, false, _T("CYUSB_OUT")));
 	if (!eventHandle.IsValid())
 	{
-		ReleaseMutex(m_hEP2EP4Mutex);
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_UNAVAILABLE;
 	}
 	UsbTransferHelpers::ResetOverlappedWithEvent(&outOvLap, eventHandle.Get());
@@ -355,7 +379,7 @@ INT USB_Lib_Info::EP2_SendData(BYTE* pSendData)
 		iRet = USB_ERR_TRANSFER_TIMEOUT;
 	}
 
-	ReleaseMutex(m_hEP2EP4Mutex);
+	UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 
 	return iRet;
 }
@@ -376,6 +400,8 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 	LONG	lOneTimeSize = EP4_DATA_BUFF_SIZE;//EP4 receive size
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
+	const bool requiresSharedMutex = UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep4);
+	bool ownsSharedMutex = false;
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt4)
@@ -392,16 +418,20 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 		return USB_ERR_PARAM;//Rev buffer size is not enough
 	}
 
-	if (UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep4) &&
-		WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
+	if (requiresSharedMutex)
 	{
-		return USB_ERR_UNAVAILABLE;
+		if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
+		{
+			return USB_ERR_UNAVAILABLE;
+		}
+
+		ownsSharedMutex = true;
 	}
 
 	UsbTransferHelpers::ScopedHandle<> eventHandle(::CreateEvent(NULL, false, false, _T("CYUSB_IN")));
 	if (!eventHandle.IsValid())
 	{
-		ReleaseMutex(m_hEP2EP4Mutex);
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_UNAVAILABLE;
 	}
 	UsbTransferHelpers::ResetOverlappedWithEvent(&inOvLap, eventHandle.Get());
@@ -409,7 +439,7 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 	pOneTimeBuffer = (PBYTE)malloc(lOneTimeSize);
 	if (!pOneTimeBuffer)
 	{
-		ReleaseMutex(m_hEP2EP4Mutex);
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_ALLOCMEM_FAILED;
 	}
 	memset(pOneTimeBuffer, 0, lOneTimeSize);
@@ -428,7 +458,7 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 	free(pOneTimeBuffer);
 	pOneTimeBuffer = NULL;
 
-	ReleaseMutex(m_hEP2EP4Mutex);
+	UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 
 	return iRet;
 }
@@ -451,6 +481,8 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
 	const ULONGLONG callStartMs = ::GetTickCount64();
+	const bool requiresSharedMutex = UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep6);
+	bool ownsSharedMutex = false;
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt6)
@@ -467,20 +499,38 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	//	return USB_ERR_PARAM;//Rev buffer size is not enough
 	//}
 
+	if (requiresSharedMutex)
+	{
+		if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, UsbTransferHelpers::kEp2Ep4MutexWaitTimeoutMs))
+		{
+			return USB_ERR_UNAVAILABLE;
+		}
+
+		ownsSharedMutex = true;
+	}
+
 	UsbTransferHelpers::ScopedHandle<> eventHandle(::CreateEvent(NULL, false, false, _T("CYUSB_IN")));
 	if (!eventHandle.IsValid())
 	{
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_UNAVAILABLE;
 	}
 	UsbTransferHelpers::ResetOverlappedWithEvent(&inOvLap, eventHandle.Get());
 
 	if (!m_ep6TransferBuffer.EnsureSize(EP6_ONETIME_MAX_SIZE))
 	{
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
+		return USB_ERR_ALLOCMEM_FAILED;
+	}
+	if (!m_ep6TransferBuffer.ZeroFill(EP6_ONETIME_MAX_SIZE))
+	{
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_ALLOCMEM_FAILED;
 	}
 	pOneTimeBuffer = m_ep6TransferBuffer.Data();
 	if (!pOneTimeBuffer)
 	{
+		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_ALLOCMEM_FAILED;
 	}
 
@@ -524,6 +574,8 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 		iRet,
 		currentTimeoutCount);
 	::OutputDebugStringA(perfLog);
+
+	UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 
 	return iRet;
 }

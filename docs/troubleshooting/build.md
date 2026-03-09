@@ -68,3 +68,36 @@ Use one of these verified approaches:
 
 - `AnalogBoard_UnitTest/build_test.bat`
 - `AnalogBoard_UnitTest/UsbTransferHelpers_test.cpp`
+
+---
+
+## MSB4184 when `msbuild` cannot access `C:\Users\...\Microsoft SDKs`
+
+**Date**: 2026-03-09
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"` fails immediately
+- MSBuild reports `error MSB4184` while evaluating `GetLatestSDKTargetPlatformVersion(Windows, 10.0)`
+- The inner message says `Access to the path 'C:\Users\chiccho\AppData\Local\Microsoft SDKs' is denied`
+
+### Root Cause
+
+The solution rebuild touches the Windows SDK discovery path under the user profile. In the sandboxed agent environment, that path is readable only when the command is run with elevated permissions, so the regular `msbuild` invocation fails before project evaluation finishes.
+
+### Failed Approaches
+
+1. Running the full solution rebuild inside the default sandbox
+
+### Solution
+
+Re-run the exact same `msbuild` command with escalated permissions enabled for the agent session. The rebuild then succeeds without any source changes.
+
+### Related Files
+
+- `scripts/run_with_vsdevcmd.bat`
+- `AnalogBoard_TestApp.sln`
+- `AnalogBoard_TestApp/AnalogBoard_TestApp.vcxproj`
+- `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
