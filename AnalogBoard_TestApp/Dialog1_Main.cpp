@@ -9,6 +9,7 @@
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
+#include "AcquisitionPerfMetrics.h"
 #include "FpgaRegisterLogic.h"
 #include "SavePathValidation.h"
 #include "WaveDataFileIO.h"
@@ -45,6 +46,11 @@ INT CreateWaveDataFile(
 
 namespace
 {
+	// Timing-isolation switch for investigating the current-version EP6 issue.
+	// Keep high-frequency EP6 logs off to reduce UI/file I/O interference.
+	constexpr bool kEnableEp6HotPathLogs = false;
+	constexpr bool kEnablePhase0CycleSummaryLog = true;
+
 	enum CreateWaveDataFileResult
 	{
 		CreateWaveDataFileOk = 0,
@@ -1420,20 +1426,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CString currentTmpPathHigh;
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
-	ULONGLONG ep6CallCount = 0;
-	ULONGLONG ep6TotalElapsedMs = 0;
-	ULONGLONG ep6MaxElapsedMs = 0;
-	ULONGLONG ep6TransferBytes = 0;
-	ULONG ep6TimeoutCount = 0;
-	ULONGLONG saveFileCallCount = 0;
-	ULONGLONG saveFileTotalElapsedMs = 0;
-	ULONGLONG saveFileMaxElapsedMs = 0;
-	ULONG ddrStatusPollCount = 0;
-	ULONG ddrWriteWaitPollCount = 0;
-	ULONG latestWaveWrCnt = 0;
-	ULONG latestWaveRdCnt = 0;
-	INT latestDdrWrEnd = 0;
-	INT latestDdrRdEnd = 0;
+	AcquisitionPerfMetrics::CycleMetrics cycleMetrics;
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
 
 	const SavePathValidation::Result savePathValidation =
@@ -1675,20 +1668,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			currentFinalPathHigh.Empty();
 			currentTmpPathLow.Empty();
 			currentTmpPathHigh.Empty();
-			ep6CallCount = 0;
-			ep6TotalElapsedMs = 0;
-			ep6MaxElapsedMs = 0;
-			ep6TransferBytes = 0;
-			ep6TimeoutCount = 0;
-			saveFileCallCount = 0;
-			saveFileTotalElapsedMs = 0;
-			saveFileMaxElapsedMs = 0;
-			ddrStatusPollCount = 0;
-			ddrWriteWaitPollCount = 0;
-			latestWaveWrCnt = 0;
-			latestWaveRdCnt = 0;
-			latestDdrWrEnd = 0;
-			latestDdrRdEnd = 0;
+			cycleMetrics.Reset();
 
 			auto SaveWaveDataWithMetrics = [&](
 				CFile* fileLow,
@@ -1707,23 +1687,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					waveCnt);
 				const ULONGLONG elapsedMs = ::GetTickCount64() - startMs;
 
-				++saveFileCallCount;
-				saveFileTotalElapsedMs += elapsedMs;
-				if (elapsedMs > saveFileMaxElapsedMs)
-				{
-					saveFileMaxElapsedMs = elapsedMs;
-				}
-
-				CString perfLine;
-				perfLine.Format(
-					_T("[PR01][FILE] call=%I64u index=%d waveCnt=%d bytes=%zu elapsedMs=%I64u result=%d"),
-					saveFileCallCount,
-					fileIndex,
-					waveCnt,
-					static_cast<size_t>(waveCnt) * static_cast<size_t>(OneWaveSize),
+				UNREFERENCED_PARAMETER(fileIndex);
+				cycleMetrics.RecordSaveTransfer(
 					elapsedMs,
-					saveResult);
-				CurObject->m_pMainDlg->PrintLog(perfLine);
+					static_cast<ULONGLONG>(waveCnt) * static_cast<ULONGLONG>(OneWaveSize));
 
 				return saveResult;
 			};
@@ -1747,30 +1714,34 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						break;
 					}
 
-					++ddrStatusPollCount;
-					latestWaveWrCnt = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
-					latestWaveRdCnt = CurObject->RegGet_DDRReadCnt(pEp4DataBuf);
-					latestDdrWrEnd = CurObject->RegGet_DDRWriteEnd(pEp4DataBuf);
-					latestDdrRdEnd = CurObject->RegGet_DDRReadEnd(pEp4DataBuf);
+					cycleMetrics.IncrementDdrStatusPoll();
+					cycleMetrics.RecordDdrStatus(
+						CurObject->RegGet_DDRWaveCnt(pEp4DataBuf),
+						CurObject->RegGet_DDRReadCnt(pEp4DataBuf),
+						CurObject->RegGet_DDRWriteEnd(pEp4DataBuf),
+						CurObject->RegGet_DDRReadEnd(pEp4DataBuf));
 
 					/* Get DDR wave data size */
-					if (latestDdrWrEnd == 1)
+					if (cycleMetrics.latestDdrWrEnd == 1)
 					{
 						//Sleep(100);
 						DDRWrCompleted = true;
-						DDRWaveBytes = (size_t)latestWaveWrCnt;
+						DDRWaveBytes = (size_t)cycleMetrics.latestWaveWrCnt;
 						if (DDRWaveBytes != 0)
 						{
 							DDRWaveBytes += 32;
 						}
 						MaxDDRBytes = DDRWaveBytes;
 						strTmp.Format(_T("Fpga ddr write completed. %zu byte."), MaxDDRBytes);
-						CurObject->m_pMainDlg->PrintLog(strTmp);	
+						if (kEnableEp6HotPathLogs)
+						{
+							CurObject->m_pMainDlg->PrintLog(strTmp);
+						}
 						CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
 					}
 					else
 					{
-						DDRWaveBytes = latestWaveWrCnt;
+						DDRWaveBytes = (size_t)cycleMetrics.latestWaveWrCnt;
 
 						if (DDRWaveBytes == 0)
 						{
@@ -1782,7 +1753,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						}
 
 						strTmp.Format(_T("DDR data sized %zu byte."), DDRWaveBytes);
-						CurObject->m_pMainDlg->PrintLog(strTmp);
+						if (kEnableEp6HotPathLogs)
+						{
+							CurObject->m_pMainDlg->PrintLog(strTmp);
+						}
 					}
 				}
 
@@ -1820,26 +1794,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				const ULONGLONG ep6StartMs = ::GetTickCount64();
 				iRet = CurObject->m_pMainDlg->UsbLibInfo.EP6_GetData(ReadBuf + ulRemainSize, ulOneTimeSize);
 				const ULONGLONG ep6ElapsedMs = ::GetTickCount64() - ep6StartMs;
-				++ep6CallCount;
-				ep6TotalElapsedMs += ep6ElapsedMs;
-				ep6TransferBytes += ulOneTimeSize;
-				if (ep6ElapsedMs > ep6MaxElapsedMs)
-				{
-					ep6MaxElapsedMs = ep6ElapsedMs;
-				}
-				if (iRet == USB_ERR_TRANSFER_TIMEOUT)
-				{
-					++ep6TimeoutCount;
-				}
-
-				strTmp.Format(
-					_T("[PR01][EP6] call=%I64u bytes=%u elapsedMs=%I64u result=%d timeoutCount=%lu"),
-					ep6CallCount,
-					ulOneTimeSize,
+				cycleMetrics.RecordEp6Transfer(
 					ep6ElapsedMs,
-					iRet,
-					ep6TimeoutCount);
-				CurObject->m_pMainDlg->PrintLog(strTmp);
+					static_cast<ULONGLONG>(ulOneTimeSize),
+					iRet == USB_ERR_TRANSFER_TIMEOUT);
 
 				if (iRet != USB_SUCCESS)
 				{
@@ -1866,7 +1824,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					//strTmp.Format(_T("EP6 Read %u byte OK. Wave cnt %d."), ulOneTimeSize, ulOneTimeCnt);
 					strTmp.Format(_T("EP6 Read %u byte OK. Save into bin file..."), ulOneTimeSize);
-					CurObject->m_pMainDlg->PrintLog(strTmp);
+					if (kEnableEp6HotPathLogs)
+					{
+						CurObject->m_pMainDlg->PrintLog(strTmp);
+					}
 
 					if (ulSaveWaveCnt % packetConfig.WaveNum != 0)//Save in last file
 					{
@@ -2046,7 +2007,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					//strTmp.Format(_T("Total size %zu byte. Total save wave %u. Remain size %u byte."), SaveDDRBytes, ulSaveWaveCnt, ulRemainSize);
 					strTmp.Format(_T("Save OK.(Total size %zu byte)"), SaveDDRBytes);
-					CurObject->m_pMainDlg->PrintLog(strTmp);
+					if (kEnableEp6HotPathLogs)
+					{
+						CurObject->m_pMainDlg->PrintLog(strTmp);
+					}
 
 					if (iUSBIndex == 1)
 					{
@@ -2075,7 +2039,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				{
 					SaveDDRBytes += ulOneTimeSize;
 					strTmp.Format(_T("EP6 Read %u byte OK.Total size %zu byte."), ulOneTimeSize, SaveDDRBytes);
-					CurObject->m_pMainDlg->PrintLog(strTmp);				
+					if (kEnableEp6HotPathLogs)
+					{
+						CurObject->m_pMainDlg->PrintLog(strTmp);
+					}
 					strTmp.Format(_T("%zu"), SaveDDRBytes);
 					CurObject->m_CtrlEditCollectedCnt.SetWindowText(strTmp);
 				}
@@ -2153,13 +2120,14 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 					break;
 				}
 
-				++ddrWriteWaitPollCount;
-				latestWaveWrCnt = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
-				latestWaveRdCnt = CurObject->RegGet_DDRReadCnt(pEp4DataBuf);
-				latestDdrWrEnd = CurObject->RegGet_DDRWriteEnd(pEp4DataBuf);
-				latestDdrRdEnd = CurObject->RegGet_DDRReadEnd(pEp4DataBuf);
+				cycleMetrics.IncrementDdrWriteWaitPoll();
+				cycleMetrics.RecordDdrStatus(
+					CurObject->RegGet_DDRWaveCnt(pEp4DataBuf),
+					CurObject->RegGet_DDRReadCnt(pEp4DataBuf),
+					CurObject->RegGet_DDRWriteEnd(pEp4DataBuf),
+					CurObject->RegGet_DDRReadEnd(pEp4DataBuf));
 
-				if (latestDdrWrEnd == 1)
+				if (cycleMetrics.latestDdrWrEnd == 1)
 				{
 					break;
 				}
@@ -2171,25 +2139,30 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				}
 			}
 
-			const ULONGLONG ep6AvgElapsedMs = (ep6CallCount > 0) ? (ep6TotalElapsedMs / ep6CallCount) : 0;
-			const ULONGLONG saveFileAvgElapsedMs = (saveFileCallCount > 0) ? (saveFileTotalElapsedMs / saveFileCallCount) : 0;
+			const ULONGLONG ep6AvgElapsedMs = cycleMetrics.GetEp6AverageElapsedMs();
+			const ULONGLONG saveFileAvgElapsedMs = cycleMetrics.GetSaveAverageElapsedMs();
 			strTmp.Format(
-				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d"),
-				ep6CallCount,
-				ep6TransferBytes,
-				ep6TimeoutCount,
+				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d"),
+				cycleMetrics.ep6.callCount,
+				cycleMetrics.ep6.totalBytes,
+				cycleMetrics.ep6TimeoutCount,
 				ep6AvgElapsedMs,
-				ep6MaxElapsedMs,
-				saveFileCallCount,
+				cycleMetrics.ep6.maxElapsedMs,
+				cycleMetrics.save.callCount,
+				cycleMetrics.save.totalBytes,
 				saveFileAvgElapsedMs,
-				saveFileMaxElapsedMs,
-				ddrStatusPollCount,
-				ddrWriteWaitPollCount,
-				latestWaveWrCnt,
-				latestWaveRdCnt,
-				latestDdrWrEnd,
-				latestDdrRdEnd);
-			CurObject->m_pMainDlg->PrintLog(strTmp);
+				cycleMetrics.save.maxElapsedMs,
+				cycleMetrics.ddrStatusPollCount,
+				cycleMetrics.ddrWriteWaitPollCount,
+				cycleMetrics.maxWaveBacklogBytes,
+				cycleMetrics.latestWaveWrCnt,
+				cycleMetrics.latestWaveRdCnt,
+				cycleMetrics.latestDdrWrEnd,
+				cycleMetrics.latestDdrRdEnd);
+			if (kEnablePhase0CycleSummaryLog)
+			{
+				CurObject->m_pMainDlg->PrintLog(strTmp);
+			}
 
 			/* Manual Mode: Stop FPGA sampling */
 			if (CurObject->m_bManualMode == TRUE)
