@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "UsbTransferHelpers.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,6 +60,11 @@ public:
 	INT EP4_GetData(BYTE* pRevData);
 	INT EP6_GetData(BYTE* pRevData, UINT  DataSizeCount);
 	const char* DllVersion_Get(void);
+
+private:
+	// Reused only while the shared USB mutex is held by EP6/disconnect paths.
+	// ReusableTransferBuffer itself is not thread-safe.
+	UsbTransferHelpers::ReusableTransferBuffer m_ep6TransferBuffer;
 };
 
 #ifdef __cplusplus

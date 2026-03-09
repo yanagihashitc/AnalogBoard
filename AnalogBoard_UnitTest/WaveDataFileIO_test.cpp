@@ -356,6 +356,28 @@ private:
     std::vector<BYTE> bytes_;
 };
 
+class FailingWriter
+{
+public:
+    explicit FailingWriter(int failOnCall)
+        : failOnCall_(failOnCall)
+    {
+    }
+
+    bool Write(const BYTE* data, ULONG size)
+    {
+        UNREFERENCED_PARAMETER(data);
+        UNREFERENCED_PARAMETER(size);
+
+        ++callCount_;
+        return callCount_ != failOnCall_;
+    }
+
+private:
+    int failOnCall_ = 1;
+    int callCount_ = 0;
+};
+
 void Test_T0_SaveWaveDataToFileImpl_NullLowWriter_SkipsLow()
 {
     const BYTE waveData[] = {
@@ -425,6 +447,52 @@ void Test_T0_SaveWaveDataToFileImpl_NullLowWriter_ZeroLowFrameSize()
     TEST_ASSERT(result == WaveDataFileIO::kSaveWaveDataOk, "T0 null low + zero low frame size should be accepted");
     const std::vector<BYTE> expectedHigh = { 0xA1, 0xA2, 0xA3, 0xB1, 0xB2, 0xB3 };
     TEST_ASSERT(highWriter.Bytes() == expectedHigh, "T0 high lane must be written as-is");
+}
+
+void Test_T0_SaveWaveDataToFileImpl_LowWriterFailure_ReturnsLowError()
+{
+    // Given: Low writer fails on the first write attempt.
+    const BYTE waveData[] = {
+        0x01, 0x02, 0xA1, 0xA2,
+        0x03, 0x04, 0xB1, 0xB2
+    };
+    FailingWriter lowWriter(1);
+    BufferWriter highWriter;
+
+    // When: SaveWaveDataToFileImpl writes one or more frames.
+    const INT result = WaveDataFileIO::SaveWaveDataToFileImpl(
+        &lowWriter,
+        &highWriter,
+        waveData,
+        2,
+        2,
+        2);
+
+    // Then: The function reports low-writer failure.
+    TEST_ASSERT(result == WaveDataFileIO::kSaveWaveDataWriteLowFailed, "T0 low writer failure should return low error");
+}
+
+void Test_T0_SaveWaveDataToFileImpl_HighWriterFailure_ReturnsHighError()
+{
+    // Given: High writer fails on the first write attempt.
+    const BYTE waveData[] = {
+        0x11, 0x12, 0xC1, 0xC2,
+        0x13, 0x14, 0xD1, 0xD2
+    };
+    BufferWriter lowWriter;
+    FailingWriter highWriter(1);
+
+    // When: SaveWaveDataToFileImpl writes one or more frames.
+    const INT result = WaveDataFileIO::SaveWaveDataToFileImpl(
+        &lowWriter,
+        &highWriter,
+        waveData,
+        2,
+        2,
+        2);
+
+    // Then: The function reports high-writer failure.
+    TEST_ASSERT(result == WaveDataFileIO::kSaveWaveDataWriteHighFailed, "T0 high writer failure should return high error");
 }
 
 void Test_T1_BinaryFormatUnchanged_AllPairs()
@@ -1122,6 +1190,8 @@ int main()
     RUN_TEST(Test_T0_SaveWaveDataToFileImpl_NullLowWriter_SkipsLow);
     RUN_TEST(Test_T0_SaveWaveDataToFileImpl_NullHighWriter_SkipsHigh);
     RUN_TEST(Test_T0_SaveWaveDataToFileImpl_NullLowWriter_ZeroLowFrameSize);
+    RUN_TEST(Test_T0_SaveWaveDataToFileImpl_LowWriterFailure_ReturnsLowError);
+    RUN_TEST(Test_T0_SaveWaveDataToFileImpl_HighWriterFailure_ReturnsHighError);
     RUN_TEST(Test_T1_BinaryFormatUnchanged_AllPairs);
     RUN_TEST(Test_T2_AtomicPublish_Success);
     RUN_TEST(Test_T2_AtomicPublish_FlRenameFail_TmpRemains);
