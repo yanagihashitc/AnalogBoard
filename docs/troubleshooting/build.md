@@ -101,3 +101,40 @@ Re-run the exact same `msbuild` command with escalated permissions enabled for t
 - `AnalogBoard_TestApp.sln`
 - `AnalogBoard_TestApp/AnalogBoard_TestApp.vcxproj`
 - `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
+
+---
+
+## LNK4098 in `Debug|x64` because `CyAPI.lib` pulls `LIBCMT`
+
+**Date**: 2026-03-11
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"` succeeds but emits:
+  - `LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs`
+- Warning is reported from `AnalogBoard_Dll.vcxproj`
+
+### Root Cause
+
+`CyLib\x64\CyAPI.lib` contains the linker directive `/DEFAULTLIB:LIBCMT`.  
+`AnalogBoard_Dll` Debug build uses the dynamic debug CRT (`/MDd`), so the linker sees a static CRT request from `CyAPI.lib` and reports `LNK4098`.
+
+### Failed Approaches
+
+1. Treating the warning as originating from the DLL project itself without inspecting dependency directives
+
+### Solution
+
+1. Confirm the dependency directive with:
+   - `cmd /d /c "scripts\run_with_vsdevcmd.bat dumpbin /directives CyLib\x64\CyAPI.lib"`
+2. Mirror the existing Release workaround in `AnalogBoard_Dll.vcxproj`
+3. Add `LIBCMT` to `IgnoreSpecificDefaultLibraries` for `Debug|x64`
+4. Re-run the full `Debug|x64` rebuild and confirm it finishes with `0 warning / 0 error`
+
+### Related Files
+
+- `CyLib/x64/CyAPI.lib`
+- `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
+- `AnalogBoard_TestApp.sln`
