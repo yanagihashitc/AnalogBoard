@@ -246,6 +246,58 @@ void Test_TC_B_05_ReusableEp6BufferZeroFill_RejectsOutOfRangeSize()
     TEST_ASSERT(!buffer.ZeroFill(9), "TC-B-05 ZeroFill beyond capacity should fail");
 }
 
+void Test_TC_N_10_ScopedHeapBufferAllocatesZeroedMaxTransfer()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: EP6 comparison fix uses a fresh local heap buffer for the maximum transfer size.
+    // When: The helper allocates a 4MB scratch buffer.
+    // Then: Allocation succeeds and the range is zero-initialized.
+    TEST_ASSERT(buffer.Allocate(kEp6OneTimeMaxSize), "TC-N-10 max allocation should succeed");
+    TEST_ASSERT(buffer.Data() != nullptr, "TC-N-10 buffer pointer must be valid");
+    TEST_ASSERT(buffer.Capacity() == kEp6OneTimeMaxSize, "TC-N-10 capacity must match requested size");
+    TEST_ASSERT(buffer.Data()[0] == 0, "TC-N-10 first byte must be zero");
+    TEST_ASSERT(buffer.Data()[kEp6OneTimeMaxSize - 1] == 0, "TC-N-10 last byte must be zero");
+}
+
+void Test_TC_N_11_ScopedHeapBufferAllocatesZeroedMinimumPositiveSize()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: The local scratch buffer helper accepts the smallest meaningful positive size.
+    // When: One byte is allocated.
+    // Then: Allocation succeeds and the byte is zero-initialized.
+    TEST_ASSERT(buffer.Allocate(1), "TC-N-11 min positive allocation should succeed");
+    TEST_ASSERT(buffer.Data() != nullptr, "TC-N-11 buffer pointer must be valid");
+    TEST_ASSERT(buffer.Capacity() == 1, "TC-N-11 capacity must be one byte");
+    TEST_ASSERT(buffer.Data()[0] == 0, "TC-N-11 allocated byte must be zero");
+}
+
+void Test_TC_B_06_ScopedHeapBufferRejectsZeroSize()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: No scratch buffer has been allocated yet.
+    // When: The helper is asked to allocate zero bytes.
+    // Then: The request is rejected and the helper stays empty.
+    TEST_ASSERT(!buffer.Allocate(0), "TC-B-06 zero-size allocation must fail");
+    TEST_ASSERT(buffer.Data() == nullptr, "TC-B-06 buffer pointer must stay null");
+    TEST_ASSERT(buffer.Capacity() == 0, "TC-B-06 capacity must stay zero");
+}
+
+void Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: A previous scratch buffer allocation succeeded.
+    // When: The helper is asked to allocate zero bytes next.
+    // Then: The previous allocation is released and state returns to empty.
+    TEST_ASSERT(buffer.Allocate(1024), "TC-B-07 initial allocation should succeed");
+    TEST_ASSERT(!buffer.Allocate(0), "TC-B-07 zero-size reallocation must fail");
+    TEST_ASSERT(buffer.Data() == nullptr, "TC-B-07 buffer pointer must be cleared");
+    TEST_ASSERT(buffer.Capacity() == 0, "TC-B-07 capacity must be cleared");
+}
+
 int main()
 {
     std::printf("=== UsbTransferHelpers Unit Tests ===\n\n");
@@ -264,6 +316,10 @@ int main()
     RUN_TEST(Test_TC_N_09_ReusableEp6BufferZeroFillClearsExistingBytes);
     RUN_TEST(Test_TC_B_04_ReusableEp6BufferZeroFill_ZeroBytesIsNoOp);
     RUN_TEST(Test_TC_B_05_ReusableEp6BufferZeroFill_RejectsOutOfRangeSize);
+    RUN_TEST(Test_TC_N_10_ScopedHeapBufferAllocatesZeroedMaxTransfer);
+    RUN_TEST(Test_TC_N_11_ScopedHeapBufferAllocatesZeroedMinimumPositiveSize);
+    RUN_TEST(Test_TC_B_06_ScopedHeapBufferRejectsZeroSize);
+    RUN_TEST(Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;

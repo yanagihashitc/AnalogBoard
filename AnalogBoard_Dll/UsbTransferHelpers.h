@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <cstddef>
+#include <cstdlib>
 #include <new>
 
 namespace UsbTransferHelpers
@@ -193,6 +194,61 @@ namespace UsbTransferHelpers
         void Reset()
         {
             delete[] buffer_;
+            buffer_ = nullptr;
+            capacity_ = 0;
+        }
+
+    private:
+        BYTE* buffer_ = nullptr;
+        size_t capacity_ = 0;
+    };
+
+    class ScopedHeapBuffer
+    {
+    public:
+        ScopedHeapBuffer() = default;
+
+        ScopedHeapBuffer(const ScopedHeapBuffer&) = delete;
+        ScopedHeapBuffer& operator=(const ScopedHeapBuffer&) = delete;
+
+        ~ScopedHeapBuffer()
+        {
+            Reset();
+        }
+
+        bool Allocate(size_t requiredSize)
+        {
+            Reset();
+            if (requiredSize == 0)
+            {
+                return false;
+            }
+
+            BYTE* newBuffer = static_cast<BYTE*>(std::malloc(requiredSize));
+            if (newBuffer == nullptr)
+            {
+                return false;
+            }
+
+            ::ZeroMemory(newBuffer, requiredSize);
+            buffer_ = newBuffer;
+            capacity_ = requiredSize;
+            return true;
+        }
+
+        BYTE* Data() const
+        {
+            return buffer_;
+        }
+
+        size_t Capacity() const
+        {
+            return capacity_;
+        }
+
+        void Reset()
+        {
+            std::free(buffer_);
             buffer_ = nullptr;
             capacity_ = 0;
         }

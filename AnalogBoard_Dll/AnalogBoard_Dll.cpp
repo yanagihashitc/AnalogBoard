@@ -258,11 +258,6 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 	isConnected = TRUE;
 	ResetEp6DiagnosticCounters();
-	if (!m_ep6TransferBuffer.EnsureSize(EP6_ONETIME_MAX_SIZE))
-	{
-		USBBoard_Disconnect();
-		return USB_ERR_ALLOCMEM_FAILED;
-	}
 
 	if (m_pUSBDevice->BcdUSB == 0x200)
 	{
@@ -483,6 +478,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	const ULONGLONG callStartMs = ::GetTickCount64();
 	const bool requiresSharedMutex = UsbTransferHelpers::RequiresEp2Ep4Mutex(UsbTransferHelpers::TransferEndpoint::Ep6);
 	bool ownsSharedMutex = false;
+	UsbTransferHelpers::ScopedHeapBuffer transferBuffer;
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt6)
@@ -517,17 +513,12 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	}
 	UsbTransferHelpers::ResetOverlappedWithEvent(&inOvLap, eventHandle.Get());
 
-	if (!m_ep6TransferBuffer.EnsureSize(EP6_ONETIME_MAX_SIZE))
+	if (!transferBuffer.Allocate(EP6_ONETIME_MAX_SIZE))
 	{
 		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
 		return USB_ERR_ALLOCMEM_FAILED;
 	}
-	if (!m_ep6TransferBuffer.ZeroFill(EP6_ONETIME_MAX_SIZE))
-	{
-		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
-		return USB_ERR_ALLOCMEM_FAILED;
-	}
-	pOneTimeBuffer = m_ep6TransferBuffer.Data();
+	pOneTimeBuffer = transferBuffer.Data();
 	if (!pOneTimeBuffer)
 	{
 		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
