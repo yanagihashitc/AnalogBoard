@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <utility>
 
 #include "../AnalogBoard_Dll/UsbTransferHelpers.h"
 
@@ -246,6 +247,129 @@ void Test_TC_B_05_ReusableEp6BufferZeroFill_RejectsOutOfRangeSize()
     TEST_ASSERT(!buffer.ZeroFill(9), "TC-B-05 ZeroFill beyond capacity should fail");
 }
 
+void Test_TC_N_10_ScopedHeapBufferAllocatesZeroedMaxTransfer()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: EP6 comparison fix uses a fresh local heap buffer for the maximum transfer size.
+    // When: The helper allocates a 4MB scratch buffer.
+    // Then: Allocation succeeds and the range is zero-initialized.
+    TEST_ASSERT(buffer.Allocate(kEp6OneTimeMaxSize), "TC-N-10 max allocation should succeed");
+    TEST_ASSERT(buffer.Data() != nullptr, "TC-N-10 buffer pointer must be valid");
+    TEST_ASSERT(buffer.Capacity() == kEp6OneTimeMaxSize, "TC-N-10 capacity must match requested size");
+    TEST_ASSERT(buffer.Data()[0] == 0, "TC-N-10 first byte must be zero");
+    TEST_ASSERT(buffer.Data()[kEp6OneTimeMaxSize - 1] == 0, "TC-N-10 last byte must be zero");
+}
+
+void Test_TC_N_11_ScopedHeapBufferAllocatesZeroedMinimumPositiveSize()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: The local scratch buffer helper accepts the smallest meaningful positive size.
+    // When: One byte is allocated.
+    // Then: Allocation succeeds and the byte is zero-initialized.
+    TEST_ASSERT(buffer.Allocate(1), "TC-N-11 min positive allocation should succeed");
+    TEST_ASSERT(buffer.Data() != nullptr, "TC-N-11 buffer pointer must be valid");
+    TEST_ASSERT(buffer.Capacity() == 1, "TC-N-11 capacity must be one byte");
+    TEST_ASSERT(buffer.Data()[0] == 0, "TC-N-11 allocated byte must be zero");
+}
+
+void Test_TC_B_06_ScopedHeapBufferRejectsZeroSize()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: No scratch buffer has been allocated yet.
+    // When: The helper is asked to allocate zero bytes.
+    // Then: The request is rejected and the helper stays empty.
+    TEST_ASSERT(!buffer.Allocate(0), "TC-B-06 zero-size allocation must fail");
+    TEST_ASSERT(buffer.Data() == nullptr, "TC-B-06 buffer pointer must stay null");
+    TEST_ASSERT(buffer.Capacity() == 0, "TC-B-06 capacity must stay zero");
+}
+
+void Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: A previous scratch buffer allocation succeeded.
+    // When: The helper is asked to allocate zero bytes next.
+    // Then: The previous allocation is released and state returns to empty.
+    TEST_ASSERT(buffer.Allocate(1024), "TC-B-07 initial allocation should succeed");
+    TEST_ASSERT(!buffer.Allocate(0), "TC-B-07 zero-size reallocation must fail");
+    TEST_ASSERT(buffer.Data() == nullptr, "TC-B-07 buffer pointer must be cleared");
+    TEST_ASSERT(buffer.Capacity() == 0, "TC-B-07 capacity must be cleared");
+}
+
+void Test_TC_N_12_ScopedHeapBufferMoveConstructorTransfersOwnership()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+
+    // Given: A scratch buffer owns a valid allocation before move construction.
+    // When: Ownership is transferred into a new helper via move construction.
+    // Then: The new helper owns the buffer and the source becomes empty.
+    TEST_ASSERT(source.Allocate(1024), "TC-N-12 initial allocation should succeed");
+    BYTE* originalData = source.Data();
+
+    UsbTransferHelpers::ScopedHeapBuffer moved(std::move(source));
+
+    TEST_ASSERT(moved.Data() == originalData, "TC-N-12 moved helper must own the original buffer");
+    TEST_ASSERT(moved.Capacity() == 1024, "TC-N-12 moved helper must keep capacity");
+    TEST_ASSERT(source.Data() == nullptr, "TC-N-12 source buffer must be cleared");
+    TEST_ASSERT(source.Capacity() == 0, "TC-N-12 source capacity must be cleared");
+}
+
+void Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+    UsbTransferHelpers::ScopedHeapBuffer destination;
+
+    // Given: Both source and destination own independent allocations.
+    // When: Destination takes ownership via move assignment.
+    // Then: Destination owns the source buffer and the source becomes empty.
+    TEST_ASSERT(source.Allocate(2048), "TC-N-13 source allocation should succeed");
+    TEST_ASSERT(destination.Allocate(512), "TC-N-13 destination allocation should succeed");
+    BYTE* sourceData = source.Data();
+
+    destination = std::move(source);
+
+    TEST_ASSERT(destination.Data() == sourceData, "TC-N-13 destination must own the source buffer");
+    TEST_ASSERT(destination.Capacity() == 2048, "TC-N-13 destination must keep source capacity");
+    TEST_ASSERT(source.Data() == nullptr, "TC-N-13 source buffer must be cleared");
+    TEST_ASSERT(source.Capacity() == 0, "TC-N-13 source capacity must be cleared");
+}
+
+void Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+
+    // Given: An empty scratch buffer has no allocation.
+    // When: It is move-constructed into another helper.
+    // Then: Both objects remain empty and valid.
+    UsbTransferHelpers::ScopedHeapBuffer moved(std::move(source));
+
+    TEST_ASSERT(moved.Data() == nullptr, "TC-B-08 moved helper must remain empty");
+    TEST_ASSERT(moved.Capacity() == 0, "TC-B-08 moved helper capacity must remain zero");
+    TEST_ASSERT(source.Data() == nullptr, "TC-B-08 source buffer must remain empty");
+    TEST_ASSERT(source.Capacity() == 0, "TC-B-08 source capacity must remain zero");
+}
+
+void Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+    UsbTransferHelpers::ScopedHeapBuffer destination;
+
+    // Given: Destination owns an allocation and source is empty.
+    // When: Destination takes ownership from the empty source.
+    // Then: Destination releases its old buffer and ends in the empty state.
+    TEST_ASSERT(destination.Allocate(256), "TC-B-09 destination allocation should succeed");
+
+    destination = std::move(source);
+
+    TEST_ASSERT(destination.Data() == nullptr, "TC-B-09 destination buffer must be cleared");
+    TEST_ASSERT(destination.Capacity() == 0, "TC-B-09 destination capacity must be cleared");
+    TEST_ASSERT(source.Data() == nullptr, "TC-B-09 source buffer must remain empty");
+    TEST_ASSERT(source.Capacity() == 0, "TC-B-09 source capacity must remain zero");
+}
+
 int main()
 {
     std::printf("=== UsbTransferHelpers Unit Tests ===\n\n");
@@ -264,6 +388,14 @@ int main()
     RUN_TEST(Test_TC_N_09_ReusableEp6BufferZeroFillClearsExistingBytes);
     RUN_TEST(Test_TC_B_04_ReusableEp6BufferZeroFill_ZeroBytesIsNoOp);
     RUN_TEST(Test_TC_B_05_ReusableEp6BufferZeroFill_RejectsOutOfRangeSize);
+    RUN_TEST(Test_TC_N_10_ScopedHeapBufferAllocatesZeroedMaxTransfer);
+    RUN_TEST(Test_TC_N_11_ScopedHeapBufferAllocatesZeroedMinimumPositiveSize);
+    RUN_TEST(Test_TC_B_06_ScopedHeapBufferRejectsZeroSize);
+    RUN_TEST(Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation);
+    RUN_TEST(Test_TC_N_12_ScopedHeapBufferMoveConstructorTransfersOwnership);
+    RUN_TEST(Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership);
+    RUN_TEST(Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource);
+    RUN_TEST(Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;
