@@ -184,6 +184,11 @@ namespace SimRunner
             }
 
             const ULONGLONG totalLogicalBytes = oneWaveSize * static_cast<ULONGLONG>(scenario.totalWaveCount);
+            if (scenario.producerStepBytes != 0 && scenario.producerBurstsPerPoll != 0)
+            {
+                return FailValidation(L"producer_step_bytes and producer_bursts_per_poll cannot both be set", outError);
+            }
+
             if (scenario.producerStepBytes != 0 &&
                 static_cast<ULONGLONG>(scenario.producerStepBytes) < totalLogicalBytes &&
                 (scenario.producerStepBytes % static_cast<ULONG>(WaveAcquisition::kEp6ReadAlignmentBytes)) != 0)
@@ -261,15 +266,39 @@ namespace SimRunner
         }
         scenario.totalWaveCount = value;
 
-        if (!FindNumberField(json, L"producer_step_bytes", &value))
+        if (FindNumberField(json, L"producer_step_bytes", &value))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing producer_step_bytes";
-            }
-            return false;
+            scenario.producerStepBytes = value;
         }
-        scenario.producerStepBytes = value;
+
+        if (FindNumberField(json, L"producer_bursts_per_poll", &value))
+        {
+            scenario.producerBurstsPerPoll = value;
+        }
+
+        if (FindIntField(json, L"init_poll_count", &scenario.initPollCount))
+        {
+            if (scenario.initPollCount < 0)
+            {
+                if (outError != nullptr)
+                {
+                    *outError = L"init_poll_count must be non-negative";
+                }
+                return false;
+            }
+        }
+
+        if (FindIntField(json, L"wait_poll_count", &scenario.waitPollCount))
+        {
+            if (scenario.waitPollCount < 0)
+            {
+                if (outError != nullptr)
+                {
+                    *outError = L"wait_poll_count must be non-negative";
+                }
+                return false;
+            }
+        }
 
         if (!FindNumberField(json, L"max_read_chunk_bytes", &value))
         {

@@ -22,6 +22,9 @@ namespace SimRunner
         ULONG wavesPerFile = 0;
         ULONG totalWaveCount = 0;
         ULONG producerStepBytes = 0;
+        ULONG producerBurstsPerPoll = 0;
+        INT initPollCount = 1;
+        INT waitPollCount = 1;
         ULONG maxReadChunkBytes = 0x4000u;
         INT timeoutRetryLimit = 0;
         DWORD writeDelayMs = 0;

@@ -1,0 +1,13 @@
+{
+  "wave_size_low": 32,
+  "wave_size_high": 32,
+  "waves_per_file": 2,
+  "total_wave_count": 2,
+  "producer_step_bytes": 128,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 0,
+  "write_delay_ms": 0,
+  "write_fail_at": 1,
+  "publish_fail_at": 0,
+  "ep6_results": ["success"]
+}

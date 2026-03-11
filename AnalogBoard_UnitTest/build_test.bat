@@ -13,7 +13,7 @@ if not exist "%RUN_WITH_VSDEVCMD%" (
 
 cd /d "%SCRIPT_DIR%"
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FpgaRegisterLogic_test^) ===
@@ -21,7 +21,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." WaveDataFileIO_test.cpp /Fe:WaveDataFileIO_test.exe /link /DEBUG bcrypt.lib
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." WaveDataFileIO_test.cpp /Fe:WaveDataFileIO_test.exe /link /DEBUG bcrypt.lib
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WaveDataFileIO_test^) ===
@@ -29,7 +29,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(SavePathValidation_test^) ===
@@ -37,7 +37,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." AcquisitionPerfMetrics_test.cpp /Fe:AcquisitionPerfMetrics_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." AcquisitionPerfMetrics_test.cpp /Fe:AcquisitionPerfMetrics_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionPerfMetrics_test^) ===
@@ -45,7 +45,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileLogger_test^) ===
@@ -53,7 +53,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." WaveAcquisitionEngine_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:WaveAcquisitionEngine_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." WaveAcquisitionEngine_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:WaveAcquisitionEngine_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WaveAcquisitionEngine_test^) ===
@@ -61,7 +61,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." SimulationRunnerIntegration_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp ..\AnalogBoard_SimRunner\SimulationRunnerCore.cpp ..\AnalogBoard_SimRunner\SimulationScenario.cpp /Fe:SimulationRunnerIntegration_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." SimulationRunnerIntegration_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp ..\AnalogBoard_SimRunner\SimulationRunnerCore.cpp ..\AnalogBoard_SimRunner\SimulationScenario.cpp /Fe:SimulationRunnerIntegration_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(SimulationRunnerIntegration_test^) ===
@@ -69,7 +69,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." UsbTransferHelpers_test.cpp /Fe:UsbTransferHelpers_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." UsbTransferHelpers_test.cpp /Fe:UsbTransferHelpers_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(UsbTransferHelpers_test^) ===

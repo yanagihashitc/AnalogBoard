@@ -1,11 +1,16 @@
 #include <windows.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <string>
 #include <vector>
 
 #include "../AnalogBoard_TestApp/WaveAcquisitionEngine.h"
+#include "../AnalogBoard_TestApp/FpgaRegisterAddress.h"
+#include "../AnalogBoard_TestApp/FpgaRegisterEncoding.h"
+#include "../AnalogBoard_TestApp/FpgaRegisterLogic.h"
+#include "../AnalogBoard_SimRunner/FpgaDdrModel.h"
 #include "../AnalogBoard_SimRunner/SimulationEp4StatusHelper.h"
 
 using namespace WaveAcquisition;
@@ -33,6 +38,7 @@ namespace
     constexpr ULONG kLargeWaveSizeLow = 2048;
     constexpr ULONG kLargeWaveSizeHigh = 2048;
     constexpr ULONG kLargeWaveSize = kLargeWaveSizeLow + kLargeWaveSizeHigh;
+    constexpr ULONG kBurstSizeBytes = static_cast<ULONG>(kEp6ReadAlignmentBytes);
 
     struct FakeStopToken : IStopToken
     {
@@ -147,12 +153,33 @@ namespace
     {
         ULONG totalLogicalBytes = 0;
         ULONG producerStepBytes = 0;
+        ULONG producerBurstsPerPoll = 0;
+        INT initPollCount = 1;
+        INT waitPollCount = 1;
         std::vector<INT> ep6Results;
 
-        ULONG producedLogicalBytes = 0;
-        ULONG readLogicalBytes = 0;
         INT ep4CallCount = 0;
         INT ep6CallCount = 0;
+        bool modelInitialized = false;
+        SimRunner::FpgaDdrModel ddrModel;
+
+        void InitializeModelIfNeeded()
+        {
+            if (modelInitialized)
+            {
+                return;
+            }
+
+            SimRunner::FpgaDdrModelConfig config = {};
+            config.totalWaveBytes = totalLogicalBytes;
+            config.burstSizeBytes = kBurstSizeBytes;
+            config.producerStepBytes = producerStepBytes;
+            config.producerBurstsPerPoll = producerBurstsPerPoll;
+            config.initPollCount = initPollCount;
+            config.waitPollCount = waitPollCount;
+            ddrModel = SimRunner::FpgaDdrModel(config);
+            modelInitialized = true;
+        }
 
         INT Connect() override
         {
@@ -178,21 +205,18 @@ namespace
                 return kAcquisitionErrEp4Read;
             }
 
-            if (producerStepBytes == 0)
-            {
-                producedLogicalBytes = totalLogicalBytes;
-            }
-            else if (producedLogicalBytes < totalLogicalBytes)
-            {
-                producedLogicalBytes = (std::min)(totalLogicalBytes, producedLogicalBytes + producerStepBytes);
-            }
-
+            InitializeModelIfNeeded();
+            ddrModel.AdvanceOnePoll();
             SimulationEp4StatusHelper::WriteStatusBuffer(
                 buffer,
                 bufferSize,
-                producedLogicalBytes,
-                readLogicalBytes,
-                totalLogicalBytes);
+                ddrModel.GetWrittenBytes(),
+                ddrModel.GetReadBytes(),
+                true,
+                ddrModel.IsAdcSetEnd(),
+                ddrModel.IsDdrWrEnd(),
+                ddrModel.IsDdrRdEnd(),
+                ddrModel.IsMeasTrg());
             return kUsbSuccess;
         }
 
@@ -215,17 +239,79 @@ namespace
                 return result;
             }
 
+            InitializeModelIfNeeded();
+            const ULONG readOffset = ddrModel.GetReadBytes();
             for (ULONG i = 0; i < size; ++i)
             {
-                buffer[i] = static_cast<BYTE>((readLogicalBytes + i) & 0xFFu);
+                buffer[i] = static_cast<BYTE>((readOffset + i) & 0xFFu);
             }
 
-            const ULONG remainingLogicalBytes = totalLogicalBytes - readLogicalBytes;
-            const ULONG logicalBytesReadThisCall = (std::min)(remainingLogicalBytes, size);
-            readLogicalBytes += logicalBytesReadThisCall;
+            ddrModel.OnEp6ReadCompleted(size);
             return kUsbSuccess;
         }
     };
+
+    std::array<BYTE, kEp4StatusBufferBytes> BuildStatusBuffer(
+        ULONG writtenBytes,
+        ULONG readBytes,
+        bool ddrLink,
+        bool adcSetEnd,
+        bool ddrWrEnd,
+        bool ddrRdEnd,
+        bool measTrg)
+    {
+        std::array<BYTE, kEp4StatusBufferBytes> buffer = {};
+        SimulationEp4StatusHelper::WriteStatusBuffer(
+            buffer.data(),
+            buffer.size(),
+            writtenBytes,
+            readBytes,
+            ddrLink,
+            adcSetEnd,
+            ddrWrEnd,
+            ddrRdEnd,
+            measTrg);
+        return buffer;
+    }
+
+    std::array<BYTE, kEp4StatusBufferBytes> BuildStatusBufferFromModel(const SimRunner::FpgaDdrModel& model)
+    {
+        return BuildStatusBuffer(
+            model.GetWrittenBytes(),
+            model.GetReadBytes(),
+            true,
+            model.IsAdcSetEnd(),
+            model.IsDdrWrEnd(),
+            model.IsDdrRdEnd(),
+            model.IsMeasTrg());
+    }
+
+    USHORT ReadFpgaStatusWord(const std::array<BYTE, kEp4StatusBufferBytes>& buffer)
+    {
+        return FpgaRegLogic::Reg_Read(FPGAREG_FPGA_ST, buffer.data());
+    }
+
+    bool AdvanceModelUntilState(
+        SimRunner::FpgaDdrModel* model,
+        SimRunner::MeasState targetState,
+        INT maxPollCount = 32)
+    {
+        if (model == nullptr)
+        {
+            return false;
+        }
+
+        for (INT poll = 0; poll < maxPollCount; ++poll)
+        {
+            model->AdvanceOnePoll();
+            if (model->GetState() == targetState)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     RunConfig MakeConfig(ULONG waveSizeLow, ULONG waveSizeHigh, ULONG wavesPerFile)
     {
@@ -523,6 +609,8 @@ void Test_TC_B_06_ProducerStepBelowPadding_DoesNotUnderflowWaveWriteCount()
     std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = {};
 
     // When: The fake USB session emits the EP4 status registers.
+    usb.EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
+    usb.EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
     const INT result = usb.EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
     const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
 
@@ -553,6 +641,288 @@ void Test_TC_B_07_UnalignedMaxReadChunk_IsRejected()
     TEST_ASSERT(summary.errorCode == kAcquisitionErrInvalidConfig, "TC-B-07 error code must be invalid config");
 }
 
+void Test_L1_01_EncodeWaveWrCnt_MatchesFpgaSpec()
+{
+    // Given: One full EP6-aligned burst has been written to DDR.
+    std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = {};
+
+    // When: The FPGA-style write counter encoding is written into EP4.
+    FpgaRegEncoding::EncodeWaveWrCnt(kBurstSizeBytes, ep4Buffer.data());
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+
+    // Then: The host sees the FPGA register value and reconstructs the burst size by adding padding.
+    TEST_ASSERT(snapshot.waveWrCnt == (kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes)), "L1-01 WAVE_WR_CNT must match FPGA encoding");
+    TEST_ASSERT(snapshot.waveWrCnt + static_cast<ULONG>(kDdrCompletionPaddingBytes) == kBurstSizeBytes, "L1-01 host-visible bytes must reconstruct the burst size");
+}
+
+void Test_L1_02_EncodeWaveWrCnt_ZeroBytes_ReturnsZero()
+{
+    // Given: No DDR data has been written yet.
+    std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = {};
+
+    // When: The FPGA-style write counter encodes zero bytes.
+    FpgaRegEncoding::EncodeWaveWrCnt(0, ep4Buffer.data());
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+
+    // Then: WAVE_WR_CNT remains zero.
+    TEST_ASSERT(snapshot.waveWrCnt == 0, "L1-02 WAVE_WR_CNT must stay zero");
+}
+
+void Test_L1_03_FpgaSt_AllBits_RoundTrip()
+{
+    // Given: All FPGA_ST bits are asserted in the EP4 status buffer.
+    const std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = BuildStatusBuffer(
+        0,
+        0,
+        true,
+        true,
+        true,
+        true,
+        true);
+
+    // When: The host decodes the status word.
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+    const USHORT fpgaStatus = ReadFpgaStatusWord(ep4Buffer);
+
+    // Then: Only the intended bits are visible and write/read end decode remains correct.
+    TEST_ASSERT((fpgaStatus & FpgaRegEncoding::kFpgaStBitDdrLink) != 0, "L1-03 DDR link bit must be set");
+    TEST_ASSERT((fpgaStatus & FpgaRegEncoding::kFpgaStBitAdcSetEnd) != 0, "L1-03 ADC set end bit must be set");
+    TEST_ASSERT((fpgaStatus & FpgaRegEncoding::kFpgaStBitDdrWrEnd) != 0, "L1-03 DDR write end bit must be set");
+    TEST_ASSERT((fpgaStatus & FpgaRegEncoding::kFpgaStBitDdrRdEnd) != 0, "L1-03 DDR read end bit must be set");
+    TEST_ASSERT((fpgaStatus & FpgaRegEncoding::kFpgaStBitMeasTrg) != 0, "L1-03 measurement trigger bit must be set");
+    TEST_ASSERT(snapshot.ddrWrEnd == 1, "L1-03 DDR_WR_END must decode to 1");
+    TEST_ASSERT(snapshot.ddrRdEnd == 1, "L1-03 DDR_RD_END must decode to 1");
+}
+
+void Test_L1_04_FpgaSt_Bit4MeasTrg_DoesNotAffectWrEnd()
+{
+    // Given: Only the measurement trigger bit is asserted in FPGA_ST.
+    const std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = BuildStatusBuffer(
+        0,
+        0,
+        true,
+        true,
+        false,
+        false,
+        true);
+
+    // When: The host decodes the FPGA status word.
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+
+    // Then: Measurement trigger must not pollute DDR write-end decoding.
+    TEST_ASSERT(snapshot.ddrWrEnd == 0, "L1-04 DDR_WR_END must remain 0");
+    TEST_ASSERT(snapshot.ddrRdEnd == 0, "L1-04 DDR_RD_END must remain 0");
+    TEST_ASSERT(FpgaRegLogic::RegGet_SampleStartSt(ep4Buffer.data()), "L1-04 sample start bit must be visible");
+}
+
+void Test_L2_01_InitPhase_WaveWrCntStaysZero()
+{
+    // Given: A DDR model with a two-poll INIT phase before measurement starts.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes * 2u;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 2;
+    SimRunner::FpgaDdrModel model(config);
+
+    // When: The first two EP4 polls are emitted during INIT.
+    model.AdvanceOnePoll();
+    const std::array<BYTE, kEp4StatusBufferBytes> firstBuffer = BuildStatusBufferFromModel(model);
+    const DdrStatusSnapshot firstSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(firstBuffer.data(), firstBuffer.size());
+    model.AdvanceOnePoll();
+    const std::array<BYTE, kEp4StatusBufferBytes> secondBuffer = BuildStatusBufferFromModel(model);
+    const DdrStatusSnapshot secondSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(secondBuffer.data(), secondBuffer.size());
+
+    // Then: No write progress is visible and measurement trigger remains asserted.
+    TEST_ASSERT(firstSnapshot.waveWrCnt == 0, "L2-01 first INIT poll must keep WAVE_WR_CNT at zero");
+    TEST_ASSERT(secondSnapshot.waveWrCnt == 0, "L2-01 second INIT poll must keep WAVE_WR_CNT at zero");
+    TEST_ASSERT(firstSnapshot.ddrWrEnd == 0, "L2-01 first INIT poll must keep DDR_WR_END low");
+    TEST_ASSERT(secondSnapshot.ddrWrEnd == 0, "L2-01 second INIT poll must keep DDR_WR_END low");
+    TEST_ASSERT(FpgaRegLogic::RegGet_SampleStartSt(firstBuffer.data()), "L2-01 first INIT poll must assert measurement trigger");
+    TEST_ASSERT(FpgaRegLogic::RegGet_SampleStartSt(secondBuffer.data()), "L2-01 second INIT poll must assert measurement trigger");
+}
+
+void Test_L2_02_MeasPhase_WaveWrCntIncreasesInBurstSteps()
+{
+    // Given: A DDR model that produces one burst per measurement poll.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes * 3u;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    SimRunner::FpgaDdrModel model(config);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::Measuring), "L2-02 measuring state must be reachable");
+
+    // When: Two measurement polls advance the visible DDR write counter.
+    model.AdvanceOnePoll();
+    const DdrStatusSnapshot firstSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+    model.AdvanceOnePoll();
+    const DdrStatusSnapshot secondSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+
+    // Then: WAVE_WR_CNT advances in burst-sized jumps.
+    TEST_ASSERT(firstSnapshot.waveWrCnt == (kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes)), "L2-02 first measurement poll must expose the first burst");
+    TEST_ASSERT(secondSnapshot.waveWrCnt == (kBurstSizeBytes * 2u - static_cast<ULONG>(kDdrCompletionPaddingBytes)), "L2-02 second measurement poll must expose two bursts");
+}
+
+void Test_L2_03_WaitPhase_DdrWrEndAsserted()
+{
+    // Given: A DDR model that has finished writing all visible bytes.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    config.waitPollCount = 2;
+    SimRunner::FpgaDdrModel model(config);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::Wait), "L2-03 wait state must be reachable");
+
+    // When: The host decodes the WAIT-phase EP4 status registers.
+    const std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = BuildStatusBufferFromModel(model);
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+
+    // Then: DDR write completion is visible while DDR read completion remains low.
+    TEST_ASSERT(snapshot.ddrWrEnd == 1, "L2-03 WAIT phase must assert DDR_WR_END");
+    TEST_ASSERT(snapshot.ddrRdEnd == 0, "L2-03 WAIT phase must keep DDR_RD_END low");
+    TEST_ASSERT(!FpgaRegLogic::RegGet_SampleStartSt(ep4Buffer.data()), "L2-03 WAIT phase must deassert measurement trigger");
+}
+
+void Test_L2_04_RdWaitPhase_DdrRdEndAssertedWhenCaughtUp()
+{
+    // Given: A DDR model that has completed writing and later catches up on reads.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    config.waitPollCount = 1;
+    SimRunner::FpgaDdrModel model(config);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::Wait), "L2-04 wait state must be reachable");
+    model.OnEp6ReadCompleted(kBurstSizeBytes);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::RdWait), "L2-04 rd_wait state must be reachable");
+
+    // When: The host decodes the RD_WAIT-phase EP4 status registers after reads catch up.
+    const std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = BuildStatusBufferFromModel(model);
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+
+    // Then: DDR read completion becomes visible.
+    TEST_ASSERT(snapshot.ddrWrEnd == 1, "L2-04 RD_WAIT phase must keep DDR_WR_END asserted");
+    TEST_ASSERT(snapshot.ddrRdEnd == 1, "L2-04 RD_WAIT phase must assert DDR_RD_END");
+}
+
+void Test_L3_01_BurstBoundary_AvailableBytesAlignedToChunk()
+{
+    // Given: A burst-aligned DDR model after the first full burst completes.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes * 2u;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    SimRunner::FpgaDdrModel model(config);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::Measuring), "L3-01 measuring state must be reachable");
+
+    // When: The first measurement poll completes one burst.
+    model.AdvanceOnePoll();
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+
+    // Then: The host-visible bytes align exactly to one EP6 chunk after adding the FPGA padding.
+    TEST_ASSERT(snapshot.waveWrCnt == (kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes)), "L3-01 raw write count must expose one burst minus padding");
+    TEST_ASSERT(snapshot.waveWrCnt + static_cast<ULONG>(kDdrCompletionPaddingBytes) == kBurstSizeBytes, "L3-01 host-visible bytes must align to one EP6 chunk");
+}
+
+void Test_L3_02_PartialWaveAtBurstBoundary_PreservesPendingBytes()
+{
+    // Given: Waves whose size does not divide evenly into a burst boundary.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = 3000u * 20u;
+    usb.producerBurstsPerPoll = 1;
+    usb.initPollCount = 1;
+    usb.waitPollCount = 1;
+    usb.ep6Results = { kUsbSuccess, kUsbSuccess, kUsbSuccess, kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(1500, 1500, 5);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine drains the burst-aligned DDR model.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: All waves are saved without losing the partial-wave remainder between bursts.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "L3-02 terminal status must be success");
+    TEST_ASSERT(summary.savedWaveCount == 20, "L3-02 savedWaveCount must be 20");
+    TEST_ASSERT(summary.ignoredTailBytes == 0, "L3-02 no tail bytes should remain");
+}
+
+void Test_L3_03_LastBurst_PaddedRead_PreservesWaveCount()
+{
+    // Given: A total byte count whose final DDR-visible read requires alignment padding.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = 1000u * 50u;
+    usb.producerBurstsPerPoll = 1;
+    usb.initPollCount = 1;
+    usb.waitPollCount = 1;
+    usb.ep6Results = { kUsbSuccess, kUsbSuccess, kUsbSuccess, kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(500, 500, 10);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine completes the final padded EP6 read.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: All logical waves are preserved and only the alignment tail is ignored.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "L3-03 terminal status must be success");
+    TEST_ASSERT(summary.savedWaveCount == 50, "L3-03 savedWaveCount must be 50");
+    TEST_ASSERT(summary.ignoredTailBytes == 16, "L3-03 alignment tail must be recorded");
+}
+
+void Test_L3_04_DdrRdEnd_ExactBurstMatch()
+{
+    // Given: Read completion exactly matches the number of written bursts.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes * 2u;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    config.waitPollCount = 1;
+    SimRunner::FpgaDdrModel model(config);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::Wait), "L3-04 wait state must be reachable");
+    model.OnEp6ReadCompleted(kBurstSizeBytes);
+    TEST_ASSERT(!BuildStatusBufferFromModel(model).empty(), "L3-04 status buffer helper must be callable");
+    const DdrStatusSnapshot beforeCatchUp = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+    model.OnEp6ReadCompleted(kBurstSizeBytes);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::RdWait), "L3-04 rd_wait state must be reachable");
+    const DdrStatusSnapshot afterCatchUp = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+
+    // Then: DDR_RD_END stays low before the exact match and asserts at equality.
+    TEST_ASSERT(beforeCatchUp.ddrRdEnd == 0, "L3-04 DDR_RD_END must stay low before exact burst match");
+    TEST_ASSERT(afterCatchUp.ddrRdEnd == 1, "L3-04 DDR_RD_END must assert at exact burst equality");
+}
+
+void Test_L3_05_BacklogCalculation_DiscreteJumps()
+{
+    // Given: A burst-aligned producer exposes data in discrete DDR jumps.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kBurstSizeBytes * 3u;
+    usb.producerBurstsPerPoll = 1;
+    usb.initPollCount = 1;
+    usb.waitPollCount = 1;
+    usb.ep6Results = { kUsbSuccess, kUsbSuccess, kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kLargeWaveSizeLow, kLargeWaveSizeHigh, 2);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine processes the burst-aligned acquisition.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The max backlog reflects the discrete burst-sized jump.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "L3-05 terminal status must be success");
+    TEST_ASSERT(summary.metrics.maxWaveBacklogBytes == (kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes)), "L3-05 max backlog must capture one discrete burst jump");
+}
+
 int main()
 {
     std::printf("=== WaveAcquisitionEngine Unit Tests ===\n\n");
@@ -571,6 +941,19 @@ int main()
     RUN_TEST(Test_TC_B_05_StopRequestedBeforeStart_ReturnsStopped);
     RUN_TEST(Test_TC_B_06_ProducerStepBelowPadding_DoesNotUnderflowWaveWriteCount);
     RUN_TEST(Test_TC_B_07_UnalignedMaxReadChunk_IsRejected);
+    RUN_TEST(Test_L1_01_EncodeWaveWrCnt_MatchesFpgaSpec);
+    RUN_TEST(Test_L1_02_EncodeWaveWrCnt_ZeroBytes_ReturnsZero);
+    RUN_TEST(Test_L1_03_FpgaSt_AllBits_RoundTrip);
+    RUN_TEST(Test_L1_04_FpgaSt_Bit4MeasTrg_DoesNotAffectWrEnd);
+    RUN_TEST(Test_L2_01_InitPhase_WaveWrCntStaysZero);
+    RUN_TEST(Test_L2_02_MeasPhase_WaveWrCntIncreasesInBurstSteps);
+    RUN_TEST(Test_L2_03_WaitPhase_DdrWrEndAsserted);
+    RUN_TEST(Test_L2_04_RdWaitPhase_DdrRdEndAssertedWhenCaughtUp);
+    RUN_TEST(Test_L3_01_BurstBoundary_AvailableBytesAlignedToChunk);
+    RUN_TEST(Test_L3_02_PartialWaveAtBurstBoundary_PreservesPendingBytes);
+    RUN_TEST(Test_L3_03_LastBurst_PaddedRead_PreservesWaveCount);
+    RUN_TEST(Test_L3_04_DdrRdEnd_ExactBurstMatch);
+    RUN_TEST(Test_L3_05_BacklogCalculation_DiscreteJumps);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

@@ -140,6 +140,16 @@ void Test_IT_A_04_WriteFail_ProducesFailureSummary()
     RunPresetAndAssert(L"write_fail", 5, "write_failed", false);
 }
 
+void Test_IT_N_04_SlowProducer_ProducesSuccessArtifacts()
+{
+    RunPresetAndAssert(L"slow_producer", 0, "success", true);
+}
+
+void Test_IT_N_05_BurstBoundaryStress_ProducesSuccessArtifacts()
+{
+    RunPresetAndAssert(L"burst_boundary_stress", 0, "success", true);
+}
+
 int main()
 {
     std::printf("=== SimulationRunner Integration Tests ===\n\n");
@@ -151,6 +161,8 @@ int main()
     RUN_TEST(Test_IT_A_02_Disconnect_ProducesDisconnectSummary);
     RUN_TEST(Test_IT_A_03_PublishFail_ProducesFailureSummary);
     RUN_TEST(Test_IT_A_04_WriteFail_ProducesFailureSummary);
+    RUN_TEST(Test_IT_N_04_SlowProducer_ProducesSuccessArtifacts);
+    RUN_TEST(Test_IT_N_05_BurstBoundaryStress_ProducesSuccessArtifacts);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

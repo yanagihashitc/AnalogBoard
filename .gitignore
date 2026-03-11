@@ -61,7 +61,9 @@ AGENTS.md
 CLAUDE.md
 FPGA_FW/
 ref/
-data/
+data/*
+!data/sim_scenarios/
+!data/sim_scenarios/*.json
 
 # Coverage artifacts
 coverage/

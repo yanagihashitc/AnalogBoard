@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "../AnalogBoard_TestApp/WaveDataFileIO.h"
+#include "FpgaDdrModel.h"
 #include "SimulationEp4StatusHelper.h"
 #include "SimulationScenario.h"
 
@@ -169,6 +170,15 @@ namespace SimRunner
                 , totalLogicalBytes_(scenario.waveSizeLow + scenario.waveSizeHigh)
             {
                 totalLogicalBytes_ *= scenario.totalWaveCount;
+
+                FpgaDdrModelConfig modelConfig = {};
+                modelConfig.totalWaveBytes = totalLogicalBytes_;
+                modelConfig.burstSizeBytes = static_cast<ULONG>(WaveAcquisition::kEp6ReadAlignmentBytes);
+                modelConfig.producerStepBytes = scenario.producerStepBytes;
+                modelConfig.producerBurstsPerPoll = scenario.producerBurstsPerPoll;
+                modelConfig.initPollCount = scenario.initPollCount;
+                modelConfig.waitPollCount = scenario.waitPollCount;
+                ddrModel_ = FpgaDdrModel(modelConfig);
             }
 
             INT Connect() override
@@ -194,21 +204,17 @@ namespace SimRunner
                     return WaveAcquisition::kAcquisitionErrEp4Read;
                 }
 
-                if (scenario_.producerStepBytes == 0)
-                {
-                    producedLogicalBytes_ = totalLogicalBytes_;
-                }
-                else if (producedLogicalBytes_ < totalLogicalBytes_)
-                {
-                    producedLogicalBytes_ = (std::min)(totalLogicalBytes_, producedLogicalBytes_ + scenario_.producerStepBytes);
-                }
-
+                ddrModel_.AdvanceOnePoll();
                 SimulationEp4StatusHelper::WriteStatusBuffer(
                     buffer,
                     bufferSize,
-                    producedLogicalBytes_,
-                    readLogicalBytes_,
-                    totalLogicalBytes_);
+                    ddrModel_.GetWrittenBytes(),
+                    ddrModel_.GetReadBytes(),
+                    true,
+                    ddrModel_.IsAdcSetEnd(),
+                    ddrModel_.IsDdrWrEnd(),
+                    ddrModel_.IsDdrRdEnd(),
+                    ddrModel_.IsMeasTrg());
                 return WaveAcquisition::kUsbSuccess;
             }
 
@@ -239,22 +245,21 @@ namespace SimRunner
                     return result;
                 }
 
+                const ULONG readOffset = ddrModel_.GetReadBytes();
                 for (ULONG i = 0; i < size; ++i)
                 {
-                    buffer[i] = static_cast<BYTE>((readLogicalBytes_ + i) & 0xFFu);
+                    buffer[i] = static_cast<BYTE>((readOffset + i) & 0xFFu);
                 }
 
-                const ULONG remainingLogicalBytes = totalLogicalBytes_ - readLogicalBytes_;
-                readLogicalBytes_ += (std::min)(remainingLogicalBytes, size);
+                ddrModel_.OnEp6ReadCompleted(size);
                 return WaveAcquisition::kUsbSuccess;
             }
 
         private:
             SimulationScenario scenario_;
             ULONG totalLogicalBytes_ = 0;
-            ULONG producedLogicalBytes_ = 0;
-            ULONG readLogicalBytes_ = 0;
             INT ep6CallCount_ = 0;
+            FpgaDdrModel ddrModel_;
         };
 
         class ScriptedWavePairSink : public WaveAcquisition::IWavePairSink
