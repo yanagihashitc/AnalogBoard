@@ -146,7 +146,13 @@ namespace SimRunner
                 return;
             }
 
-            ULONG remainingBytes = GetVisibleTotalBytes() - writtenBytes_;
+            const ULONG visibleTotal = GetVisibleTotalBytes();
+            if (writtenBytes_ >= visibleTotal)
+            {
+                return;
+            }
+
+            ULONG remainingBytes = visibleTotal - writtenBytes_;
             for (ULONG burst = 0; burst < config_.producerBurstsPerPoll && remainingBytes > 0; ++burst)
             {
                 const ULONG stepBytes = (std::min)(config_.burstSizeBytes, remainingBytes);

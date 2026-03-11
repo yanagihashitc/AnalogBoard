@@ -2,8 +2,8 @@
 
 ## 対象プラン
 
-- [FPGA Model Improvement Design](./2026-03-11-fpga-model-improvement-design.md)
-- [チェックリスト](./2026-03-11-fpga-model-improvement-checklist.md)
+- [FPGA Model Improvement Design](../2026-03-11-fpga-model-improvement-design.md)
+- [チェックリスト](../2026-03-11-fpga-model-improvement-checklist.md)
 
 ## 記入ルール
 

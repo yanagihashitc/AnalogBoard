@@ -2,8 +2,10 @@
 
 #include <cwctype>
 #include <fstream>
+#include <limits>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 
 #include "../AnalogBoard_TestApp/WaveAcquisitionEngine.h"
 
@@ -11,11 +13,12 @@ namespace SimRunner
 {
     namespace
     {
-        enum class NumberFieldMatch
+        enum class NumericFieldStatus
         {
             Missing,
             Value,
             NegativeValue,
+            OutOfRange,
         };
 
         bool ReadFileText(const std::wstring& path, std::wstring* outText)
@@ -56,14 +59,14 @@ namespace SimRunner
             return true;
         }
 
-        NumberFieldMatch FindNumberToken(
+        bool FindNumberToken(
             const std::wstring& json,
             const wchar_t* fieldName,
             std::wstring* outToken)
         {
             if (fieldName == nullptr || outToken == nullptr)
             {
-                return NumberFieldMatch::Missing;
+                return false;
             }
 
             const std::wstring pattern = L"\"" + std::wstring(fieldName) + L"\"\\s*:\\s*(-?[0-9]+)";
@@ -71,51 +74,87 @@ namespace SimRunner
             std::wsmatch match;
             if (!std::regex_search(json, match, regex) || match.size() < 2)
             {
-                return NumberFieldMatch::Missing;
+                return false;
             }
 
             *outToken = match[1].str();
-            if (!outToken->empty() && (*outToken)[0] == L'-')
-            {
-                return NumberFieldMatch::NegativeValue;
-            }
-
-            return NumberFieldMatch::Value;
-        }
-
-        NumberFieldMatch FindUnsignedField(const std::wstring& json, const wchar_t* fieldName, ULONG* outValue)
-        {
-            if (outValue == nullptr)
-            {
-                return NumberFieldMatch::Missing;
-            }
-
-            std::wstring token;
-            const NumberFieldMatch match = FindNumberToken(json, fieldName, &token);
-            if (match != NumberFieldMatch::Value)
-            {
-                return match;
-            }
-
-            *outValue = static_cast<ULONG>(std::stoul(token));
-            return NumberFieldMatch::Value;
-        }
-
-        bool FindIntField(const std::wstring& json, const wchar_t* fieldName, INT* outValue)
-        {
-            if (outValue == nullptr)
-            {
-                return false;
-            }
-
-            std::wstring token;
-            if (FindNumberToken(json, fieldName, &token) == NumberFieldMatch::Missing)
-            {
-                return false;
-            }
-
-            *outValue = static_cast<INT>(std::stoi(token));
             return true;
+        }
+
+        NumericFieldStatus FindUnsignedField(const std::wstring& json, const wchar_t* fieldName, ULONG* outValue)
+        {
+            if (outValue == nullptr)
+            {
+                return NumericFieldStatus::Missing;
+            }
+
+            std::wstring token;
+            if (!FindNumberToken(json, fieldName, &token))
+            {
+                return NumericFieldStatus::Missing;
+            }
+
+            if (!token.empty() && token[0] == L'-')
+            {
+                return NumericFieldStatus::NegativeValue;
+            }
+
+            try
+            {
+                const unsigned long long parsed = std::stoull(token);
+                if (parsed > static_cast<unsigned long long>((std::numeric_limits<ULONG>::max)()))
+                {
+                    return NumericFieldStatus::OutOfRange;
+                }
+
+                *outValue = static_cast<ULONG>(parsed);
+            }
+            catch (const std::out_of_range&)
+            {
+                return NumericFieldStatus::OutOfRange;
+            }
+            catch (const std::exception&)
+            {
+                return NumericFieldStatus::OutOfRange;
+            }
+
+            return NumericFieldStatus::Value;
+        }
+
+        NumericFieldStatus FindIntField(const std::wstring& json, const wchar_t* fieldName, INT* outValue)
+        {
+            if (outValue == nullptr)
+            {
+                return NumericFieldStatus::Missing;
+            }
+
+            std::wstring token;
+            if (!FindNumberToken(json, fieldName, &token))
+            {
+                return NumericFieldStatus::Missing;
+            }
+
+            try
+            {
+                const long long parsed = std::stoll(token);
+                if (parsed < static_cast<long long>((std::numeric_limits<INT>::min)()) ||
+                    parsed > static_cast<long long>((std::numeric_limits<INT>::max)()))
+                {
+                    return NumericFieldStatus::OutOfRange;
+                }
+
+                *outValue = static_cast<INT>(parsed);
+            }
+            catch (const std::out_of_range&)
+            {
+                return NumericFieldStatus::OutOfRange;
+            }
+            catch (const std::exception&)
+            {
+                return NumericFieldStatus::OutOfRange;
+            }
+
+            return NumericFieldStatus::Value;
         }
 
         bool FindStringArrayField(
@@ -128,7 +167,7 @@ namespace SimRunner
                 return false;
             }
 
-            const std::wstring pattern = L"\"" + std::wstring(fieldName) + L"\"\\s*:\\s*\\[(.*?)\\]";
+            const std::wstring pattern = L"\"" + std::wstring(fieldName) + L"\"\\s*:\\s*\\[([\\s\\S]*?)\\]";
             std::wregex regex(pattern);
             std::wsmatch match;
             if (!std::regex_search(json, match, regex) || match.size() < 2)
@@ -265,17 +304,21 @@ namespace SimRunner
         SimulationScenario scenario = {};
         auto LoadRequiredUnsignedField = [&](const wchar_t* fieldName, ULONG* outValue) -> bool
         {
-            const NumberFieldMatch match = FindUnsignedField(json, fieldName, outValue);
-            if (match == NumberFieldMatch::Value)
+            const NumericFieldStatus status = FindUnsignedField(json, fieldName, outValue);
+            if (status == NumericFieldStatus::Value)
             {
                 return true;
             }
 
             if (outError != nullptr)
             {
-                if (match == NumberFieldMatch::NegativeValue)
+                if (status == NumericFieldStatus::NegativeValue)
                 {
                     *outError = std::wstring(fieldName) + L" must not be negative";
+                }
+                else if (status == NumericFieldStatus::OutOfRange)
+                {
+                    *outError = std::wstring(fieldName) + L" is out of range";
                 }
                 else
                 {
@@ -288,20 +331,71 @@ namespace SimRunner
 
         auto LoadOptionalUnsignedField = [&](const wchar_t* fieldName, ULONG* outValue) -> bool
         {
-            const NumberFieldMatch match = FindUnsignedField(json, fieldName, outValue);
-            if (match == NumberFieldMatch::Value)
+            const NumericFieldStatus status = FindUnsignedField(json, fieldName, outValue);
+            if (status == NumericFieldStatus::Value)
             {
                 return true;
             }
 
-            if (match == NumberFieldMatch::Missing)
+            if (status == NumericFieldStatus::Missing)
             {
                 return true;
             }
 
             if (outError != nullptr)
             {
-                *outError = std::wstring(fieldName) + L" must not be negative";
+                if (status == NumericFieldStatus::NegativeValue)
+                {
+                    *outError = std::wstring(fieldName) + L" must not be negative";
+                }
+                else
+                {
+                    *outError = std::wstring(fieldName) + L" is out of range";
+                }
+            }
+
+            return false;
+        };
+
+        auto LoadOptionalIntField = [&](const wchar_t* fieldName, INT* outValue) -> bool
+        {
+            const NumericFieldStatus status = FindIntField(json, fieldName, outValue);
+            if (status == NumericFieldStatus::Value)
+            {
+                return true;
+            }
+
+            if (status == NumericFieldStatus::Missing)
+            {
+                return true;
+            }
+
+            if (outError != nullptr)
+            {
+                *outError = std::wstring(fieldName) + L" is out of range";
+            }
+
+            return false;
+        };
+
+        auto LoadRequiredIntField = [&](const wchar_t* fieldName, INT* outValue) -> bool
+        {
+            const NumericFieldStatus status = FindIntField(json, fieldName, outValue);
+            if (status == NumericFieldStatus::Value)
+            {
+                return true;
+            }
+
+            if (outError != nullptr)
+            {
+                if (status == NumericFieldStatus::OutOfRange)
+                {
+                    *outError = std::wstring(fieldName) + L" is out of range";
+                }
+                else
+                {
+                    *outError = L"missing " + std::wstring(fieldName);
+                }
             }
 
             return false;
@@ -337,7 +431,12 @@ namespace SimRunner
             return false;
         }
 
-        if (FindIntField(json, L"init_poll_count", &scenario.initPollCount))
+        if (!LoadOptionalIntField(L"init_poll_count", &scenario.initPollCount))
+        {
+            return false;
+        }
+
+        if (FindIntField(json, L"init_poll_count", &scenario.initPollCount) == NumericFieldStatus::Value)
         {
             if (scenario.initPollCount < 0)
             {
@@ -349,7 +448,12 @@ namespace SimRunner
             }
         }
 
-        if (FindIntField(json, L"wait_poll_count", &scenario.waitPollCount))
+        if (!LoadOptionalIntField(L"wait_poll_count", &scenario.waitPollCount))
+        {
+            return false;
+        }
+
+        if (FindIntField(json, L"wait_poll_count", &scenario.waitPollCount) == NumericFieldStatus::Value)
         {
             if (scenario.waitPollCount < 0)
             {
@@ -366,12 +470,8 @@ namespace SimRunner
             return false;
         }
 
-        if (!FindIntField(json, L"timeout_retry_limit", &scenario.timeoutRetryLimit))
+        if (!LoadRequiredIntField(L"timeout_retry_limit", &scenario.timeoutRetryLimit))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing timeout_retry_limit";
-            }
             return false;
         }
 
@@ -380,21 +480,13 @@ namespace SimRunner
             return false;
         }
 
-        if (!FindIntField(json, L"write_fail_at", &scenario.writeFailAt))
+        if (!LoadRequiredIntField(L"write_fail_at", &scenario.writeFailAt))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing write_fail_at";
-            }
             return false;
         }
 
-        if (!FindIntField(json, L"publish_fail_at", &scenario.publishFailAt))
+        if (!LoadRequiredIntField(L"publish_fail_at", &scenario.publishFailAt))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing publish_fail_at";
-            }
             return false;
         }
 

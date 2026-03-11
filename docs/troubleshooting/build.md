@@ -174,3 +174,44 @@ The VS2022 STL marks `<codecvt>` helpers such as `std::codecvt_utf8_utf16` as de
 - `AnalogBoard_SimRunner/SimulationScenario.cpp`
 - `AnalogBoard_SimRunner/SimulationRunnerCore.cpp`
 - `AnalogBoard_SimRunner/AnalogBoard_SimRunner.vcxproj`
+
+---
+
+## C2589/C4003 when `std::numeric_limits::min/max` collides with Windows macros
+
+**Date**: 2026-03-11
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- A standalone `cl` build of `SimulationScenario.cpp` fails after adding `std::numeric_limits<...>::min()` / `max()`
+- The compiler reports:
+  - `warning C4003: 関数に似たマクロ呼び出し 'max' の引数が不足しています`
+  - `error C2589: '(' : スコープ解決演算子 (::) の右側にあるトークンは使えません`
+
+### Root Cause
+
+`windows.h` defines `min` and `max` as macros unless `NOMINMAX` is set.  
+Those macros expand inside `std::numeric_limits<T>::min()` / `max()` and break parsing in MSVC.
+
+### Failed Approaches
+
+1. Calling `std::numeric_limits<T>::min()` / `max()` directly in a translation unit that already includes `windows.h`
+
+### Solution
+
+1. Keep using `std::numeric_limits`
+2. Call the functions with macro-safe syntax:
+   - `(std::numeric_limits<T>::min)()`
+   - `(std::numeric_limits<T>::max)()`
+3. Re-run the standalone `cl` build or project rebuild to confirm the errors disappear
+
+### Related Files
+
+- `AnalogBoard_SimRunner/SimulationScenario.cpp`
+- `AnalogBoard_UnitTest/SimulationScenario_test.cpp`
+
+### References
+
+- none

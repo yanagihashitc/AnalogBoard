@@ -2,8 +2,8 @@
 
 ## 対象プラン
 
-- [USB データ取得・書き込み安定性改善プラン](./plans/2026-03-02-usb-acquisition-stability.md)
-- [チェックリスト](./2026-03-02-usb-acquisition-stability-checklist.md)
+- [USB データ取得・書き込み安定性改善プラン](../archive/plans/2026-03-02-usb-acquisition-stability.md)
+- [チェックリスト](../2026-03-02-usb-acquisition-stability-checklist.md)
 
 ## Process Log Entries
 

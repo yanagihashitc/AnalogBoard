@@ -1,7 +1,6 @@
 #include <windows.h>
 #include <bcrypt.h>
 
-#include <cstdio>
 #include <vector>
 #include <string>
 #include <fstream>
@@ -14,24 +13,10 @@
 #include <atomic>
 #include <thread>
 
+#include "TestFramework.h"
 #include "../AnalogBoard_TestApp/WaveDataFileIO.h"
 
 namespace fs = std::filesystem;
-
-static int g_TestCount = 0;
-static int g_PassCount = 0;
-static int g_FailCount = 0;
-
-#define TEST_ASSERT(cond, msg) do { \
-    g_TestCount++; \
-    if (cond) { g_PassCount++; } \
-    else { g_FailCount++; std::printf("  FAIL: %s (line %d)\n", msg, __LINE__); } \
-} while(0)
-
-#define RUN_TEST(func) do { \
-    std::printf("[TEST] %s\n", #func); \
-    func(); \
-} while(0)
 
 std::vector<unsigned char> ReadBinaryFile(const fs::path& path)
 {

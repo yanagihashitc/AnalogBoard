@@ -30,7 +30,10 @@ namespace SimRunner
             }
 
             std::string utf8(static_cast<size_t>(required), '\0');
-            ::WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), &utf8[0], required, nullptr, nullptr);
+            if (::WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()), &utf8[0], required, nullptr, nullptr) <= 0)
+            {
+                return {};
+            }
             return utf8;
         }
 

@@ -1,25 +1,11 @@
 #include <windows.h>
 
-#include <cstdio>
 #include <utility>
 
+#include "TestFramework.h"
 #include "../AnalogBoard_Dll/UsbTransferHelpers.h"
 
-static int g_TestCount = 0;
-static int g_PassCount = 0;
-static int g_FailCount = 0;
 static constexpr size_t kEp6OneTimeMaxSize = static_cast<size_t>(1024) * 1024 * 4;
-
-#define TEST_ASSERT(cond, msg) do { \
-    g_TestCount++; \
-    if (cond) { g_PassCount++; } \
-    else { g_FailCount++; std::printf("  FAIL: %s (line %d)\n", msg, __LINE__); } \
-} while(0)
-
-#define RUN_TEST(func) do { \
-    std::printf("[TEST] %s\n", #func); \
-    func(); \
-} while(0)
 
 struct CountingCloser
 {

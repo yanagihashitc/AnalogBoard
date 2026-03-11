@@ -2,8 +2,8 @@
 
 ## 対象プラン
 
-- [2026-03-11-acquisition-preflight-simulation-design](./archive/simulation/2026-03-11-acquisition-preflight-simulation-design.md)
-- [チェックリスト](./2026-03-11-review-findings-fix-checklist.md)
+- [2026-03-11-acquisition-preflight-simulation-design](../archive/simulation/2026-03-11-acquisition-preflight-simulation-design.md)
+- [チェックリスト](../2026-03-11-review-findings-fix-checklist.md)
 
 ## 記入ルール
 

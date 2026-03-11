@@ -29,7 +29,7 @@ INT g_bStartSampling = 0;
 
 void LoopTestProcessThread_EP2_EP4(LPVOID lpParam);
 void LoopTestProcessThread_EP6_GetData(LPVOID lpParam);
-INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
+INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, const BYTE* WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt);
 INT SaveWaveDataToCHFile(CFile fp[12], PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt, ULONG OneHighSize, ULONG OneLowSize);
 INT CreateWaveDataFile(
 	CFile* fp_h,
@@ -350,7 +350,7 @@ namespace
 			const INT saveResult = SaveWaveDataToFile(
 				&fileLow_,
 				&fileHigh_,
-				const_cast<PBYTE>(waveData),
+				waveData,
 				frameSizeLow,
 				frameSizeHigh,
 				waveCnt);
@@ -2003,7 +2003,7 @@ INT CreateWaveDataFile(
 	return CreateWaveDataFileOk;
 }
 
-INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, PBYTE WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
+INT SaveWaveDataToFile(CFile* fp_l, CFile* fp_h, const BYTE* WaveData, ULONG FrameSize_L, ULONG FrameSize_H, INT WaveCnt)
 {
 	if (fp_l == nullptr || fp_h == nullptr)
 	{

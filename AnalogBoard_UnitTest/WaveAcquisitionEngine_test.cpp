@@ -2,10 +2,10 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdio>
 #include <string>
 #include <vector>
 
+#include "TestFramework.h"
 #include "../AnalogBoard_TestApp/WaveAcquisitionEngine.h"
 #include "../AnalogBoard_TestApp/FpgaRegisterAddress.h"
 #include "../AnalogBoard_TestApp/FpgaRegisterEncoding.h"
@@ -14,21 +14,6 @@
 #include "../AnalogBoard_SimRunner/SimulationEp4StatusHelper.h"
 
 using namespace WaveAcquisition;
-
-static int g_TestCount = 0;
-static int g_PassCount = 0;
-static int g_FailCount = 0;
-
-#define TEST_ASSERT(cond, msg) do { \
-    g_TestCount++; \
-    if (cond) { g_PassCount++; } \
-    else { g_FailCount++; std::printf("  FAIL: %s (line %d)\n", msg, __LINE__); } \
-} while(0)
-
-#define RUN_TEST(func) do { \
-    std::printf("[TEST] %s\n", #func); \
-    func(); \
-} while(0)
 
 namespace
 {
@@ -98,6 +83,7 @@ namespace
         ULONG totalWaveCount = 0;
         ULONGLONG totalBytesWritten = 0;
         bool pairOpen = false;
+        bool contractViolation = false;
 
         INT OpenPair(INT index) override
         {
@@ -125,8 +111,10 @@ namespace
                 return kAcquisitionErrWritePair;
             }
 
-            TEST_ASSERT(pairOpen, "FakeWavePairSink write requires an open pair");
-            TEST_ASSERT(waveData != nullptr, "FakeWavePairSink write requires waveData");
+            if (!pairOpen || waveData == nullptr)
+            {
+                contractViolation = true;
+            }
 
             totalWaveCount += static_cast<ULONG>(waveCnt);
             totalBytesWritten += static_cast<ULONGLONG>(waveCnt) *
@@ -142,7 +130,10 @@ namespace
                 return kAcquisitionErrPublishPair;
             }
 
-            TEST_ASSERT(pairOpen, "FakeWavePairSink publish requires an open pair");
+            if (!pairOpen)
+            {
+                contractViolation = true;
+            }
             pairOpen = false;
             return kUsbSuccess;
         }
@@ -362,6 +353,7 @@ void Test_TC_N_01_NormalComplete_ReturnsSuccessSummary()
     TEST_ASSERT(summary.metrics.latestDdrWrEnd == 1, "TC-N-01 DDR_WR_END must be 1");
     TEST_ASSERT(observer.sawSummary, "TC-N-01 observer must receive summary");
     TEST_ASSERT(sink.publishCallCount == 2, "TC-N-01 sink publish must be called twice");
+    TEST_ASSERT(!sink.contractViolation, "TC-N-01 sink must not have contract violations");
 }
 
 void Test_TC_N_02_TimeoutRecover_ContinuesAfterSingleTimeout()
