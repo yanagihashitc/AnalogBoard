@@ -12,6 +12,24 @@ namespace fs = std::filesystem;
 
 namespace
 {
+    class ScopedCurrentPath
+    {
+    public:
+        ScopedCurrentPath()
+            : originalPath_(fs::current_path())
+        {
+        }
+
+        ~ScopedCurrentPath()
+        {
+            std::error_code ignored;
+            fs::current_path(originalPath_, ignored);
+        }
+
+    private:
+        fs::path originalPath_;
+    };
+
     std::wstring GetRepoRoot()
     {
         fs::path cwd = fs::current_path();
@@ -47,6 +65,13 @@ namespace
             }
         }
         return count;
+    }
+
+    bool RemoveDirectoryRecursively(const std::wstring& directory)
+    {
+        std::error_code error;
+        fs::remove_all(directory, error);
+        return !error;
     }
 
     void RunPresetAndAssert(
@@ -87,7 +112,47 @@ namespace
         {
             TEST_ASSERT(binFileCount >= 0, "bin file count query must succeed");
         }
+
+        TEST_ASSERT(RemoveDirectoryRecursively(result.outputDirectory), "simulation output directory cleanup must succeed");
+        TEST_ASSERT(!fs::exists(result.outputDirectory), "simulation output directory must be cleaned up after assertions");
     }
+}
+
+void Test_IT_B_01_ResolveRepoRootFromExecutablePath_FindsRepositoryRoot()
+{
+    // Given: The standard x64\Debug executable path under this repository.
+    const std::wstring expectedRepoRoot = GetRepoRoot();
+    const std::wstring executablePath =
+        (fs::path(expectedRepoRoot) / L"x64" / L"Debug" / L"AnalogBoard_SimRunner.exe").wstring();
+
+    // When: The repo root is derived from the executable path.
+    const std::wstring resolvedRepoRoot = SimRunner::ResolveRepoRootFromExecutablePath(executablePath);
+
+    // Then: The helper finds the repository root instead of depending on the current working directory.
+    TEST_ASSERT(resolvedRepoRoot == expectedRepoRoot, "executable-path resolution must find the repository root");
+}
+
+void Test_IT_B_02_ResolveRepoRootFromRelativeExecutablePath_FindsRepositoryRoot()
+{
+    // Given: A relative executable path from the repository root.
+    ScopedCurrentPath scopedCurrentPath = {};
+    const std::wstring expectedRepoRoot = GetRepoRoot();
+    std::error_code setPathError;
+    fs::current_path(expectedRepoRoot, setPathError);
+    TEST_ASSERT(!setPathError, "relative-path setup must succeed");
+    if (setPathError)
+    {
+        return;
+    }
+
+    const std::wstring relativeExecutablePath =
+        (fs::path(L"x64") / L"Debug" / L"AnalogBoard_SimRunner.exe").wstring();
+
+    // When: The repo root is derived from the relative executable path.
+    const std::wstring resolvedRepoRoot = SimRunner::ResolveRepoRootFromExecutablePath(relativeExecutablePath);
+
+    // Then: The helper still resolves the repository root correctly.
+    TEST_ASSERT(resolvedRepoRoot == expectedRepoRoot, "relative executable path must resolve to the repository root");
 }
 
 void Test_IT_N_01_NormalComplete_ProducesSuccessArtifacts()
@@ -148,6 +213,8 @@ int main()
     RUN_TEST(Test_IT_A_04_WriteFail_ProducesFailureSummary);
     RUN_TEST(Test_IT_N_04_SlowProducer_ProducesSuccessArtifacts);
     RUN_TEST(Test_IT_N_05_BurstBoundaryStress_ProducesSuccessArtifacts);
+    RUN_TEST(Test_IT_B_01_ResolveRepoRootFromExecutablePath_FindsRepositoryRoot);
+    RUN_TEST(Test_IT_B_02_ResolveRepoRootFromRelativeExecutablePath_FindsRepositoryRoot);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

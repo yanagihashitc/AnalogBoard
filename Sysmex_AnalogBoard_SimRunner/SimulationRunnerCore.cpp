@@ -16,6 +16,13 @@ namespace SimRunner
 {
     namespace
     {
+        bool IsRepoRoot(const fs::path& candidate)
+        {
+            std::error_code error;
+            return fs::exists(candidate / L"AnalogBoard_TestApp.sln", error) &&
+                fs::exists(candidate / L"data" / L"sim_scenarios", error);
+        }
+
         std::string WideToUtf8(const std::wstring& value)
         {
             if (value.empty())
@@ -461,6 +468,34 @@ namespace SimRunner
         {
             return fs::path(repoRoot) / L"data" / L"sim_scenarios" / (presetName + L".json");
         }
+    }
+
+    std::wstring ResolveRepoRootFromExecutablePath(const std::wstring& executablePath)
+    {
+        std::error_code error;
+        fs::path current = fs::absolute(fs::path(executablePath), error);
+        if (error)
+        {
+            current = fs::path(executablePath);
+        }
+
+        current = current.parent_path();
+        while (!current.empty())
+        {
+            if (IsRepoRoot(current))
+            {
+                return current.wstring();
+            }
+
+            const fs::path parent = current.parent_path();
+            if (parent == current)
+            {
+                break;
+            }
+            current = parent;
+        }
+
+        return L"";
     }
 
     int ExitCodeFromStatus(WaveAcquisition::TerminalStatus status)

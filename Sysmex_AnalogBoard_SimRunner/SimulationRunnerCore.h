@@ -15,6 +15,8 @@ namespace SimRunner
         WaveAcquisition::AcquisitionSummary summary;
     };
 
+    std::wstring ResolveRepoRootFromExecutablePath(const std::wstring& executablePath);
+
     int ExitCodeFromStatus(WaveAcquisition::TerminalStatus status);
 
     bool RunPreset(

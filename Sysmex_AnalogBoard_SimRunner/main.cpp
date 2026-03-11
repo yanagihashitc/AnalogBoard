@@ -13,12 +13,24 @@ int wmain(int argc, wchar_t* argv[])
         return 1;
     }
 
-    wchar_t cwd[MAX_PATH] = {};
-    ::GetCurrentDirectoryW(MAX_PATH, cwd);
+    wchar_t modulePath[MAX_PATH] = {};
+    const DWORD modulePathLength = ::GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+    std::wstring repoRoot;
+    if (modulePathLength > 0)
+    {
+        repoRoot = SimRunner::ResolveRepoRootFromExecutablePath(modulePath);
+    }
+
+    if (repoRoot.empty())
+    {
+        wchar_t cwd[MAX_PATH] = {};
+        ::GetCurrentDirectoryW(MAX_PATH, cwd);
+        repoRoot = cwd;
+    }
 
     SimRunner::SimulationRunResult result = {};
     std::wstring error;
-    if (!SimRunner::RunPreset(cwd, argv[1], &result, &error))
+    if (!SimRunner::RunPreset(repoRoot, argv[1], &result, &error))
     {
         std::wcerr << error << L"\n";
         return 1;

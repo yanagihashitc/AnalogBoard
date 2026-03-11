@@ -250,6 +250,11 @@ namespace SimRunner
                 return FailValidation(L"total_wave_count must be greater than zero", outError);
             }
 
+            if (scenario.timeoutRetryLimit < 0)
+            {
+                return FailValidation(L"timeout_retry_limit must be non-negative", outError);
+            }
+
             if (scenario.maxReadChunkBytes == 0)
             {
                 return FailValidation(L"max_read_chunk_bytes must be greater than zero", outError);
@@ -261,6 +266,11 @@ namespace SimRunner
             }
 
             const ULONGLONG totalLogicalBytes = oneWaveSize * static_cast<ULONGLONG>(scenario.totalWaveCount);
+            if (totalLogicalBytes > static_cast<ULONGLONG>((std::numeric_limits<ULONG>::max)()))
+            {
+                return FailValidation(L"total logical bytes exceed supported range", outError);
+            }
+
             if (scenario.producerStepBytes != 0 && scenario.producerBurstsPerPoll != 0)
             {
                 return FailValidation(L"producer_step_bytes and producer_bursts_per_poll cannot both be set", outError);
@@ -475,17 +485,17 @@ namespace SimRunner
             return false;
         }
 
-        if (!LoadRequiredUnsignedField(L"write_delay_ms", &scenario.writeDelayMs))
+        if (!LoadOptionalUnsignedField(L"write_delay_ms", &scenario.writeDelayMs))
         {
             return false;
         }
 
-        if (!LoadRequiredIntField(L"write_fail_at", &scenario.writeFailAt))
+        if (!LoadOptionalIntField(L"write_fail_at", &scenario.writeFailAt))
         {
             return false;
         }
 
-        if (!LoadRequiredIntField(L"publish_fail_at", &scenario.publishFailAt))
+        if (!LoadOptionalIntField(L"publish_fail_at", &scenario.publishFailAt))
         {
             return false;
         }

@@ -83,8 +83,8 @@ preset 定義は `data/sim_scenarios/<preset>.json` に配置。
 | フィールド | 型 | デフォルト | 説明 |
 |---|---|---|---|
 | `write_delay_ms` | unsigned int | 0 | write 遅延 (ms) |
-| `write_fail_at` | int | -1 | 指定回目の write で failure を注入 |
-| `publish_fail_at` | int | -1 | 指定回目の publish で failure を注入 |
+| `write_fail_at` | int | 0 | 指定回目の write で failure を注入 (`0` は無効) |
+| `publish_fail_at` | int | 0 | 指定回目の publish で failure を注入 (`0` は無効) |
 | `producer_step_bytes` | unsigned int | - | legacy 方式: 1 poll あたりの書き込みバイト数 (0x4000 の倍数) |
 | `producer_bursts_per_poll` | unsigned int | - | burst 方式: 1 poll あたりのバースト数 |
 | `init_poll_count` | unsigned int | 1 | Init 状態のポーリング回数 |

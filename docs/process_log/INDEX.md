@@ -7,6 +7,7 @@
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-03-11 | SimRunner review follow-ups | [log](2026-03-11-simrunner-review-followups-log.md) |
 | 2026-03-11 | SimulationScenario parser hardening | [log](2026-03-11-simulation-scenario-parser-hardening-log.md) |
 | 2026-03-11 | Warning cleanup | [log](2026-03-11-warning-cleanup-log.md) |
 | 2026-03-11 | Review findings fix | [log](2026-03-11-review-findings-fix-log.md) |
