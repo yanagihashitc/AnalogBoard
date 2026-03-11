@@ -519,11 +519,6 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 		return USB_ERR_ALLOCMEM_FAILED;
 	}
 	pOneTimeBuffer = transferBuffer.Data();
-	if (!pOneTimeBuffer)
-	{
-		UsbTransferHelpers::ReleaseMutexIfOwned(ownsSharedMutex, m_hEP2EP4Mutex);
-		return USB_ERR_ALLOCMEM_FAILED;
-	}
 
 	while (ulRecvDataSize < DataSizeCount)
 	{

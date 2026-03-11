@@ -2,7 +2,7 @@
 
 Source: `AnalogBoard_UnitTest/UsbTransferHelpers_test.cpp`
 
-Total tests: 18
+Total tests: 22
 
 ## Perspective Table
 
@@ -26,3 +26,7 @@ Total tests: 18
 | `Test_TC_N_11_ScopedHeapBufferAllocatesZeroedMinimumPositiveSize` | local heap buffer requested for 1 byte | Boundary – min positive | allocation succeeds and the byte is zero | smallest meaningful size |
 | `Test_TC_B_06_ScopedHeapBufferRejectsZeroSize` | local heap buffer requested for 0 bytes | Boundary – zero | allocation fails and state remains empty | invalid size guard |
 | `Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation` | valid allocation followed by 0-byte request | Boundary – zero after valid state | request fails and previous allocation is released | avoids stale scratch buffer reuse |
+| `Test_TC_N_12_ScopedHeapBufferMoveConstructorTransfersOwnership` | populated scratch buffer is move-constructed | Equivalence – normal | ownership transfers and source becomes empty | explicit move support for unique ownership |
+| `Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership` | populated destination takes ownership from populated source | Equivalence – normal | destination takes source buffer and source becomes empty | existing allocation must be released |
+| `Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource` | empty scratch buffer is move-constructed | Boundary – empty source | both helpers remain empty and valid | no allocation to transfer |
+| `Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource` | populated destination takes ownership from empty source | Boundary – empty source | destination releases old allocation and becomes empty | validates empty-source move assignment |

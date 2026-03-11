@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <utility>
 
 #include "../AnalogBoard_Dll/UsbTransferHelpers.h"
 
@@ -298,6 +299,77 @@ void Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation()
     TEST_ASSERT(buffer.Capacity() == 0, "TC-B-07 capacity must be cleared");
 }
 
+void Test_TC_N_12_ScopedHeapBufferMoveConstructorTransfersOwnership()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+
+    // Given: A scratch buffer owns a valid allocation before move construction.
+    // When: Ownership is transferred into a new helper via move construction.
+    // Then: The new helper owns the buffer and the source becomes empty.
+    TEST_ASSERT(source.Allocate(1024), "TC-N-12 initial allocation should succeed");
+    BYTE* originalData = source.Data();
+
+    UsbTransferHelpers::ScopedHeapBuffer moved(std::move(source));
+
+    TEST_ASSERT(moved.Data() == originalData, "TC-N-12 moved helper must own the original buffer");
+    TEST_ASSERT(moved.Capacity() == 1024, "TC-N-12 moved helper must keep capacity");
+    TEST_ASSERT(source.Data() == nullptr, "TC-N-12 source buffer must be cleared");
+    TEST_ASSERT(source.Capacity() == 0, "TC-N-12 source capacity must be cleared");
+}
+
+void Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+    UsbTransferHelpers::ScopedHeapBuffer destination;
+
+    // Given: Both source and destination own independent allocations.
+    // When: Destination takes ownership via move assignment.
+    // Then: Destination owns the source buffer and the source becomes empty.
+    TEST_ASSERT(source.Allocate(2048), "TC-N-13 source allocation should succeed");
+    TEST_ASSERT(destination.Allocate(512), "TC-N-13 destination allocation should succeed");
+    BYTE* sourceData = source.Data();
+
+    destination = std::move(source);
+
+    TEST_ASSERT(destination.Data() == sourceData, "TC-N-13 destination must own the source buffer");
+    TEST_ASSERT(destination.Capacity() == 2048, "TC-N-13 destination must keep source capacity");
+    TEST_ASSERT(source.Data() == nullptr, "TC-N-13 source buffer must be cleared");
+    TEST_ASSERT(source.Capacity() == 0, "TC-N-13 source capacity must be cleared");
+}
+
+void Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+
+    // Given: An empty scratch buffer has no allocation.
+    // When: It is move-constructed into another helper.
+    // Then: Both objects remain empty and valid.
+    UsbTransferHelpers::ScopedHeapBuffer moved(std::move(source));
+
+    TEST_ASSERT(moved.Data() == nullptr, "TC-B-08 moved helper must remain empty");
+    TEST_ASSERT(moved.Capacity() == 0, "TC-B-08 moved helper capacity must remain zero");
+    TEST_ASSERT(source.Data() == nullptr, "TC-B-08 source buffer must remain empty");
+    TEST_ASSERT(source.Capacity() == 0, "TC-B-08 source capacity must remain zero");
+}
+
+void Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource()
+{
+    UsbTransferHelpers::ScopedHeapBuffer source;
+    UsbTransferHelpers::ScopedHeapBuffer destination;
+
+    // Given: Destination owns an allocation and source is empty.
+    // When: Destination takes ownership from the empty source.
+    // Then: Destination releases its old buffer and ends in the empty state.
+    TEST_ASSERT(destination.Allocate(256), "TC-B-09 destination allocation should succeed");
+
+    destination = std::move(source);
+
+    TEST_ASSERT(destination.Data() == nullptr, "TC-B-09 destination buffer must be cleared");
+    TEST_ASSERT(destination.Capacity() == 0, "TC-B-09 destination capacity must be cleared");
+    TEST_ASSERT(source.Data() == nullptr, "TC-B-09 source buffer must remain empty");
+    TEST_ASSERT(source.Capacity() == 0, "TC-B-09 source capacity must remain zero");
+}
+
 int main()
 {
     std::printf("=== UsbTransferHelpers Unit Tests ===\n\n");
@@ -320,6 +392,10 @@ int main()
     RUN_TEST(Test_TC_N_11_ScopedHeapBufferAllocatesZeroedMinimumPositiveSize);
     RUN_TEST(Test_TC_B_06_ScopedHeapBufferRejectsZeroSize);
     RUN_TEST(Test_TC_B_07_ScopedHeapBufferZeroSizeClearsPreviousAllocation);
+    RUN_TEST(Test_TC_N_12_ScopedHeapBufferMoveConstructorTransfersOwnership);
+    RUN_TEST(Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership);
+    RUN_TEST(Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource);
+    RUN_TEST(Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;

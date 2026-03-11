@@ -3,7 +3,7 @@
 対象プラン: [USB データ取得・書き込み安定性改善プラン](./2026-03-02-usb-acquisition-stability.md)
 プロセスログ: [Process Log](./2026-03-02-usb-acquisition-stability-log.md)
 作成日: 2026-03-05
-最終同期: 2026-03-09
+最終同期: 2026-03-11
 
 ---
 
@@ -11,7 +11,7 @@
 
 依存: なし
 
-注記（2026-03-09 / Version A）: hot-path の高頻度 `PrintLog(...)` は waveform を壊しうるため、PR-01 で入れた呼び出しごとの逐次ログは Phase 0 完了条件として採用しない。Phase 0 は未完了のまま、軽量集計 + 取得終了後サマリ出力へ切り替える。
+注記（2026-03-11 更新）: 2026-03-09 に hot-path の高頻度 `PrintLog(...)` を Phase 0 完了条件から外し、軽量集計 + 取得終了後サマリ出力へ再定義した。その後、2026-03-09 16:47 JST run で baseline を再取得できたため、Phase 0 は完了扱いとする。
 
 - [x] hot-path の呼び出しごと `PrintLog(...)` 計測を無効化し、逐次ログ前提の実装を完了扱いから外す
 - [x] EP6 読み取り時間を hot-path で逐次出力せず、メモリ集計（合計/最大/回数）して取得終了後に要約出力する
@@ -36,7 +36,7 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Anal
 - [x] EP6 の不要 mutex 排除（`EP6_GetData` から `m_hEP2EP4Mutex` の Wait/Release を除去）
 - [x] OVERLAPPED イベントハンドルリーク修正（EP2/EP4/EP6 各関数末尾に `CloseHandle`）
 - [x] OVERLAPPED 構造体の `ZeroMemory` 初期化追加
-- [x] EP6 一時バッファの事前確保（毎回 malloc/free → クラスメンバ管理）
+- [x] EP6 scratch buffer 戦略を修正し、reusable buffer 導入後の回帰を 0.1.6 で per-call local heap buffer 化により解消
 - [x] Mutex 待機タイムアウト追加（`INFINITE` → 5000ms）
 - [x] `SaveWaveDataToFile` の失敗検知強化
 - [x] TDD: 各修正に対する failing test を先に追加し、修正後に pass を確認

@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <cstddef>
-#include <cstdlib>
 #include <new>
 
 namespace UsbTransferHelpers
@@ -210,6 +209,20 @@ namespace UsbTransferHelpers
 
         ScopedHeapBuffer(const ScopedHeapBuffer&) = delete;
         ScopedHeapBuffer& operator=(const ScopedHeapBuffer&) = delete;
+        ScopedHeapBuffer(ScopedHeapBuffer&& other) noexcept
+        {
+            TakeOwnershipFrom(other);
+        }
+
+        ScopedHeapBuffer& operator=(ScopedHeapBuffer&& other) noexcept
+        {
+            if (this != &other)
+            {
+                Reset();
+                TakeOwnershipFrom(other);
+            }
+            return *this;
+        }
 
         ~ScopedHeapBuffer()
         {
@@ -224,7 +237,7 @@ namespace UsbTransferHelpers
                 return false;
             }
 
-            BYTE* newBuffer = static_cast<BYTE*>(std::malloc(requiredSize));
+            BYTE* newBuffer = new (std::nothrow) BYTE[requiredSize];
             if (newBuffer == nullptr)
             {
                 return false;
@@ -248,12 +261,20 @@ namespace UsbTransferHelpers
 
         void Reset()
         {
-            std::free(buffer_);
+            delete[] buffer_;
             buffer_ = nullptr;
             capacity_ = 0;
         }
 
     private:
+        void TakeOwnershipFrom(ScopedHeapBuffer& other) noexcept
+        {
+            buffer_ = other.buffer_;
+            capacity_ = other.capacity_;
+            other.buffer_ = nullptr;
+            other.capacity_ = 0;
+        }
+
         BYTE* buffer_ = nullptr;
         size_t capacity_ = 0;
     };
