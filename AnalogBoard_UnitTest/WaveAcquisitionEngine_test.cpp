@@ -74,6 +74,16 @@ namespace
         }
     };
 
+    struct FakePollWaiter : IPollWaiter
+    {
+        std::vector<DWORD> waitCalls;
+
+        void Wait(DWORD milliseconds) override
+        {
+            waitCalls.push_back(milliseconds);
+        }
+    };
+
     struct FakeWavePairSink : IWavePairSink
     {
         INT failOpenPairAt = -1;
@@ -641,6 +651,55 @@ void Test_TC_B_07_UnalignedMaxReadChunk_IsRejected()
     TEST_ASSERT(summary.errorCode == kAcquisitionErrInvalidConfig, "TC-B-07 error code must be invalid config");
 }
 
+void Test_TC_B_08_Ep4PollSleepZero_YieldsBeforeEachPoll()
+{
+    // Given: A multi-poll acquisition with EP4 sleep set to zero.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4;
+    usb.producerStepBytes = usb.totalLogicalBytes;
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    FakePollWaiter pollWaiter = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2);
+    config.ep4PollSleepMs = 0;
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken, &pollWaiter);
+
+    // When: The engine runs the acquisition cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: Every EP4 poll is preceded by a zero-duration yield.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-B-08 terminal status must be success");
+    TEST_ASSERT(!pollWaiter.waitCalls.empty(), "TC-B-08 wait hook must be called");
+    TEST_ASSERT(pollWaiter.waitCalls.size() == static_cast<size_t>(usb.ep4CallCount), "TC-B-08 wait hook count must match EP4 polls");
+    TEST_ASSERT(std::all_of(pollWaiter.waitCalls.begin(), pollWaiter.waitCalls.end(), [](DWORD value) { return value == 0; }), "TC-B-08 wait hook values must stay zero");
+}
+
+void Test_TC_B_09_Ep4PollSleepPositive_UsesConfiguredDelay()
+{
+    // Given: A multi-poll acquisition with a positive EP4 sleep.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4;
+    usb.producerStepBytes = usb.totalLogicalBytes;
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    FakePollWaiter pollWaiter = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2);
+    config.ep4PollSleepMs = 5;
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken, &pollWaiter);
+
+    // When: The engine runs the acquisition cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: Every EP4 poll uses the configured delay.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-B-09 terminal status must be success");
+    TEST_ASSERT(!pollWaiter.waitCalls.empty(), "TC-B-09 wait hook must be called");
+    TEST_ASSERT(std::all_of(pollWaiter.waitCalls.begin(), pollWaiter.waitCalls.end(), [](DWORD value) { return value == 5; }), "TC-B-09 wait hook values must stay five");
+}
+
 void Test_L1_01_EncodeWaveWrCnt_MatchesFpgaSpec()
 {
     // Given: One full EP6-aligned burst has been written to DDR.
@@ -941,6 +1000,8 @@ int main()
     RUN_TEST(Test_TC_B_05_StopRequestedBeforeStart_ReturnsStopped);
     RUN_TEST(Test_TC_B_06_ProducerStepBelowPadding_DoesNotUnderflowWaveWriteCount);
     RUN_TEST(Test_TC_B_07_UnalignedMaxReadChunk_IsRejected);
+    RUN_TEST(Test_TC_B_08_Ep4PollSleepZero_YieldsBeforeEachPoll);
+    RUN_TEST(Test_TC_B_09_Ep4PollSleepPositive_UsesConfiguredDelay);
     RUN_TEST(Test_L1_01_EncodeWaveWrCnt_MatchesFpgaSpec);
     RUN_TEST(Test_L1_02_EncodeWaveWrCnt_ZeroBytes_ReturnsZero);
     RUN_TEST(Test_L1_03_FpgaSt_AllBits_RoundTrip);

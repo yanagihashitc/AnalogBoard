@@ -11,6 +11,13 @@ namespace SimRunner
 {
     namespace
     {
+        enum class NumberFieldMatch
+        {
+            Missing,
+            Value,
+            NegativeValue,
+        };
+
         bool ReadFileText(const std::wstring& path, std::wstring* outText)
         {
             if (outText == nullptr)
@@ -49,11 +56,14 @@ namespace SimRunner
             return true;
         }
 
-        bool FindNumberField(const std::wstring& json, const wchar_t* fieldName, ULONG* outValue)
+        NumberFieldMatch FindNumberToken(
+            const std::wstring& json,
+            const wchar_t* fieldName,
+            std::wstring* outToken)
         {
-            if (fieldName == nullptr || outValue == nullptr)
+            if (fieldName == nullptr || outToken == nullptr)
             {
-                return false;
+                return NumberFieldMatch::Missing;
             }
 
             const std::wstring pattern = L"\"" + std::wstring(fieldName) + L"\"\\s*:\\s*(-?[0-9]+)";
@@ -61,22 +71,50 @@ namespace SimRunner
             std::wsmatch match;
             if (!std::regex_search(json, match, regex) || match.size() < 2)
             {
-                return false;
+                return NumberFieldMatch::Missing;
             }
 
-            *outValue = static_cast<ULONG>(std::stoul(match[1].str()));
-            return true;
+            *outToken = match[1].str();
+            if (!outToken->empty() && (*outToken)[0] == L'-')
+            {
+                return NumberFieldMatch::NegativeValue;
+            }
+
+            return NumberFieldMatch::Value;
+        }
+
+        NumberFieldMatch FindUnsignedField(const std::wstring& json, const wchar_t* fieldName, ULONG* outValue)
+        {
+            if (outValue == nullptr)
+            {
+                return NumberFieldMatch::Missing;
+            }
+
+            std::wstring token;
+            const NumberFieldMatch match = FindNumberToken(json, fieldName, &token);
+            if (match != NumberFieldMatch::Value)
+            {
+                return match;
+            }
+
+            *outValue = static_cast<ULONG>(std::stoul(token));
+            return NumberFieldMatch::Value;
         }
 
         bool FindIntField(const std::wstring& json, const wchar_t* fieldName, INT* outValue)
         {
-            ULONG value = 0;
-            if (!FindNumberField(json, fieldName, &value) || outValue == nullptr)
+            if (outValue == nullptr)
             {
                 return false;
             }
 
-            *outValue = static_cast<INT>(value);
+            std::wstring token;
+            if (FindNumberToken(json, fieldName, &token) == NumberFieldMatch::Missing)
+            {
+                return false;
+            }
+
+            *outValue = static_cast<INT>(std::stoi(token));
             return true;
         }
 
@@ -225,55 +263,78 @@ namespace SimRunner
         }
 
         SimulationScenario scenario = {};
-        ULONG value = 0;
-        if (!FindNumberField(json, L"wave_size_low", &value))
+        auto LoadRequiredUnsignedField = [&](const wchar_t* fieldName, ULONG* outValue) -> bool
         {
+            const NumberFieldMatch match = FindUnsignedField(json, fieldName, outValue);
+            if (match == NumberFieldMatch::Value)
+            {
+                return true;
+            }
+
             if (outError != nullptr)
             {
-                *outError = L"missing wave_size_low";
+                if (match == NumberFieldMatch::NegativeValue)
+                {
+                    *outError = std::wstring(fieldName) + L" must not be negative";
+                }
+                else
+                {
+                    *outError = L"missing " + std::wstring(fieldName);
+                }
             }
-            return false;
-        }
-        scenario.waveSizeLow = value;
 
-        if (!FindNumberField(json, L"wave_size_high", &value))
+            return false;
+        };
+
+        auto LoadOptionalUnsignedField = [&](const wchar_t* fieldName, ULONG* outValue) -> bool
         {
+            const NumberFieldMatch match = FindUnsignedField(json, fieldName, outValue);
+            if (match == NumberFieldMatch::Value)
+            {
+                return true;
+            }
+
+            if (match == NumberFieldMatch::Missing)
+            {
+                return true;
+            }
+
             if (outError != nullptr)
             {
-                *outError = L"missing wave_size_high";
+                *outError = std::wstring(fieldName) + L" must not be negative";
             }
+
+            return false;
+        };
+
+        if (!LoadRequiredUnsignedField(L"wave_size_low", &scenario.waveSizeLow))
+        {
             return false;
         }
-        scenario.waveSizeHigh = value;
 
-        if (!FindNumberField(json, L"waves_per_file", &value))
+        if (!LoadRequiredUnsignedField(L"wave_size_high", &scenario.waveSizeHigh))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing waves_per_file";
-            }
             return false;
         }
-        scenario.wavesPerFile = value;
 
-        if (!FindNumberField(json, L"total_wave_count", &value))
+        if (!LoadRequiredUnsignedField(L"waves_per_file", &scenario.wavesPerFile))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing total_wave_count";
-            }
             return false;
         }
-        scenario.totalWaveCount = value;
 
-        if (FindNumberField(json, L"producer_step_bytes", &value))
+        if (!LoadRequiredUnsignedField(L"total_wave_count", &scenario.totalWaveCount))
         {
-            scenario.producerStepBytes = value;
+            return false;
         }
 
-        if (FindNumberField(json, L"producer_bursts_per_poll", &value))
+        if (!LoadOptionalUnsignedField(L"producer_step_bytes", &scenario.producerStepBytes))
         {
-            scenario.producerBurstsPerPoll = value;
+            return false;
+        }
+
+        if (!LoadOptionalUnsignedField(L"producer_bursts_per_poll", &scenario.producerBurstsPerPoll))
+        {
+            return false;
         }
 
         if (FindIntField(json, L"init_poll_count", &scenario.initPollCount))
@@ -300,15 +361,10 @@ namespace SimRunner
             }
         }
 
-        if (!FindNumberField(json, L"max_read_chunk_bytes", &value))
+        if (!LoadRequiredUnsignedField(L"max_read_chunk_bytes", &scenario.maxReadChunkBytes))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing max_read_chunk_bytes";
-            }
             return false;
         }
-        scenario.maxReadChunkBytes = value;
 
         if (!FindIntField(json, L"timeout_retry_limit", &scenario.timeoutRetryLimit))
         {
@@ -319,15 +375,10 @@ namespace SimRunner
             return false;
         }
 
-        if (!FindNumberField(json, L"write_delay_ms", &value))
+        if (!LoadRequiredUnsignedField(L"write_delay_ms", &scenario.writeDelayMs))
         {
-            if (outError != nullptr)
-            {
-                *outError = L"missing write_delay_ms";
-            }
             return false;
         }
-        scenario.writeDelayMs = value;
 
         if (!FindIntField(json, L"write_fail_at", &scenario.writeFailAt))
         {

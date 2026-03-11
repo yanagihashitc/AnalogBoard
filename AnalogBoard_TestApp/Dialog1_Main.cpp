@@ -9,7 +9,6 @@
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
-#include "AcquisitionPerfMetrics.h"
 #include "FpgaRegisterLogic.h"
 #include "SavePathValidation.h"
 #include "WaveDataFileIO.h"
@@ -22,8 +21,6 @@ Dialog1_Main* pMainDlg;
 FPGAConfigI_REGMAP	packetConfig;
 PBYTE pEp2DataBuf = NULL;//Ep2 data buffer
 PBYTE pEp4DataBuf = NULL;//Ep4 data buffer
-PBYTE pEp6DataBuf1 = NULL;//Ep6 data buffer
-PBYTE pEp6DataBuf2 = NULL;//Ep6 data buffer
 CWinThread* pLpTestThread_EP2_EP4;
 CWinThread* pLpTestThread_EP6_GetData;
 INT g_bEP24LoopFlag = 0;
@@ -61,6 +58,7 @@ namespace
 
 	constexpr INT kUsbErrFileIo = -10020;
 	constexpr INT kUsbErrFileRename = -10021;
+	constexpr ULONG kDefaultMaxReadChunkBytes = 1024u * 1024u * 256u;
 	constexpr DWORD kRenameRetryWaitMs = 100;
 	// Total attempts = 1 initial attempt + kRenameMaxRetries.
 	constexpr int kRenameMaxRetries = 3;
@@ -530,7 +528,7 @@ namespace
 		config.waveSizeLow = oneWaveSizeLow;
 		config.waveSizeHigh = oneWaveSizeHigh;
 		config.wavesPerFile = packetConfig.WaveNum;
-		config.maxReadChunkBytes = 1024u * 1024u * 256u;
+		config.maxReadChunkBytes = kDefaultMaxReadChunkBytes;
 		config.ep6TimeoutRetryLimit = 1;
 		config.ep4PollSleepMs = 0;
 
@@ -1658,40 +1656,19 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	INT iIndex = 0;
 	INT CHNum_L = 0;
 	INT CHNum_H = 0;
-	INT File_OnetimeWriteCnt = 0;
-	INT File_WriteCnt = 0;
 	INT iTimeStampIndex = 0;
 	FLOAT TrgRange = 0.0;		
 	ULONG OneCHSize_H = 0;
 	ULONG OneWaveSize_L = 0;
 	ULONG OneWaveSize_H = 0;
-	ULONG OneWaveSize = 0;
 	ULONG OneFileSize_L = 0;
 	ULONG OneFileSize_H = 0;
 	ULONG OneFileSize = 0;
-	ULONG ulOneTimeMaxSize = 0;
-	ULONG ulOneTimeSize = 0;
-	ULONG ulOneTimeCnt = 0;
-	ULONG ulRemainSize = 0;
-	ULONG ulSaveWaveCnt = 0;
-	ULONG ulLastReadComByte = 0;
-	ULONG ulLastCanSaveCnt = 0;
-	size_t DDRWaveBytes = 0;
-	size_t MaxDDRBytes = 0;
-	size_t SaveDDRBytes = 0;
-	CFile File_Low;
-	CFile File_High;
 	CString strTmp;
 	CString strTimeStamp;
 	CString strTimeStamp_use;
 	CString normalizedSavePath;
-	CString currentFinalPathLow;
-	CString currentFinalPathHigh;
-	CString currentTmpPathLow;
-	CString currentTmpPathHigh;
-	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
-	AcquisitionPerfMetrics::CycleMetrics cycleMetrics;
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
 
 	const SavePathValidation::Result savePathValidation =
@@ -1744,7 +1721,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 	OneWaveSize_L = (ULONG)((80 * CHNum_L) * TrgRange);
 	OneWaveSize_H = (ULONG)((OneCHSize_H * CHNum_H) * TrgRange);
-	OneWaveSize = OneWaveSize_L + OneWaveSize_H;
 	OneFileSize_L = OneWaveSize_L * packetConfig.WaveNum;
 	OneFileSize_H = OneWaveSize_H * packetConfig.WaveNum;
 	OneFileSize = OneFileSize_L + OneFileSize_H;
@@ -1756,37 +1732,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	strTmp.Format(_T("High file size = %dbyte, Low file size = %dbyte"), OneFileSize_H, OneFileSize_L);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
 	
-	ulOneTimeMaxSize = 1024 * 1024 * 256;
-	MaxDDRBytes = 0xFFFFFFFF;//DDR size 0xFFFFFFFF byte
-
-	strTmp.Format(_T("One time max size = %dbyte"), ulOneTimeMaxSize);
+	strTmp.Format(_T("One time max size = %dbyte"), kDefaultMaxReadChunkBytes);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
 
 	do
 	{
-		/* Initial ep6 read buffer */
-		pEp6DataBuf1 = (PBYTE)malloc(ulOneTimeMaxSize + (size_t)0x20000);
-		if (!pEp6DataBuf1)
-		{
-			CurObject->m_pMainDlg->PrintLog(_T("EP6 DATA BUF1 alloc failed."));
-			break;
-		}
-		else
-		{
-			memset(pEp6DataBuf1, 0x00, ulOneTimeMaxSize + (size_t)0x20000);
-		}
-
-		pEp6DataBuf2 = (PBYTE)malloc(ulOneTimeMaxSize + (size_t)0x20000);
-		if (!pEp6DataBuf2)
-		{
-			CurObject->m_pMainDlg->PrintLog(_T("EP6 DATA BUF2 alloc failed."));
-			break;
-		}
-		else
-		{
-			memset(pEp6DataBuf2, 0x00, ulOneTimeMaxSize + (size_t)0x20000);
-		}
-
 		/* Set button status */
 		if (CurObject->m_bManualMode == TRUE)
 		{
@@ -1963,18 +1913,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	} while (0);
 
 FINALIZE_THREAD:
-	/* Free ep6 read buffer */
-	if (pEp6DataBuf1)
-	{
-		free(pEp6DataBuf1);
-		pEp6DataBuf1 = NULL;
-	}	
-	if (pEp6DataBuf2)
-	{
-		free(pEp6DataBuf2);
-		pEp6DataBuf2 = NULL;
-	}
-
 	/* Restore button status */
 	CurObject->m_CtrlBtnDataGetStart.SetWindowText(_T("Data Get Start"));
 	CurObject->m_CtrlBtnDataGetStart.EnableWindow(TRUE);

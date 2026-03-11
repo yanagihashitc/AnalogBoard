@@ -111,6 +111,14 @@ namespace WaveAcquisition
         virtual bool IsStopRequested() const = 0;
     };
 
+    class IPollWaiter
+    {
+    public:
+        virtual ~IPollWaiter() = default;
+
+        virtual void Wait(DWORD milliseconds) = 0;
+    };
+
     class WaveAcquisitionEngine
     {
     public:
@@ -118,7 +126,8 @@ namespace WaveAcquisition
             IUsbSession* usbSession,
             IWavePairSink* wavePairSink,
             IAcquisitionObserver* observer,
-            IStopToken* stopToken);
+            IStopToken* stopToken,
+            IPollWaiter* pollWaiter = nullptr);
 
         AcquisitionSummary RunCycle(const RunConfig& config);
 
@@ -130,5 +139,6 @@ namespace WaveAcquisition
         IWavePairSink* wavePairSink_ = nullptr;
         IAcquisitionObserver* observer_ = nullptr;
         IStopToken* stopToken_ = nullptr;
+        IPollWaiter* pollWaiter_ = nullptr;
     };
 }

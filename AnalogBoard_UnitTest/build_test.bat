@@ -61,6 +61,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." SimulationScenario_test.cpp ..\AnalogBoard_SimRunner\SimulationScenario.cpp /Fe:SimulationScenario_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(SimulationScenario_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." SimulationRunnerIntegration_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp ..\AnalogBoard_SimRunner\SimulationRunnerCore.cpp ..\AnalogBoard_SimRunner\SimulationScenario.cpp /Fe:SimulationRunnerIntegration_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
@@ -131,6 +139,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(WaveAcquisitionEngine_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%SimulationScenario_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(SimulationScenario_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

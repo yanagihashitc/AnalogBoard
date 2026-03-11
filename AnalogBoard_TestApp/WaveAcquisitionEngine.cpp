@@ -14,6 +14,17 @@ namespace WaveAcquisition
             return stopToken != nullptr && stopToken->IsStopRequested();
         }
 
+        void WaitBeforeEp4Poll(IPollWaiter* pollWaiter, DWORD milliseconds)
+        {
+            if (pollWaiter != nullptr)
+            {
+                pollWaiter->Wait(milliseconds);
+                return;
+            }
+
+            ::Sleep(milliseconds);
+        }
+
         void NotifyLog(IAcquisitionObserver* observer, const std::wstring& message)
         {
             if (observer != nullptr)
@@ -217,11 +228,13 @@ namespace WaveAcquisition
         IUsbSession* usbSession,
         IWavePairSink* wavePairSink,
         IAcquisitionObserver* observer,
-        IStopToken* stopToken)
+        IStopToken* stopToken,
+        IPollWaiter* pollWaiter)
         : usbSession_(usbSession)
         , wavePairSink_(wavePairSink)
         , observer_(observer)
         , stopToken_(stopToken)
+        , pollWaiter_(pollWaiter)
     {
     }
 
@@ -273,10 +286,7 @@ namespace WaveAcquisition
 
             if (!ddrWriteCompleted)
             {
-                if (config.ep4PollSleepMs > 0)
-                {
-                    ::Sleep(config.ep4PollSleepMs);
-                }
+                WaitBeforeEp4Poll(pollWaiter_, config.ep4PollSleepMs);
 
                 const INT ep4Result = usbSession_->EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
                 if (ep4Result != kUsbSuccess)
