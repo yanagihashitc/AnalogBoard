@@ -42,15 +42,27 @@ cmd /d /c "D:\ubuntu\jupyter\sys_analyzer\AnalogBoard\scripts\run_with_vsdevcmd.
 
 ---
 
-## Phase 5: review follow-up 指摘対応
+## Phase 5: review follow-up 指摘対応（Phase 6 で一部巻き戻し）
 
 依存: Phase 3
 
-- [x] `ScopedHeapBuffer` の allocator を `ReusableTransferBuffer` と統一する
+- [x] `ScopedHeapBuffer` の allocator を `ReusableTransferBuffer` と統一する review follow-up を評価する（後続 Phase 6 で field regression により巻き戻し）
 - [x] `ScopedHeapBuffer` の move semantics を test-first で追加する
 - [x] `EP6_GetData()` の到達不能な null check を削除する
 - [x] process log の timestamp 順序を修正する
 - [x] follow-up の targeted/full test と `Debug x64` rebuild を確認する
+
+---
+
+## Phase 6: field regression fix
+
+依存: Phase 5
+
+- [x] versioned field logs の比較結果を設計/ログへ反映する
+- [x] allocator backend contract の test case を追加する
+- [x] red を確認する
+- [x] `ScopedHeapBuffer` を CRT `malloc/free` backend に戻す
+- [x] targeted test を pass させる
 
 ---
 

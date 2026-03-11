@@ -33,13 +33,16 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Anal
 
 依存: Phase 0 (PR-01)
 
-- [x] EP6 の不要 mutex 排除（`EP6_GetData` から `m_hEP2EP4Mutex` の Wait/Release を除去）
+- 注記（2026-03-11 更新）: versioned field logs により、`0.1.4` と `cmp_76b2b2a` は正常完走、`0.1.5` と生の `76b2b2a` は取得開始後にログが途切れて再起動相当、`0.1.6` follow-up は `new[]/delete[]` 化後に EP6 timeout で未完走と判明した。Phase 1 の完了条件は comparison build の成功条件である `per-call local scratch buffer + CRT malloc/free` の維持に置き、shared mutex 分離は後続 Phase で再評価する。
+
+- [x] EP6 shared mutex 方針を comparison build と整合させ、現時点では shared mutex 維持・後続 Phase で再評価と明記
 - [x] OVERLAPPED イベントハンドルリーク修正（EP2/EP4/EP6 各関数末尾に `CloseHandle`）
 - [x] OVERLAPPED 構造体の `ZeroMemory` 初期化追加
-- [x] EP6 scratch buffer 戦略を修正し、reusable buffer 導入後の回帰を 0.1.6 で per-call local heap buffer 化により解消
+- [x] EP6 scratch buffer 戦略を修正し、comparison build と同じ per-call local heap buffer + CRT `malloc/free` backend に固定する
 - [x] Mutex 待機タイムアウト追加（`INFINITE` → 5000ms）
 - [x] `SaveWaveDataToFile` の失敗検知強化
 - [x] TDD: 各修正に対する failing test を先に追加し、修正後に pass を確認
+- [x] `0.1.4 / 0.1.5 / 76b2b2a / cmp_76b2b2a / 0.1.6` の実機ログ比較結果を plan / process log / troubleshooting に記録する
 - [ ] 既存通信シーケンスで回帰なし、timeout 率が baseline 以下を確認
 - [ ] 実機確認: PR-02 完了直後に通常取得 3-5 サイクルを実施し、waveform 正常・`[PR01][CYCLE]` が baseline から大きく悪化しない・timeout 率が baseline 以下であることを確認
 

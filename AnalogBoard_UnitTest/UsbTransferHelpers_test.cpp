@@ -370,6 +370,32 @@ void Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource()
     TEST_ASSERT(source.Capacity() == 0, "TC-B-09 source capacity must remain zero");
 }
 
+void Test_TC_N_14_ScopedHeapBufferUsesCrtMallocBackend()
+{
+    // Given: Field verification succeeded only with the CRT malloc/free-backed
+    // scratch buffer used in the comparison build.
+    // When: The helper exposes the active allocator backend contract.
+    // Then: The contract must remain CRT malloc/free.
+    TEST_ASSERT(
+        UsbTransferHelpers::GetScopedHeapBufferBackend() == UsbTransferHelpers::HeapAllocationBackend::CrtMalloc,
+        "TC-N-14 ScopedHeapBuffer backend must stay on CRT malloc/free");
+}
+
+void Test_TC_B_10_ScopedHeapBufferBackendContractSurvivesReuse()
+{
+    UsbTransferHelpers::ScopedHeapBuffer buffer;
+
+    // Given: The scratch buffer has already gone through one allocate/reset cycle.
+    // When: The allocator backend contract is queried after reuse-related state changes.
+    // Then: The helper must still report the CRT malloc/free backend.
+    TEST_ASSERT(buffer.Allocate(64), "TC-B-10 initial allocation should succeed");
+    buffer.Reset();
+
+    TEST_ASSERT(
+        UsbTransferHelpers::GetScopedHeapBufferBackend() == UsbTransferHelpers::HeapAllocationBackend::CrtMalloc,
+        "TC-B-10 backend contract must remain CRT malloc/free after reset");
+}
+
 int main()
 {
     std::printf("=== UsbTransferHelpers Unit Tests ===\n\n");
@@ -396,6 +422,8 @@ int main()
     RUN_TEST(Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership);
     RUN_TEST(Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource);
     RUN_TEST(Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource);
+    RUN_TEST(Test_TC_N_14_ScopedHeapBufferUsesCrtMallocBackend);
+    RUN_TEST(Test_TC_B_10_ScopedHeapBufferBackendContractSurvivesReuse);
 
     std::printf("\n=== Results: %d tests, %d passed, %d failed ===\n", g_TestCount, g_PassCount, g_FailCount);
     return g_FailCount > 0 ? 1 : 0;

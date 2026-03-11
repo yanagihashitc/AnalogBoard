@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <cstddef>
+#include <cstdlib>
 #include <new>
 
 namespace UsbTransferHelpers
@@ -21,12 +22,32 @@ namespace UsbTransferHelpers
         Ep6,
     };
 
+    enum class HeapAllocationBackend
+    {
+        CrtMalloc,
+    };
+
     inline bool RequiresEp2Ep4Mutex(TransferEndpoint endpoint)
     {
         // CyAPI endpoint independence has not been proven for this device/session,
         // so every transfer path stays behind the shared mutex.
         UNREFERENCED_PARAMETER(endpoint);
         return true;
+    }
+
+    inline HeapAllocationBackend GetScopedHeapBufferBackend()
+    {
+        return HeapAllocationBackend::CrtMalloc;
+    }
+
+    inline BYTE* AllocateScopedHeapBytes(size_t requiredSize)
+    {
+        return static_cast<BYTE*>(std::malloc(requiredSize));
+    }
+
+    inline void FreeScopedHeapBytes(BYTE* buffer)
+    {
+        std::free(buffer);
     }
 
     inline void ResetOverlappedWithEvent(OVERLAPPED* overlapped, HANDLE eventHandle)
@@ -237,7 +258,7 @@ namespace UsbTransferHelpers
                 return false;
             }
 
-            BYTE* newBuffer = new (std::nothrow) BYTE[requiredSize];
+            BYTE* newBuffer = AllocateScopedHeapBytes(requiredSize);
             if (newBuffer == nullptr)
             {
                 return false;
@@ -261,7 +282,7 @@ namespace UsbTransferHelpers
 
         void Reset()
         {
-            delete[] buffer_;
+            FreeScopedHeapBytes(buffer_);
             buffer_ = nullptr;
             capacity_ = 0;
         }

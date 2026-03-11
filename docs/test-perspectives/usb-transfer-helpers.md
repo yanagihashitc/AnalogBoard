@@ -2,7 +2,7 @@
 
 Source: `AnalogBoard_UnitTest/UsbTransferHelpers_test.cpp`
 
-Total tests: 22
+Total tests: 24
 
 ## Perspective Table
 
@@ -10,7 +10,7 @@ Total tests: 22
 |---|---|---|---|---|
 | `Test_TC_N_01_Ep2RequiresSharedMutex` | endpoint role is EP2 | Equivalence – normal | shared EP2/EP4 mutex is required | command endpoint contract |
 | `Test_TC_N_02_Ep4RequiresSharedMutex` | endpoint role is EP4 | Equivalence – normal | shared EP2/EP4 mutex is required | register-read endpoint contract |
-| `Test_TC_N_03_Ep6RequiresSharedMutex` | endpoint role is EP6 | Equivalence – normal | shared EP2/EP4 mutex is required | current `0.1.5` contract |
+| `Test_TC_N_03_Ep6RequiresSharedMutex` | endpoint role is EP6 | Equivalence – normal | shared EP2/EP4 mutex is required | current stable comparison-path contract |
 | `Test_TC_B_01_MutexWaitTimeoutIsFixedToFiveSeconds` | helper timeout constant | Boundary – fixed config | timeout is `5000ms` | replaces `INFINITE` wait |
 | `Test_TC_N_04_ResetOverlappedPreservesOnlyEventHandle` | stale `OVERLAPPED` with a fresh event handle | Equivalence – reinitialization | all fields except `hEvent` are zeroed | `ZeroMemory` contract |
 | `Test_TC_N_05_ScopedHandleClosesExactlyOnce` | scoped handle owns one valid handle | Equivalence – resource cleanup | closer runs exactly once | event handle leak prevention |
@@ -30,3 +30,5 @@ Total tests: 22
 | `Test_TC_N_13_ScopedHeapBufferMoveAssignmentTransfersOwnership` | populated destination takes ownership from populated source | Equivalence – normal | destination takes source buffer and source becomes empty | existing allocation must be released |
 | `Test_TC_B_08_ScopedHeapBufferMoveConstructorHandlesEmptySource` | empty scratch buffer is move-constructed | Boundary – empty source | both helpers remain empty and valid | no allocation to transfer |
 | `Test_TC_B_09_ScopedHeapBufferMoveAssignmentHandlesEmptySource` | populated destination takes ownership from empty source | Boundary – empty source | destination releases old allocation and becomes empty | validates empty-source move assignment |
+| `Test_TC_N_14_ScopedHeapBufferUsesCrtMallocBackend` | backend contract is queried | Equivalence – field-validated config | backend is CRT `malloc/free` | protects the successful comparison build contract |
+| `Test_TC_B_10_ScopedHeapBufferBackendContractSurvivesReuse` | allocate/reset completed before querying backend | Boundary – post-reuse | backend remains CRT `malloc/free` | prevents follow-up allocator regressions |
