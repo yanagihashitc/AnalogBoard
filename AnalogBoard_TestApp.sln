@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AnalogBoard_TestApp", "Anal
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AnalogBoard_Dll", "AnalogBoard_Dll\AnalogBoard_Dll.vcxproj", "{ED113977-2820-40BD-9CE8-DFFADA83A42B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AnalogBoard_SimRunner", "AnalogBoard_SimRunner\AnalogBoard_SimRunner.vcxproj", "{A1C0F5E4-9C5F-4D9B-8D54-5E4F3B1F9A73}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,10 @@ Global
 		{ED113977-2820-40BD-9CE8-DFFADA83A42B}.Debug|x64.Build.0 = Debug|x64
 		{ED113977-2820-40BD-9CE8-DFFADA83A42B}.Release|x64.ActiveCfg = Release|x64
 		{ED113977-2820-40BD-9CE8-DFFADA83A42B}.Release|x64.Build.0 = Release|x64
+		{A1C0F5E4-9C5F-4D9B-8D54-5E4F3B1F9A73}.Debug|x64.ActiveCfg = Debug|x64
+		{A1C0F5E4-9C5F-4D9B-8D54-5E4F3B1F9A73}.Debug|x64.Build.0 = Debug|x64
+		{A1C0F5E4-9C5F-4D9B-8D54-5E4F3B1F9A73}.Release|x64.ActiveCfg = Release|x64
+		{A1C0F5E4-9C5F-4D9B-8D54-5E4F3B1F9A73}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

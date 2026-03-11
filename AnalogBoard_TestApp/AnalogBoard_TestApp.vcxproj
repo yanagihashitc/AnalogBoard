@@ -108,6 +108,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CColorEdit.h" />
+    <ClInclude Include="WaveAcquisitionEngine.h" />
     <ClInclude Include="Dialog1_Main.h" />
     <ClInclude Include="Dialog2_Debug.h" />
     <ClInclude Include="FpgaRegisterAddress.h" />
@@ -123,6 +124,10 @@
     <ClCompile Include="CColorEdit.cpp" />
     <ClCompile Include="Dialog1_Main.cpp" />
     <ClCompile Include="Dialog2_Debug.cpp" />
+    <ClCompile Include="WaveAcquisitionEngine.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

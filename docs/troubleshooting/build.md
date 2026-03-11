@@ -138,3 +138,39 @@ Re-run the exact same `msbuild` command with escalated permissions enabled for t
 - `CyLib/x64/CyAPI.lib`
 - `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
 - `AnalogBoard_TestApp.sln`
+
+---
+
+## C4996 / STL4017 when simulation code uses `<codecvt>` in VS2022
+
+**Date**: 2026-03-11
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_SimRunner:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1` fails in `SimulationRunnerCore.cpp` / `SimulationScenario.cpp`
+- Compiler reports `error C4996` for `std::codecvt_utf8_utf16`
+- The nested warning text is `STL4017` about `<codecvt>` deprecation in C++17
+
+### Root Cause
+
+The VS2022 STL marks `<codecvt>` helpers such as `std::codecvt_utf8_utf16` as deprecated in C++17. In this repository, the standalone simulation project treats that deprecation as `C4996`, so using locale facets based on `<codecvt>` breaks the build.
+
+### Failed Approaches
+
+1. Using `std::wifstream` / `std::wofstream` with `std::locale(..., new std::codecvt_utf8_utf16<wchar_t>)`
+
+### Solution
+
+1. Remove `<codecvt>` usage from the simulation code
+2. Read JSON as UTF-8 bytes with `std::ifstream`
+3. Convert UTF-8 to UTF-16 with `MultiByteToWideChar`
+4. Convert UTF-16 to UTF-8 with `WideCharToMultiByte` when writing `runner.log` / `summary.json`
+5. Re-run the SimRunner rebuild and confirm it succeeds
+
+### Related Files
+
+- `AnalogBoard_SimRunner/SimulationScenario.cpp`
+- `AnalogBoard_SimRunner/SimulationRunnerCore.cpp`
+- `AnalogBoard_SimRunner/AnalogBoard_SimRunner.vcxproj`

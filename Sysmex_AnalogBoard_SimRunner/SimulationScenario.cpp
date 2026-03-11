@@ -1,0 +1,295 @@
+#include "SimulationScenario.h"
+
+#include <cwctype>
+#include <fstream>
+#include <regex>
+#include <sstream>
+
+namespace SimRunner
+{
+    namespace
+    {
+        bool ReadFileText(const std::wstring& path, std::wstring* outText)
+        {
+            if (outText == nullptr)
+            {
+                return false;
+            }
+
+            std::ifstream input(path, std::ios::binary);
+            if (!input.is_open())
+            {
+                return false;
+            }
+
+            std::ostringstream buffer;
+            buffer << input.rdbuf();
+            const std::string utf8 = buffer.str();
+            if (utf8.empty())
+            {
+                outText->clear();
+                return true;
+            }
+
+            const int required = ::MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.size()), nullptr, 0);
+            if (required <= 0)
+            {
+                return false;
+            }
+
+            std::wstring wideText(static_cast<size_t>(required), L'\0');
+            if (::MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.size()), &wideText[0], required) <= 0)
+            {
+                return false;
+            }
+
+            *outText = wideText;
+            return true;
+        }
+
+        bool FindNumberField(const std::wstring& json, const wchar_t* fieldName, ULONG* outValue)
+        {
+            if (fieldName == nullptr || outValue == nullptr)
+            {
+                return false;
+            }
+
+            const std::wstring pattern = L"\"" + std::wstring(fieldName) + L"\"\\s*:\\s*(-?[0-9]+)";
+            std::wregex regex(pattern);
+            std::wsmatch match;
+            if (!std::regex_search(json, match, regex) || match.size() < 2)
+            {
+                return false;
+            }
+
+            *outValue = static_cast<ULONG>(std::stoul(match[1].str()));
+            return true;
+        }
+
+        bool FindIntField(const std::wstring& json, const wchar_t* fieldName, INT* outValue)
+        {
+            ULONG value = 0;
+            if (!FindNumberField(json, fieldName, &value) || outValue == nullptr)
+            {
+                return false;
+            }
+
+            *outValue = static_cast<INT>(value);
+            return true;
+        }
+
+        bool FindStringArrayField(
+            const std::wstring& json,
+            const wchar_t* fieldName,
+            std::vector<std::wstring>* outValues)
+        {
+            if (fieldName == nullptr || outValues == nullptr)
+            {
+                return false;
+            }
+
+            const std::wstring pattern = L"\"" + std::wstring(fieldName) + L"\"\\s*:\\s*\\[(.*?)\\]";
+            std::wregex regex(pattern);
+            std::wsmatch match;
+            if (!std::regex_search(json, match, regex) || match.size() < 2)
+            {
+                return false;
+            }
+
+            const std::wstring rawValues = match[1].str();
+            std::wregex itemRegex(L"\"([^\"]+)\"");
+            auto begin = std::wsregex_iterator(rawValues.begin(), rawValues.end(), itemRegex);
+            auto end = std::wsregex_iterator();
+            for (auto it = begin; it != end; ++it)
+            {
+                outValues->push_back((*it)[1].str());
+            }
+
+            return !outValues->empty();
+        }
+
+        bool TryParseEp6Result(const std::wstring& token, Ep6ResultKind* outValue)
+        {
+            if (outValue == nullptr)
+            {
+                return false;
+            }
+
+            std::wstring lower = token;
+            for (wchar_t& ch : lower)
+            {
+                ch = static_cast<wchar_t>(std::towlower(ch));
+            }
+
+            if (lower == L"success")
+            {
+                *outValue = Ep6ResultKind::Success;
+                return true;
+            }
+            if (lower == L"timeout")
+            {
+                *outValue = Ep6ResultKind::Timeout;
+                return true;
+            }
+            if (lower == L"disconnect")
+            {
+                *outValue = Ep6ResultKind::Disconnect;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    bool LoadScenarioFromFile(
+        const std::wstring& path,
+        SimulationScenario* outScenario,
+        std::wstring* outError)
+    {
+        if (outScenario == nullptr)
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"outScenario is null";
+            }
+            return false;
+        }
+
+        std::wstring json;
+        if (!ReadFileText(path, &json))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"failed to read scenario file";
+            }
+            return false;
+        }
+
+        SimulationScenario scenario = {};
+        ULONG value = 0;
+        if (!FindNumberField(json, L"wave_size_low", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing wave_size_low";
+            }
+            return false;
+        }
+        scenario.waveSizeLow = value;
+
+        if (!FindNumberField(json, L"wave_size_high", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing wave_size_high";
+            }
+            return false;
+        }
+        scenario.waveSizeHigh = value;
+
+        if (!FindNumberField(json, L"waves_per_file", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing waves_per_file";
+            }
+            return false;
+        }
+        scenario.wavesPerFile = value;
+
+        if (!FindNumberField(json, L"total_wave_count", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing total_wave_count";
+            }
+            return false;
+        }
+        scenario.totalWaveCount = value;
+
+        if (!FindNumberField(json, L"producer_step_bytes", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing producer_step_bytes";
+            }
+            return false;
+        }
+        scenario.producerStepBytes = value;
+
+        if (!FindNumberField(json, L"max_read_chunk_bytes", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing max_read_chunk_bytes";
+            }
+            return false;
+        }
+        scenario.maxReadChunkBytes = value;
+
+        if (!FindIntField(json, L"timeout_retry_limit", &scenario.timeoutRetryLimit))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing timeout_retry_limit";
+            }
+            return false;
+        }
+
+        if (!FindNumberField(json, L"write_delay_ms", &value))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing write_delay_ms";
+            }
+            return false;
+        }
+        scenario.writeDelayMs = value;
+
+        if (!FindIntField(json, L"write_fail_at", &scenario.writeFailAt))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing write_fail_at";
+            }
+            return false;
+        }
+
+        if (!FindIntField(json, L"publish_fail_at", &scenario.publishFailAt))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing publish_fail_at";
+            }
+            return false;
+        }
+
+        std::vector<std::wstring> ep6Tokens;
+        if (!FindStringArrayField(json, L"ep6_results", &ep6Tokens))
+        {
+            if (outError != nullptr)
+            {
+                *outError = L"missing ep6_results";
+            }
+            return false;
+        }
+
+        for (const std::wstring& token : ep6Tokens)
+        {
+            Ep6ResultKind resultKind = Ep6ResultKind::Success;
+            if (!TryParseEp6Result(token, &resultKind))
+            {
+                if (outError != nullptr)
+                {
+                    *outError = L"invalid ep6_results value: " + token;
+                }
+                return false;
+            }
+
+            scenario.ep6Results.push_back(resultKind);
+        }
+
+        *outScenario = scenario;
+        return true;
+    }
+}

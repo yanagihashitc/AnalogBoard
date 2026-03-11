@@ -3,73 +3,87 @@
 ## 1. 前提環境
 
 - OS: Windows
-- IDE: Visual Studio 2022 (Community で可)
+- IDE: Visual Studio 2022
 - 必須コンポーネント:
   - `C++ によるデスクトップ開発`
   - `MSVC v143 (x64)`
   - `Windows 10 SDK` または `Windows 11 SDK`
-  - `MFC for v143 (x64)`
+  - `MFC for v143 (x64)` (`AnalogBoard_TestApp` / `AnalogBoard_Dll` 用)
 
-## 2. ビルド端末を開く
-
-- `x64 Native Tools Command Prompt for VS 2022` を起動する
-- リポジトリへ移動する
+## 2. 実行場所
 
 ```bat
 cd /d D:\ubuntu\jupyter\sys_analyzer\AnalogBoard
 ```
 
-## 3. 初回準備（.vcxproj を用意）
+## 3. `.vcxproj` を再生成する場合
 
-このリポジトリは `*.vcxproj.xml` を保持しているため、ビルド前に `*.vcxproj` を作る。
+通常は不要。`*.vcxproj` が欠けている場合だけ `*.vcxproj.xml` から復元する。
 
 ```bat
 copy /Y AnalogBoard_TestApp\AnalogBoard_TestApp.vcxproj.xml AnalogBoard_TestApp\AnalogBoard_TestApp.vcxproj
 copy /Y AnalogBoard_Dll\AnalogBoard_Dll.vcxproj.xml AnalogBoard_Dll\AnalogBoard_Dll.vcxproj
+copy /Y AnalogBoard_SimRunner\AnalogBoard_SimRunner.vcxproj.xml AnalogBoard_SimRunner\AnalogBoard_SimRunner.vcxproj
 ```
 
-## 4. ビルド（Release / x64）
+## 4. 実機用だけ build
 
-このリポジトリは `x64` のみサポート。依存関係の都合で `Dll` を先にビルドする。
+依存関係の都合で `Dll` を先に build する。
 
 ```bat
-msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_Dll:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1
-msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_TestApp:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1
+cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_Dll:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1"
+cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_TestApp:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1"
 ```
 
-## 5. 生成物
+生成物:
 
 - `x64\Release\AnalogBoard_Dll.dll`
 - `x64\Release\AnalogBoard_TestApp.exe`
 
-## 6. 既存配布物との比較
+## 5. simulation 用だけ build
 
 ```bat
-certutil -hashfile x64\Release\AnalogBoard_TestApp.exe SHA256
-certutil -hashfile D:\ubuntu\jupyter\sys_analyzer\AnalogBoard_TestApp_ver2.0.2.exe SHA256
+cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_SimRunner:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"
 ```
 
-参考: `AnalogBoard_TestApp_ver2.0.2.exe` の既知SHA256
+生成物:
 
-```text
-d8393310f279c5fda6568b01d1d0577a4d50863d9ef4f13a757166d719c7da80
+- `x64\Debug\AnalogBoard_SimRunner.exe`
+
+## 6. UnitTest だけ build / run
+
+この repository の UnitTest 正本は solution target ではなく `build_test.bat`。
+
+```bat
+cmd /d /c "scripts\run_with_vsdevcmd.bat AnalogBoard_UnitTest\build_test.bat"
 ```
 
-## 7. よくあるエラー
+## 7. simulation preset 実行
 
-### MSB8041 (MFCがない)
+`scripts\run_simulation.bat <preset>` が正本。script 内で `AnalogBoard_SimRunner` を rebuild してから実行する。
 
-- 症状: `このプロジェクトには、MFC のライブラリが必要です`
-- 対応: Visual Studio Installer で `MFC for v143 (x64)` を追加
+```bat
+cmd /d /c "scripts\run_simulation.bat normal_complete"
+cmd /d /c "scripts\run_simulation.bat ep6_timeout_once_then_recover"
+cmd /d /c "scripts\run_simulation.bat ep6_timeout_persistent"
+cmd /d /c "scripts\run_simulation.bat usb_disconnect_midstream"
+cmd /d /c "scripts\run_simulation.bat writer_slow_queue_pressure"
+cmd /d /c "scripts\run_simulation.bat publish_fail"
+```
 
-### LNK1181 (`AnalogBoard_Dll.lib` を開けない)
+出力先:
 
-- 症状: `..\x64\Release\AnalogBoard_Dll.lib を開けません`
-- 原因: `TestApp` が先にリンクされ、`Dll.lib` が未生成
-- 対応: 本書の通り `Dll` を先にビルドする
+- `logs\sim\<preset>\<timestamp>\runner.log`
+- `logs\sim\<preset>\<timestamp>\summary.json`
+- `logs\sim\<preset>\<timestamp>\*_fl_*.bin`
+- `logs\sim\<preset>\<timestamp>\*_fh_*.bin`
 
 ## 8. 補足
 
-- ソリューション構成は `Debug|x64` / `Release|x64` のみ（`Win32/x86` は非対応）
-- ハッシュが一致しない場合でも、タイムスタンプやビルド環境差分でバイナリ差分が出ることがある
-- 完全一致を狙う場合は、ソースリビジョン / VSバージョン / SDK / ビルドオプションを固定する
+- solution 構成は `Debug|x64` / `Release|x64` のみ
+- `AnalogBoard_TestApp.exe` には simulation preset / fake USB / scenario parser は含めない
+- `scripts\run_simulation.bat` の戻り値は terminal status に応じて変わる
+  - `0`: success
+  - `2`: EP6 timeout
+  - `3`: USB disconnect
+  - `4`: publish failure
