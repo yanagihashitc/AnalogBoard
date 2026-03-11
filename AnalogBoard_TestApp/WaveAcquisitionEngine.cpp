@@ -80,6 +80,11 @@ namespace WaveAcquisition
                 return false;
             }
 
+            if ((config.maxReadChunkBytes % static_cast<ULONG>(kEp6ReadAlignmentBytes)) != 0)
+            {
+                return false;
+            }
+
             return true;
         }
 

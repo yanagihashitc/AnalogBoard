@@ -28,6 +28,7 @@ cmd /d /c "scripts\run_simulation.bat normal_complete"
 | `ep6_timeout_persistent` | timeout 打ち切り確認 | `ep6_timeout` |
 | `usb_disconnect_midstream` | 途中 disconnect 確認 | `usb_disconnect` |
 | `writer_slow_queue_pressure` | write 遅延時の backlog 確認 | `success` |
+| `write_fail` | write failure 確認 | `write_failed` |
 | `publish_fail` | publish failure 確認 | `publish_failed` |
 
 ## 4. まず何を回すか
@@ -35,6 +36,7 @@ cmd /d /c "scripts\run_simulation.bat normal_complete"
 最小:
 
 - `normal_complete`
+- `write_fail`
 - `publish_fail`
 
 実機前の推奨:
@@ -45,6 +47,7 @@ cmd /d /c "scripts\run_simulation.bat ep6_timeout_once_then_recover"
 cmd /d /c "scripts\run_simulation.bat ep6_timeout_persistent"
 cmd /d /c "scripts\run_simulation.bat usb_disconnect_midstream"
 cmd /d /c "scripts\run_simulation.bat writer_slow_queue_pressure"
+cmd /d /c "scripts\run_simulation.bat write_fail"
 cmd /d /c "scripts\run_simulation.bat publish_fail"
 ```
 

@@ -5,6 +5,15 @@
 作成日: 2026-03-05
 最終同期: 2026-03-11
 
+> **2026-03-11 同期メモ**: `feature/acquisition-preflight-simulation` ブランチで以下が先行実施された。
+> - `WaveAcquisitionEngine` の抽出（`IUsbSession` / `IWavePairSink` / `IAcquisitionObserver` インターフェース分離）
+> - `Dialog1_Main.cpp` のリファクタ（adapter パターンで engine 呼び出し、~1300行 → ~800行）
+> - 6 preset の simulation runner + unit test 11 本 + integration test 6 本
+>
+> これにより Phase 2 以降の一部項目（Engine 抽出、Dialog1_Main 行数削減）は simulation ブランチで達成済み。
+> ただし Phase 2 の本来の目的である **Queue ベースの非同期 Reader/Writer 分離**は未実施。
+> Phase 1.5 以降は simulation ブランチの成果を土台として進める。
+
 ---
 
 ## Phase 0: 現状可視化・ログ計測（PR-01）
@@ -83,7 +92,7 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Anal
 
 依存: Phase 1.5 (PR-03a)
 
-- [ ] `WaveAcquisitionEngine.h` 新規作成（型定義: `EngineStatus`, `AcquisitionConfig`, `WaveChunk`）
+- [ ] `WaveAcquisitionEngine.h` 新規作成（型定義: `EngineStatus`, `AcquisitionConfig`, `WaveChunk`）— 注記: simulation ブランチで `WaveAcquisitionEngine` は作成済み。Queue/非同期化の追加が必要
 - [ ] `BlockingQueue<WaveChunk>` 実装（`std::mutex` + `std::condition_variable`）
 - [ ] `Enqueue` / `Dequeue` のタイムアウト・停止要求時挙動実装
 - [ ] エラーコード追加（`USB_ERR_INVALID_STATE`, `USB_ERR_DEVICE_DISCONNECTED`, `USB_ERR_THREAD_STOP_TIMEOUT`, `USB_ERR_QUEUE_FULL_TIMEOUT`, `USB_ERR_INVALID_OUTPUT_PATH`, `USB_ERR_OUTPUT_PATH_NOT_FOUND`, `USB_ERR_OUTPUT_PATH_NOT_WRITABLE`）
@@ -142,7 +151,7 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat x64\Debug\AnalogBoard_UnitTest.exe"
 - [ ] `.tmp` 失敗時の隔離ディレクトリ退避（`{SavePath}\.quarantine\{YYYYMMDD_HHmmss}\`）
 - [ ] グローバル変数のクラスメンバ移動
 - [ ] TDD: T6（Draining 中 Stop）テスト追加・pass
-- [ ] Dialog1_Main.cpp の行数削減目標確認（各ファイル 1000行以下）
+- [ ] Dialog1_Main.cpp の行数削減目標確認（各ファイル 1000行以下）— 注記: simulation ブランチで ~1300行 → ~800行に削減済み
 
 ---
 

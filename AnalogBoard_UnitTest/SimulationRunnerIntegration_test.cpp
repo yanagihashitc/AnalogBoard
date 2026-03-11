@@ -135,6 +135,11 @@ void Test_IT_A_03_PublishFail_ProducesFailureSummary()
     RunPresetAndAssert(L"publish_fail", 4, "publish_failed", false);
 }
 
+void Test_IT_A_04_WriteFail_ProducesFailureSummary()
+{
+    RunPresetAndAssert(L"write_fail", 5, "write_failed", false);
+}
+
 int main()
 {
     std::printf("=== SimulationRunner Integration Tests ===\n\n");
@@ -145,6 +150,7 @@ int main()
     RUN_TEST(Test_IT_A_01_PersistentTimeout_ProducesTimeoutSummary);
     RUN_TEST(Test_IT_A_02_Disconnect_ProducesDisconnectSummary);
     RUN_TEST(Test_IT_A_03_PublishFail_ProducesFailureSummary);
+    RUN_TEST(Test_IT_A_04_WriteFail_ProducesFailureSummary);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

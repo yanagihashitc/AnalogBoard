@@ -5,6 +5,8 @@
 #include <regex>
 #include <sstream>
 
+#include "../AnalogBoard_TestApp/WaveAcquisitionEngine.h"
+
 namespace SimRunner
 {
     namespace
@@ -138,6 +140,58 @@ namespace SimRunner
             }
 
             return false;
+        }
+
+        bool FailValidation(const std::wstring& message, std::wstring* outError)
+        {
+            if (outError != nullptr)
+            {
+                *outError = message;
+            }
+
+            return false;
+        }
+
+        bool ValidateScenario(const SimulationScenario& scenario, std::wstring* outError)
+        {
+            const ULONGLONG oneWaveSize =
+                static_cast<ULONGLONG>(scenario.waveSizeLow) +
+                static_cast<ULONGLONG>(scenario.waveSizeHigh);
+
+            if (oneWaveSize == 0)
+            {
+                return FailValidation(L"wave sizes must not both be zero", outError);
+            }
+
+            if (scenario.wavesPerFile == 0)
+            {
+                return FailValidation(L"waves_per_file must be greater than zero", outError);
+            }
+
+            if (scenario.totalWaveCount == 0)
+            {
+                return FailValidation(L"total_wave_count must be greater than zero", outError);
+            }
+
+            if (scenario.maxReadChunkBytes == 0)
+            {
+                return FailValidation(L"max_read_chunk_bytes must be greater than zero", outError);
+            }
+
+            if ((scenario.maxReadChunkBytes % static_cast<ULONG>(WaveAcquisition::kEp6ReadAlignmentBytes)) != 0)
+            {
+                return FailValidation(L"max_read_chunk_bytes must align to EP6 reads", outError);
+            }
+
+            const ULONGLONG totalLogicalBytes = oneWaveSize * static_cast<ULONGLONG>(scenario.totalWaveCount);
+            if (scenario.producerStepBytes != 0 &&
+                static_cast<ULONGLONG>(scenario.producerStepBytes) < totalLogicalBytes &&
+                (scenario.producerStepBytes % static_cast<ULONG>(WaveAcquisition::kEp6ReadAlignmentBytes)) != 0)
+            {
+                return FailValidation(L"producer_step_bytes must align to EP6 reads for multi-step scenarios", outError);
+            }
+
+            return true;
         }
     }
 
@@ -287,6 +341,11 @@ namespace SimRunner
             }
 
             scenario.ep6Results.push_back(resultKind);
+        }
+
+        if (!ValidateScenario(scenario, outError))
+        {
+            return false;
         }
 
         *outScenario = scenario;

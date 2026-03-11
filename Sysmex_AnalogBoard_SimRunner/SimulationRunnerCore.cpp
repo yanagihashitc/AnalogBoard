@@ -5,8 +5,8 @@
 #include <fstream>
 #include <sstream>
 
-#include "../AnalogBoard_TestApp/FpgaRegisterLogic.h"
 #include "../AnalogBoard_TestApp/WaveDataFileIO.h"
+#include "SimulationEp4StatusHelper.h"
 #include "SimulationScenario.h"
 
 namespace fs = std::filesystem;
@@ -33,14 +33,63 @@ namespace SimRunner
             return utf8;
         }
 
+        std::string EscapeJsonString(const std::string& value)
+        {
+            static const char kHexDigits[] = "0123456789abcdef";
+
+            std::string escaped;
+            escaped.reserve(value.size());
+            for (unsigned char ch : value)
+            {
+                switch (ch)
+                {
+                case '\"':
+                    escaped += "\\\"";
+                    break;
+                case '\\':
+                    escaped += "\\\\";
+                    break;
+                case '\b':
+                    escaped += "\\b";
+                    break;
+                case '\f':
+                    escaped += "\\f";
+                    break;
+                case '\n':
+                    escaped += "\\n";
+                    break;
+                case '\r':
+                    escaped += "\\r";
+                    break;
+                case '\t':
+                    escaped += "\\t";
+                    break;
+                default:
+                    if (ch < 0x20)
+                    {
+                        escaped += "\\u00";
+                        escaped += kHexDigits[(ch >> 4) & 0x0Fu];
+                        escaped += kHexDigits[ch & 0x0Fu];
+                    }
+                    else
+                    {
+                        escaped.push_back(static_cast<char>(ch));
+                    }
+                    break;
+                }
+            }
+
+            return escaped;
+        }
+
         class RunnerLogFile
         {
         public:
             bool Init(const fs::path& outputDirectory)
             {
                 logPath_ = outputDirectory / L"runner.log";
-                std::ofstream output(logPath_.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
-                if (!output.is_open())
+                output_.open(logPath_.c_str(), std::ios::out | std::ios::trunc | std::ios::binary);
+                if (!output_.is_open())
                 {
                     return false;
                 }
@@ -49,13 +98,13 @@ namespace SimRunner
 
             void Append(const std::wstring& line)
             {
-                std::ofstream output(logPath_.c_str(), std::ios::out | std::ios::app | std::ios::binary);
-                if (!output.is_open())
+                if (!output_.is_open())
                 {
                     return;
                 }
 
-                output << WideToUtf8(line) << "\n";
+                output_ << WideToUtf8(line) << "\n";
+                output_.flush();
             }
 
             std::wstring GetPath() const
@@ -65,6 +114,7 @@ namespace SimRunner
 
         private:
             fs::path logPath_;
+            std::ofstream output_;
         };
 
         class RunnerObserver : public WaveAcquisition::IAcquisitionObserver
@@ -153,35 +203,12 @@ namespace SimRunner
                     producedLogicalBytes_ = (std::min)(totalLogicalBytes_, producedLogicalBytes_ + scenario_.producerStepBytes);
                 }
 
-                std::memset(buffer, 0, bufferSize);
-
-                ULONG registerWaveWrCnt = 0;
-                if (producedLogicalBytes_ > 0)
-                {
-                    registerWaveWrCnt = producedLogicalBytes_ - static_cast<ULONG>(WaveAcquisition::kDdrCompletionPaddingBytes);
-                }
-
-                ULONG registerWaveRdCnt = 0;
-                if (readLogicalBytes_ > 0)
-                {
-                    registerWaveRdCnt = readLogicalBytes_ - static_cast<ULONG>(WaveAcquisition::kDdrCompletionPaddingBytes);
-                }
-
-                FpgaRegLogic::Reg_Write(FPGAREG_WAVE_WR_CNT_H, static_cast<USHORT>((registerWaveWrCnt >> 16) & 0xFFFF), buffer);
-                FpgaRegLogic::Reg_Write(FPGAREG_WAVE_WR_CNT_L, static_cast<USHORT>(registerWaveWrCnt & 0xFFFF), buffer);
-                FpgaRegLogic::Reg_Write(FPGAREG_WAVE_RD_CNT_H, static_cast<USHORT>((registerWaveRdCnt >> 16) & 0xFFFF), buffer);
-                FpgaRegLogic::Reg_Write(FPGAREG_WAVE_RD_CNT_L, static_cast<USHORT>(registerWaveRdCnt & 0xFFFF), buffer);
-
-                USHORT fpgaStatus = 0;
-                if (producedLogicalBytes_ >= totalLogicalBytes_ && totalLogicalBytes_ != 0)
-                {
-                    fpgaStatus |= 0x4;
-                }
-                if (readLogicalBytes_ >= totalLogicalBytes_ && totalLogicalBytes_ != 0)
-                {
-                    fpgaStatus |= 0x8;
-                }
-                FpgaRegLogic::Reg_Write(FPGAREG_FPGA_ST, fpgaStatus, buffer);
+                SimulationEp4StatusHelper::WriteStatusBuffer(
+                    buffer,
+                    bufferSize,
+                    producedLogicalBytes_,
+                    readLogicalBytes_,
+                    totalLogicalBytes_);
                 return WaveAcquisition::kUsbSuccess;
             }
 
@@ -405,8 +432,8 @@ namespace SimRunner
 
             std::ostringstream json;
             json << "{\n";
-            json << "  \"preset\": \"" << WideToUtf8(presetName) << "\",\n";
-            json << "  \"terminal_status\": \"" << WideToUtf8(WaveAcquisition::WaveAcquisitionEngine::ToString(summary.terminalStatus)) << "\",\n";
+            json << "  \"preset\": \"" << EscapeJsonString(WideToUtf8(presetName)) << "\",\n";
+            json << "  \"terminal_status\": \"" << EscapeJsonString(WideToUtf8(WaveAcquisition::WaveAcquisitionEngine::ToString(summary.terminalStatus))) << "\",\n";
             json << "  \"error_code\": " << summary.errorCode << ",\n";
             json << "  \"exit_code\": " << exitCode << ",\n";
             json << "  \"ep6_call_count\": " << summary.metrics.ep6.callCount << ",\n";

@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "../AnalogBoard_TestApp/FpgaRegisterLogic.h"
 #include "../AnalogBoard_TestApp/WaveAcquisitionEngine.h"
+#include "../AnalogBoard_SimRunner/SimulationEp4StatusHelper.h"
 
 using namespace WaveAcquisition;
 
@@ -187,35 +187,12 @@ namespace
                 producedLogicalBytes = (std::min)(totalLogicalBytes, producedLogicalBytes + producerStepBytes);
             }
 
-            std::memset(buffer, 0, bufferSize);
-
-            ULONG registerWaveWrCnt = 0;
-            if (producedLogicalBytes > 0)
-            {
-                registerWaveWrCnt = producedLogicalBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes);
-            }
-
-            ULONG registerWaveRdCnt = 0;
-            if (readLogicalBytes > 0)
-            {
-                registerWaveRdCnt = readLogicalBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes);
-            }
-
-            FpgaRegLogic::Reg_Write(FPGAREG_WAVE_WR_CNT_H, static_cast<USHORT>((registerWaveWrCnt >> 16) & 0xFFFF), buffer);
-            FpgaRegLogic::Reg_Write(FPGAREG_WAVE_WR_CNT_L, static_cast<USHORT>(registerWaveWrCnt & 0xFFFF), buffer);
-            FpgaRegLogic::Reg_Write(FPGAREG_WAVE_RD_CNT_H, static_cast<USHORT>((registerWaveRdCnt >> 16) & 0xFFFF), buffer);
-            FpgaRegLogic::Reg_Write(FPGAREG_WAVE_RD_CNT_L, static_cast<USHORT>(registerWaveRdCnt & 0xFFFF), buffer);
-
-            USHORT fpgaStatus = 0;
-            if (producedLogicalBytes >= totalLogicalBytes && totalLogicalBytes != 0)
-            {
-                fpgaStatus |= 0x4;
-            }
-            if (readLogicalBytes >= totalLogicalBytes && totalLogicalBytes != 0)
-            {
-                fpgaStatus |= 0x8;
-            }
-            FpgaRegLogic::Reg_Write(FPGAREG_FPGA_ST, fpgaStatus, buffer);
+            SimulationEp4StatusHelper::WriteStatusBuffer(
+                buffer,
+                bufferSize,
+                producedLogicalBytes,
+                readLogicalBytes,
+                totalLogicalBytes);
             return kUsbSuccess;
         }
 
@@ -410,6 +387,29 @@ void Test_TC_A_03_PublishFailure_StopsWithPublishFailedStatus()
     TEST_ASSERT(sink.abortCallCount == 1, "TC-A-03 publish failure must abort the open pair");
 }
 
+void Test_TC_A_04_WriteFailure_StopsWithWriteFailedStatus()
+{
+    // Given: A scenario where write fails after a pair is opened.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 2;
+    usb.producerStepBytes = usb.totalLogicalBytes;
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    sink.failWriteAt = 1;
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine tries to persist the first completed pair.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle terminates with write_failed and aborts the open pair.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::WriteFailed, "TC-A-04 terminal status must be write_failed");
+    TEST_ASSERT(summary.errorCode == kAcquisitionErrWritePair, "TC-A-04 error code must be write pair");
+    TEST_ASSERT(sink.abortCallCount == 1, "TC-A-04 write failure must abort the open pair");
+}
+
 void Test_TC_B_01_ZeroWavesPerFile_IsRejected()
 {
     // Given: An invalid config with wavesPerFile equal to zero.
@@ -514,6 +514,45 @@ void Test_TC_B_05_StopRequestedBeforeStart_ReturnsStopped()
     TEST_ASSERT(usb.ep6CallCount == 0, "TC-B-05 EP6 must not be called");
 }
 
+void Test_TC_B_06_ProducerStepBelowPadding_DoesNotUnderflowWaveWriteCount()
+{
+    // Given: EP4 production progress smaller than the DDR completion padding.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize;
+    usb.producerStepBytes = static_cast<ULONG>(kDdrCompletionPaddingBytes - 16u);
+    std::array<BYTE, kEp4StatusBufferBytes> ep4Buffer = {};
+
+    // When: The fake USB session emits the EP4 status registers.
+    const INT result = usb.EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+
+    // Then: WAVE_WR_CNT stays at zero instead of wrapping around ULONG.
+    TEST_ASSERT(result == kUsbSuccess, "TC-B-06 EP4 read must succeed");
+    TEST_ASSERT(snapshot.waveWrCnt == 0, "TC-B-06 WAVE_WR_CNT must clamp to zero");
+}
+
+void Test_TC_B_07_UnalignedMaxReadChunk_IsRejected()
+{
+    // Given: A config whose maxReadChunkBytes is not aligned to EP6 requirements.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 2;
+    usb.producerStepBytes = usb.totalLogicalBytes;
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2);
+    config.maxReadChunkBytes = static_cast<ULONG>(kEp6ReadAlignmentBytes - 1u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine validates the config.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle is rejected as invalid_config before any transfer starts.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::InvalidConfig, "TC-B-07 terminal status must be invalid_config");
+    TEST_ASSERT(summary.errorCode == kAcquisitionErrInvalidConfig, "TC-B-07 error code must be invalid config");
+}
+
 int main()
 {
     std::printf("=== WaveAcquisitionEngine Unit Tests ===\n\n");
@@ -524,11 +563,14 @@ int main()
     RUN_TEST(Test_TC_A_01_PersistentTimeout_StopsAfterRetryBudget);
     RUN_TEST(Test_TC_A_02_DisconnectMidstream_StopsWithDisconnectStatus);
     RUN_TEST(Test_TC_A_03_PublishFailure_StopsWithPublishFailedStatus);
+    RUN_TEST(Test_TC_A_04_WriteFailure_StopsWithWriteFailedStatus);
     RUN_TEST(Test_TC_B_01_ZeroWavesPerFile_IsRejected);
     RUN_TEST(Test_TC_B_02_ZeroWaveSizes_IsRejected);
     RUN_TEST(Test_TC_B_03_ZeroRetryBudget_FailsOnFirstTimeout);
     RUN_TEST(Test_TC_B_04_RetryBudgetOne_AllowsSingleRecovery);
     RUN_TEST(Test_TC_B_05_StopRequestedBeforeStart_ReturnsStopped);
+    RUN_TEST(Test_TC_B_06_ProducerStepBelowPadding_DoesNotUnderflowWaveWriteCount);
+    RUN_TEST(Test_TC_B_07_UnalignedMaxReadChunk_IsRejected);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

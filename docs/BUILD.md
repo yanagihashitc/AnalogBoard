@@ -68,6 +68,7 @@ cmd /d /c "scripts\run_simulation.bat ep6_timeout_once_then_recover"
 cmd /d /c "scripts\run_simulation.bat ep6_timeout_persistent"
 cmd /d /c "scripts\run_simulation.bat usb_disconnect_midstream"
 cmd /d /c "scripts\run_simulation.bat writer_slow_queue_pressure"
+cmd /d /c "scripts\run_simulation.bat write_fail"
 cmd /d /c "scripts\run_simulation.bat publish_fail"
 ```
 
@@ -83,7 +84,8 @@ cmd /d /c "scripts\run_simulation.bat publish_fail"
 - solution 構成は `Debug|x64` / `Release|x64` のみ
 - `AnalogBoard_TestApp.exe` には simulation preset / fake USB / scenario parser は含めない
 - `scripts\run_simulation.bat` の戻り値は terminal status に応じて変わる
-  - `0`: success
-  - `2`: EP6 timeout
-  - `3`: USB disconnect
-  - `4`: publish failure
+- `0`: success
+- `2`: EP6 timeout
+- `3`: USB disconnect
+- `5`: write failure
+- `4`: publish failure
