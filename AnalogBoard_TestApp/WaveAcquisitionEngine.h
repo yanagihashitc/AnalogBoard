@@ -27,6 +27,14 @@ namespace WaveAcquisition
     constexpr size_t kEp6ReadAlignmentBytes = 0x4000u;
     constexpr size_t kDdrCompletionPaddingBytes = 32u;
 
+    // Maximum number of EP4 polls to wait for DDR_WR_END to clear (settle)
+    // after sampling starts.  FPGA registers retain stale DDR_WR_END=1 from
+    // the previous acquisition cycle.  The engine must observe ddrWrEnd==0
+    // at least once before treating ddrWrEnd==1 as a valid write-completion
+    // signal.  If the register never clears within this budget the engine
+    // falls through to the normal empty-capture path.
+    constexpr INT kDdrSettlingPollLimit = 200;
+
     enum class TerminalStatus
     {
         Success,
@@ -69,6 +77,8 @@ namespace WaveAcquisition
         ULONG savedWaveCount = 0;
         ULONG ignoredTailBytes = 0;
         INT publishedPairCount = 0;
+        INT settlingPollCount = 0;
+        bool sawDdrWrEndClear = false;
     };
 
     class IUsbSession

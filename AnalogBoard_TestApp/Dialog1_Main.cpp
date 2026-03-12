@@ -473,7 +473,7 @@ namespace
 
 			CString line;
 			line.Format(
-				_T("[PR01][CYCLE] status=%s error=%d ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d ignoredTail=%lu"),
+				_T("[PR01][CYCLE] status=%s error=%d ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu settlingPolls=%d sawWrEndClear=%d maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d ignoredTail=%lu"),
 				WaveAcquisition::WaveAcquisitionEngine::ToString(summary.terminalStatus),
 				summary.errorCode,
 				summary.metrics.ep6.callCount,
@@ -487,6 +487,8 @@ namespace
 				summary.metrics.save.maxElapsedMs,
 				summary.metrics.ddrStatusPollCount,
 				summary.metrics.ddrWriteWaitPollCount,
+				summary.settlingPollCount,
+				summary.sawDdrWrEndClear ? 1 : 0,
 				summary.metrics.maxWaveBacklogBytes,
 				summary.metrics.latestWaveWrCnt,
 				summary.metrics.latestWaveRdCnt,

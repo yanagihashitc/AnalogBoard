@@ -256,6 +256,9 @@ namespace
     {
         INT ep4CallCount = 0;
         INT ep6CallCount = 0;
+        // Number of initial polls that return ddrWrEnd=0 (simulating the
+        // settling period where stale FPGA registers have been cleared).
+        INT settlingPolls = 1;
 
         INT Connect() override
         {
@@ -281,6 +284,10 @@ namespace
                 return kAcquisitionErrEp4Read;
             }
 
+            // First `settlingPolls` calls: ddrWrEnd=0 (FPGA has started
+            // new cycle and cleared stale completion flag).
+            // After that: ddrWrEnd=1 with 0 bytes (genuine empty capture).
+            const bool ddrWrEnd = (ep4CallCount > settlingPolls);
             SimulationEp4StatusHelper::WriteStatusBuffer(
                 buffer,
                 bufferSize,
@@ -288,7 +295,7 @@ namespace
                 0,
                 true,
                 true,
-                true,
+                ddrWrEnd,
                 false,
                 false);
             return kUsbSuccess;
@@ -1090,6 +1097,239 @@ void Test_TC_A_10_EmptyCapture_IsRejected()
     TEST_ASSERT(usb.ep6CallCount == 0, "TC-A-10 EP6 must not be called");
 }
 
+// Simulates the real runtime scenario: FPGA DDR_WR_END=1 is stale from the
+// previous acquisition cycle for several polls, then clears to 0, then the
+// real measurement produces data and eventually sets DDR_WR_END=1 again.
+struct StaleDdrWrEndUsbSession : IUsbSession
+{
+    INT ep4CallCount = 0;
+    INT ep6CallCount = 0;
+    INT stalePollCount = 5;    // How many polls return stale ddrWrEnd=1
+    bool staleMeasTrg = true;
+    ULONG totalLogicalBytes = 0;
+    SimRunner::FpgaDdrModel ddrModel;
+    bool modelInitialized = false;
+
+    void InitializeModelIfNeeded()
+    {
+        if (modelInitialized)
+        {
+            return;
+        }
+
+        SimRunner::FpgaDdrModelConfig config = {};
+        config.totalWaveBytes = totalLogicalBytes;
+        config.burstSizeBytes = kBurstSizeBytes;
+        config.producerStepBytes = totalLogicalBytes;
+        config.initPollCount = 1;
+        config.waitPollCount = 1;
+        ddrModel = SimRunner::FpgaDdrModel(config);
+        modelInitialized = true;
+    }
+
+    INT Connect() override { return kUsbSuccess; }
+    void Disconnect() override {}
+    INT EP2_SendData(BYTE* buffer, size_t bufferSize) override
+    {
+        (void)buffer;
+        (void)bufferSize;
+        return kUsbSuccess;
+    }
+
+    INT EP4_GetData(BYTE* buffer, size_t bufferSize) override
+    {
+        ++ep4CallCount;
+        if (buffer == nullptr || bufferSize < kEp4StatusBufferBytes)
+        {
+            return kAcquisitionErrEp4Read;
+        }
+
+        // During the stale period, return ddrWrEnd=1 with waveWrCnt=0
+        // (mimicking real FPGA behavior where DDR_WR_END persists from
+        // previous cycle but WAVE_WR_CNT has been reset).
+        if (ep4CallCount <= stalePollCount)
+        {
+            SimulationEp4StatusHelper::WriteStatusBuffer(
+                buffer, bufferSize,
+                0, 0, true, true, true, false, staleMeasTrg);
+            return kUsbSuccess;
+        }
+
+        // After the stale period, run the real DDR model.
+        InitializeModelIfNeeded();
+        ddrModel.AdvanceOnePoll();
+        SimulationEp4StatusHelper::WriteStatusBuffer(
+            buffer, bufferSize,
+            ddrModel.GetWrittenBytes(),
+            ddrModel.GetReadBytes(),
+            true,
+            ddrModel.IsAdcSetEnd(),
+            ddrModel.IsDdrWrEnd(),
+            ddrModel.IsDdrRdEnd(),
+            ddrModel.IsMeasTrg());
+        return kUsbSuccess;
+    }
+
+    INT EP6_GetData(BYTE* buffer, ULONG size) override
+    {
+        ++ep6CallCount;
+        if (buffer == nullptr)
+        {
+            return kAcquisitionErrEp6Read;
+        }
+
+        InitializeModelIfNeeded();
+        const ULONG readOffset = ddrModel.GetReadBytes();
+        for (ULONG i = 0; i < size; ++i)
+        {
+            buffer[i] = static_cast<BYTE>((readOffset + i) & 0xFFu);
+        }
+        ddrModel.OnEp6ReadCompleted(size);
+        return kUsbSuccess;
+    }
+};
+
+void Test_TC_A_11_StaleDdrWrEnd_SettlesAndAcquiresData()
+{
+    // Given: FPGA returns stale ddrWrEnd=1 for the first 5 polls, then
+    // clears to 0 (Init phase), then produces data normally.
+    StaleDdrWrEndUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4;
+    usb.stalePollCount = 5;
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine runs the cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The engine must successfully acquire data despite the stale
+    // DDR_WR_END at startup.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success,
+        "TC-A-11 terminal status must be success after stale settling");
+    TEST_ASSERT(summary.savedWaveCount == 4u,
+        "TC-A-11 must save all 4 waves after stale settling");
+    TEST_ASSERT(usb.ep6CallCount > 0,
+        "TC-A-11 EP6 must be called after stale settling");
+    TEST_ASSERT(summary.settlingPollCount == usb.stalePollCount,
+        "TC-A-11 summary must record the consumed stale settling polls");
+    TEST_ASSERT(summary.sawDdrWrEndClear,
+        "TC-A-11 summary must record that DDR_WR_END cleared");
+}
+
+void Test_TC_A_12_StaleDdrWrEnd_ExceedsSettlingBudget_ReturnsEmptyCapture()
+{
+    // Given: FPGA returns stale ddrWrEnd=1 indefinitely with 0 bytes.
+    // This simulates a broken FPGA that never starts a new cycle.
+    EmptyCaptureUsbSession usb = {};
+    usb.settlingPolls = 0;   // All polls return ddrWrEnd=1 from the start
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine runs the cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The engine must eventually give up and return EmptyCapture.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::EmptyCapture,
+        "TC-A-12 terminal status must be empty_capture after settling budget exhausted");
+    TEST_ASSERT(summary.errorCode == kAcquisitionErrEmptyCapture,
+        "TC-A-12 error code must be empty capture");
+    TEST_ASSERT(usb.ep6CallCount == 0,
+        "TC-A-12 EP6 must not be called");
+    TEST_ASSERT(summary.settlingPollCount > static_cast<INT>(kDdrSettlingPollLimit),
+        "TC-A-12 summary must record settling polls beyond the budget");
+    TEST_ASSERT(!summary.sawDdrWrEndClear,
+        "TC-A-12 summary must record that DDR_WR_END never cleared");
+    // Must have polled at least kDdrSettlingPollLimit times.
+    TEST_ASSERT(usb.ep4CallCount > static_cast<INT>(kDdrSettlingPollLimit),
+        "TC-A-12 must poll EP4 at least settling limit times");
+}
+
+void Test_TC_N_11_CycleSummary_ReportsSettlingTelemetry()
+{
+    // Given: A stale-start cycle that must report settling telemetry in the summary.
+    StaleDdrWrEndUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4u;
+    usb.stalePollCount = 3;
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine completes the cycle after consuming stale polls.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The summary callback and return value must both report the settling telemetry.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success,
+        "TC-N-11 terminal status must be success");
+    TEST_ASSERT(summary.settlingPollCount == 3,
+        "TC-N-11 returned summary must report stale settling polls");
+    TEST_ASSERT(summary.sawDdrWrEndClear,
+        "TC-N-11 returned summary must report DDR_WR_END clear observation");
+    TEST_ASSERT(observer.sawSummary,
+        "TC-N-11 observer must receive the cycle summary");
+    TEST_ASSERT(observer.lastSummary.settlingPollCount == 3,
+        "TC-N-11 observer summary must report stale settling polls");
+    TEST_ASSERT(observer.lastSummary.sawDdrWrEndClear,
+        "TC-N-11 observer summary must report DDR_WR_END clear observation");
+}
+
+void Test_TC_B_11_StaleDdrWrEnd_JustBelowLimit_Succeeds()
+{
+    // Given: Stale DDR_WR_END persists until just before the settling limit.
+    StaleDdrWrEndUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4u;
+    usb.stalePollCount = kDdrSettlingPollLimit - 1;
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine waits through the stale period and the flag clears just below the limit.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle must still succeed without a premature empty-capture failure.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success,
+        "TC-B-11 terminal status must stay success below the settling limit");
+    TEST_ASSERT(summary.savedWaveCount == 4u,
+        "TC-B-11 must save all waves below the settling limit");
+    TEST_ASSERT(summary.settlingPollCount == (kDdrSettlingPollLimit - 1),
+        "TC-B-11 summary must report the stale poll count below the limit");
+}
+
+void Test_TC_B_12_StaleDdrWrEnd_ExactLimit_SucceedsAfterClear()
+{
+    // Given: Stale DDR_WR_END persists for exactly the settling limit and clears on the next poll.
+    StaleDdrWrEndUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4u;
+    usb.stalePollCount = kDdrSettlingPollLimit;
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine consumes the exact settling budget and then observes a clear.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle must recover once DDR_WR_END clears instead of failing permanently at the boundary.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success,
+        "TC-B-12 terminal status must recover at the exact settling limit");
+    TEST_ASSERT(summary.savedWaveCount == 4u,
+        "TC-B-12 must save all waves at the exact settling limit");
+    TEST_ASSERT(summary.settlingPollCount == kDdrSettlingPollLimit,
+        "TC-B-12 summary must report the exact settling poll count");
+    TEST_ASSERT(summary.sawDdrWrEndClear,
+        "TC-B-12 summary must record that DDR_WR_END eventually cleared");
+}
+
 int main()
 {
     std::printf("=== WaveAcquisitionEngine Unit Tests ===\n\n");
@@ -1126,6 +1366,11 @@ int main()
     RUN_TEST(Test_TC_N_10_UnalignedIntermediateProgress_CompletesWithoutAlignmentError);
     RUN_TEST(Test_TC_B_10_SubAlignmentProgress_WaitsForFinalRead);
     RUN_TEST(Test_TC_A_10_EmptyCapture_IsRejected);
+    RUN_TEST(Test_TC_A_11_StaleDdrWrEnd_SettlesAndAcquiresData);
+    RUN_TEST(Test_TC_A_12_StaleDdrWrEnd_ExceedsSettlingBudget_ReturnsEmptyCapture);
+    RUN_TEST(Test_TC_N_11_CycleSummary_ReportsSettlingTelemetry);
+    RUN_TEST(Test_TC_B_11_StaleDdrWrEnd_JustBelowLimit_Succeeds);
+    RUN_TEST(Test_TC_B_12_StaleDdrWrEnd_ExactLimit_SucceedsAfterClear);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

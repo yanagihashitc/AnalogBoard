@@ -7,6 +7,7 @@
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-03-12 | WaveAcquisition stale DDR_WR_END follow-up | [log](2026-03-12-waveacquisition-stale-ddrwrend-followup-log.md) |
 | 2026-03-12 | Simulation regression coverage | [log](2026-03-12-simulation-regression-coverage-log.md) |
 | 2026-03-12 | 0.2.0 WaveAcquisitionEngine fix | [log](2026-03-12-waveacquisition-020-fix-log.md) |
 | 2026-03-11 | SimRunner review follow-ups | [log](2026-03-11-simrunner-review-followups-log.md) |

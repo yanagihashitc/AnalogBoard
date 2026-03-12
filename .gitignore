@@ -64,6 +64,7 @@ ref/
 data/*
 !data/sim_scenarios/
 !data/sim_scenarios/*.json
+memo.md
 
 # Coverage artifacts
 coverage/

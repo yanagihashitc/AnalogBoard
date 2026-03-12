@@ -35,11 +35,23 @@ namespace WaveAcquisition
             }
         }
 
-        void FinalizeSummary(IAcquisitionObserver* observer, const AcquisitionSummary& summary)
+        void FinalizeSummary(
+            IAcquisitionObserver* observer,
+            AcquisitionSummary* summary,
+            INT settlingPollCount = 0,
+            bool sawDdrWrEndClear = false)
         {
+            if (summary == nullptr)
+            {
+                return;
+            }
+
+            summary->settlingPollCount = settlingPollCount;
+            summary->sawDdrWrEndClear = sawDdrWrEndClear;
+
             if (observer != nullptr)
             {
-                observer->OnCycleSummary(summary);
+                observer->OnCycleSummary(*summary);
             }
         }
 
@@ -247,7 +259,7 @@ namespace WaveAcquisition
         {
             summary.terminalStatus = TerminalStatus::InvalidConfig;
             summary.errorCode = kAcquisitionErrInvalidConfig;
-            FinalizeSummary(observer_, summary);
+            FinalizeSummary(observer_, &summary);
             return summary;
         }
 
@@ -255,7 +267,7 @@ namespace WaveAcquisition
         {
             summary.terminalStatus = TerminalStatus::Stopped;
             summary.errorCode = kAcquisitionErrStopped;
-            FinalizeSummary(observer_, summary);
+            FinalizeSummary(observer_, &summary);
             return summary;
         }
 
@@ -269,6 +281,8 @@ namespace WaveAcquisition
         INT consecutiveTimeoutCount = 0;
         INT emptyCompletionStatusCount = 0;
         bool sawVisibleDdrBytes = false;
+        bool sawDdrWrEndClear = false;
+        INT settlingPollCount = 0;
 
         std::vector<BYTE> ep4Buffer(kEp4StatusBufferBytes, 0);
         std::vector<BYTE> transferBuffer;
@@ -282,7 +296,7 @@ namespace WaveAcquisition
                 summary.terminalStatus = TerminalStatus::Stopped;
                 summary.errorCode = kAcquisitionErrStopped;
                 AbortIfNeeded(wavePairSink_);
-                FinalizeSummary(observer_, summary);
+                FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                 return summary;
             }
 
@@ -298,7 +312,7 @@ namespace WaveAcquisition
                     summary.terminalStatus = TerminalStatus::Ep4ReadFailed;
                     summary.errorCode = ep4Result;
                     AbortIfNeeded(wavePairSink_);
-                    FinalizeSummary(observer_, summary);
+                    FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                     return summary;
                 }
 
@@ -319,6 +333,22 @@ namespace WaveAcquisition
 
                 if (snapshot.ddrWrEnd == 1)
                 {
+                    // Stale DDR_WR_END guard: FPGA registers retain
+                    // DDR_WR_END=1 from the previous acquisition cycle.
+                    // Ignore the completion signal until we have observed
+                    // ddrWrEnd==0 at least once (proving the FPGA has
+                    // started the new measurement cycle).
+                    if (!sawDdrWrEndClear && !sawVisibleDdrBytes)
+                    {
+                        ++settlingPollCount;
+                        if (settlingPollCount < kDdrSettlingPollLimit)
+                        {
+                            continue;
+                        }
+                        // Exhausted settling budget — fall through to
+                        // empty-capture detection below.
+                    }
+
                     if (availableDdrBytes == 0 && !sawVisibleDdrBytes)
                     {
                         ++emptyCompletionStatusCount;
@@ -329,20 +359,23 @@ namespace WaveAcquisition
 
                         summary.terminalStatus = TerminalStatus::EmptyCapture;
                         summary.errorCode = kAcquisitionErrEmptyCapture;
-                        FinalizeSummary(observer_, summary);
+                        FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                         return summary;
                     }
 
                     ddrWriteCompleted = true;
                     maxDdrBytes = availableDdrBytes;
                 }
-                else if (availableDdrBytes == 0)
-                {
-                    emptyCompletionStatusCount = 0;
-                    continue;
-                }
                 else
                 {
+                    sawDdrWrEndClear = true;
+
+                    if (availableDdrBytes == 0)
+                    {
+                        emptyCompletionStatusCount = 0;
+                        continue;
+                    }
+
                     emptyCompletionStatusCount = 0;
                 }
             }
@@ -398,7 +431,7 @@ namespace WaveAcquisition
                 summary.terminalStatus = TerminalStatus::AlignmentError;
                 summary.errorCode = kAcquisitionErrAlignment;
                 AbortIfNeeded(wavePairSink_);
-                FinalizeSummary(observer_, summary);
+                FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                 return summary;
             }
 
@@ -421,7 +454,7 @@ namespace WaveAcquisition
                     summary.terminalStatus = TerminalStatus::Ep6Timeout;
                     summary.errorCode = ep6Result;
                     AbortIfNeeded(wavePairSink_);
-                    FinalizeSummary(observer_, summary);
+                    FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                     return summary;
                 }
 
@@ -434,7 +467,7 @@ namespace WaveAcquisition
             if (MapEp6Failure(ep6Result, &summary))
             {
                 AbortIfNeeded(wavePairSink_);
-                FinalizeSummary(observer_, summary);
+                FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                 return summary;
             }
 
@@ -471,7 +504,7 @@ namespace WaveAcquisition
                 }
 
                 AbortIfNeeded(wavePairSink_);
-                FinalizeSummary(observer_, summary);
+                FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                 return summary;
             }
         }
@@ -491,7 +524,7 @@ namespace WaveAcquisition
                 summary.terminalStatus = TerminalStatus::PublishFailed;
                 summary.errorCode = publishResult;
                 AbortIfNeeded(wavePairSink_);
-                FinalizeSummary(observer_, summary);
+                FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                 return summary;
             }
 
@@ -502,13 +535,13 @@ namespace WaveAcquisition
         {
             summary.terminalStatus = TerminalStatus::EmptyCapture;
             summary.errorCode = kAcquisitionErrEmptyCapture;
-            FinalizeSummary(observer_, summary);
+            FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
             return summary;
         }
 
         summary.terminalStatus = TerminalStatus::Success;
         summary.errorCode = kUsbSuccess;
-        FinalizeSummary(observer_, summary);
+        FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
         return summary;
     }
 
