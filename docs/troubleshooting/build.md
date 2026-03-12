@@ -1,5 +1,39 @@
 # Build Troubleshooting
 
+## MSB3491 when parallel `run_simulation.bat` rebuilds lock `AnalogBoard_SimRunner.Build.CppClean.log`
+
+**Date**: 2026-03-12
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- Two simulation presets are launched in parallel with `cmd /d /c "scripts\run_with_vsdevcmd.bat scripts\run_simulation.bat ..."`
+- One invocation fails during `AnalogBoard_SimRunner:Rebuild`
+- MSBuild reports `error MSB3491` and says `AnalogBoard_SimRunner.Build.CppClean.log` is in use by another process
+
+### Root Cause
+
+`scripts\run_simulation.bat` rebuilds `AnalogBoard_SimRunner` before running a preset. When two preset commands run at the same time, both `Rebuild` steps try to clean and rewrite the same `AnalogBoard_SimRunner.Build.CppClean.log`, so one process loses the file lock race.
+
+### Failed Approaches
+
+1. Launching multiple `scripts\run_simulation.bat` commands in parallel against the same working tree
+
+### Solution
+
+1. Run simulation preset commands serially
+2. If multiple presets are needed, finish one `run_simulation.bat` invocation before starting the next
+3. Alternatively, rebuild `AnalogBoard_SimRunner` once and invoke the built executable directly for repeated preset runs
+
+### Related Files
+
+- `scripts/run_simulation.bat`
+- `AnalogBoard_SimRunner/AnalogBoard_SimRunner.vcxproj`
+- `AnalogBoard_TestApp.sln`
+
+---
+
 ## MSB4057 when invoking `AnalogBoard_UnitTest:Rebuild` on the solution
 
 **Date**: 2026-03-06

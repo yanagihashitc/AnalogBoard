@@ -21,6 +21,7 @@ namespace WaveAcquisition
     constexpr INT kAcquisitionErrWritePair = -20006;
     constexpr INT kAcquisitionErrPublishPair = -20007;
     constexpr INT kAcquisitionErrAlignment = -20008;
+    constexpr INT kAcquisitionErrEmptyCapture = -20009;
 
     constexpr size_t kEp4StatusBufferBytes = 128u * 2u;
     constexpr size_t kEp6ReadAlignmentBytes = 0x4000u;
@@ -38,6 +39,7 @@ namespace WaveAcquisition
         OpenPairFailed,
         WriteFailed,
         PublishFailed,
+        EmptyCapture,
         AlignmentError,
     };
 

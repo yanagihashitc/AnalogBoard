@@ -252,6 +252,57 @@ namespace
         }
     };
 
+    struct EmptyCaptureUsbSession : IUsbSession
+    {
+        INT ep4CallCount = 0;
+        INT ep6CallCount = 0;
+
+        INT Connect() override
+        {
+            return kUsbSuccess;
+        }
+
+        void Disconnect() override
+        {
+        }
+
+        INT EP2_SendData(BYTE* buffer, size_t bufferSize) override
+        {
+            (void)buffer;
+            (void)bufferSize;
+            return kUsbSuccess;
+        }
+
+        INT EP4_GetData(BYTE* buffer, size_t bufferSize) override
+        {
+            ++ep4CallCount;
+            if (buffer == nullptr || bufferSize < kEp4StatusBufferBytes)
+            {
+                return kAcquisitionErrEp4Read;
+            }
+
+            SimulationEp4StatusHelper::WriteStatusBuffer(
+                buffer,
+                bufferSize,
+                0,
+                0,
+                true,
+                true,
+                true,
+                false,
+                false);
+            return kUsbSuccess;
+        }
+
+        INT EP6_GetData(BYTE* buffer, ULONG size) override
+        {
+            (void)buffer;
+            (void)size;
+            ++ep6CallCount;
+            return kUsbSuccess;
+        }
+    };
+
     std::array<BYTE, kEp4StatusBufferBytes> BuildStatusBuffer(
         ULONG writtenBytes,
         ULONG readBytes,
@@ -974,6 +1025,71 @@ void Test_L3_05_BacklogCalculation_DiscreteJumps()
     TEST_ASSERT(summary.metrics.maxWaveBacklogBytes == (kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes)), "L3-05 max backlog must capture one discrete burst jump");
 }
 
+void Test_TC_N_10_UnalignedIntermediateProgress_CompletesWithoutAlignmentError()
+{
+    // Given: A producer that exposes non-16KB-aligned intermediate write counts before enough bytes accumulate.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = 20000u;
+    usb.producerStepBytes = 1000u;
+    usb.ep6Results = { kUsbSuccess, kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(1000u, 1000u, 5u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine processes non-aligned intermediate DDR progress.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle must finish successfully instead of stopping with alignment_error.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-N-10 terminal status must be success");
+    TEST_ASSERT(summary.savedWaveCount == 10u, "TC-N-10 savedWaveCount must be 10");
+}
+
+void Test_TC_B_10_SubAlignmentProgress_WaitsForFinalRead()
+{
+    // Given: Total visible data stays below one 16KB chunk until the write-complete poll.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4u;
+    usb.producerStepBytes = 32u;
+    usb.initPollCount = 1;
+    usb.waitPollCount = 1;
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine sees repeated sub-alignment progress before the final poll.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle must keep polling and save all waves on the final padded read.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-B-10 terminal status must be success");
+    TEST_ASSERT(summary.savedWaveCount == 4u, "TC-B-10 savedWaveCount must be 4");
+    TEST_ASSERT(summary.metrics.ep6.callCount == 1u, "TC-B-10 ep6 callCount must be 1");
+}
+
+void Test_TC_A_10_EmptyCapture_IsRejected()
+{
+    // Given: EP4 reports write-complete with zero visible bytes.
+    EmptyCaptureUsbSession usb = {};
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine runs the cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The cycle must fail with empty_capture instead of succeeding with zero saved waves.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::EmptyCapture, "TC-A-10 terminal status must be empty_capture");
+    TEST_ASSERT(summary.errorCode == kAcquisitionErrEmptyCapture, "TC-A-10 error code must be empty capture");
+    TEST_ASSERT(summary.savedWaveCount == 0u, "TC-A-10 savedWaveCount must stay 0");
+    TEST_ASSERT(usb.ep6CallCount == 0, "TC-A-10 EP6 must not be called");
+}
+
 int main()
 {
     std::printf("=== WaveAcquisitionEngine Unit Tests ===\n\n");
@@ -1007,6 +1123,9 @@ int main()
     RUN_TEST(Test_L3_03_LastBurst_PaddedRead_PreservesWaveCount);
     RUN_TEST(Test_L3_04_DdrRdEnd_ExactBurstMatch);
     RUN_TEST(Test_L3_05_BacklogCalculation_DiscreteJumps);
+    RUN_TEST(Test_TC_N_10_UnalignedIntermediateProgress_CompletesWithoutAlignmentError);
+    RUN_TEST(Test_TC_B_10_SubAlignmentProgress_WaitsForFinalRead);
+    RUN_TEST(Test_TC_A_10_EmptyCapture_IsRejected);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

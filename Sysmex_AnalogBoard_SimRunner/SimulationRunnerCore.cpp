@@ -524,6 +524,8 @@ namespace SimRunner
             return 10;
         case WaveAcquisition::TerminalStatus::AlignmentError:
             return 11;
+        case WaveAcquisition::TerminalStatus::EmptyCapture:
+            return 12;
         default:
             return 1;
         }

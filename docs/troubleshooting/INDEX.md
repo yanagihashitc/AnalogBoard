@@ -13,6 +13,7 @@ Quick-reference index of all recorded troubleshooting knowledge.
 
 | Date | Category | Title | File |
 |------|----------|-------|------|
+| 2026-03-12 | build | MSB3491 when parallel `run_simulation.bat` rebuilds lock `AnalogBoard_SimRunner.Build.CppClean.log` | [build.md#msb3491-when-parallel-run_simulationbat-rebuilds-lock-analogboard_simrunnerbuildcppcleanlog](build.md#msb3491-when-parallel-run_simulationbat-rebuilds-lock-analogboard_simrunnerbuildcppcleanlog) |
 | 2026-03-11 | build | C2589/C4003 when `std::numeric_limits::min/max` collides with Windows macros | [build.md#c2589c4003-when-stdnumeric_limitsminmax-collides-with-windows-macros](build.md#c2589c4003-when-stdnumeric_limitsminmax-collides-with-windows-macros) |
 | 2026-03-06 | build | MSB4057 when invoking `AnalogBoard_UnitTest:Rebuild` on the solution | [build.md#msb4057-when-invoking-analogboard_unittestrebuild-on-the-solution](build.md#msb4057-when-invoking-analogboard_unittestrebuild-on-the-solution) |
 | 2026-03-09 | build | Parallel `cl` invocations hit C1041 on shared `vc140.pdb` | [build.md#parallel-cl-invocations-hit-c1041-on-shared-vc140pdb](build.md#parallel-cl-invocations-hit-c1041-on-shared-vc140pdb) |

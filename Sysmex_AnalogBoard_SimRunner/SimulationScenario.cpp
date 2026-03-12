@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "../AnalogBoard_TestApp/FpgaRegisterEncoding.h"
 #include "../AnalogBoard_TestApp/WaveAcquisitionEngine.h"
 
 namespace SimRunner
@@ -245,11 +246,6 @@ namespace SimRunner
                 return FailValidation(L"waves_per_file must be greater than zero", outError);
             }
 
-            if (scenario.totalWaveCount == 0)
-            {
-                return FailValidation(L"total_wave_count must be greater than zero", outError);
-            }
-
             if (scenario.timeoutRetryLimit < 0)
             {
                 return FailValidation(L"timeout_retry_limit must be non-negative", outError);
@@ -277,10 +273,9 @@ namespace SimRunner
             }
 
             if (scenario.producerStepBytes != 0 &&
-                static_cast<ULONGLONG>(scenario.producerStepBytes) < totalLogicalBytes &&
-                (scenario.producerStepBytes % static_cast<ULONG>(WaveAcquisition::kEp6ReadAlignmentBytes)) != 0)
+                (scenario.producerStepBytes % FpgaRegEncoding::kDdrAddressUnitBytes) != 0)
             {
-                return FailValidation(L"producer_step_bytes must align to EP6 reads for multi-step scenarios", outError);
+                return FailValidation(L"producer_step_bytes must align to the 32-byte DDR address unit", outError);
             }
 
             return true;

@@ -9,6 +9,8 @@ namespace WaveAcquisition
 {
     namespace
     {
+        constexpr INT kEmptyCompletionStatusRetryLimit = 3;
+
         bool IsStopRequested(IStopToken* stopToken)
         {
             return stopToken != nullptr && stopToken->IsStopRequested();
@@ -265,6 +267,8 @@ namespace WaveAcquisition
         size_t savedDdrBytes = 0;
         INT nextPairIndex = 0;
         INT consecutiveTimeoutCount = 0;
+        INT emptyCompletionStatusCount = 0;
+        bool sawVisibleDdrBytes = false;
 
         std::vector<BYTE> ep4Buffer(kEp4StatusBufferBytes, 0);
         std::vector<BYTE> transferBuffer;
@@ -310,16 +314,36 @@ namespace WaveAcquisition
                 if (availableDdrBytes != 0)
                 {
                     availableDdrBytes += kDdrCompletionPaddingBytes;
+                    sawVisibleDdrBytes = true;
                 }
 
                 if (snapshot.ddrWrEnd == 1)
                 {
+                    if (availableDdrBytes == 0 && !sawVisibleDdrBytes)
+                    {
+                        ++emptyCompletionStatusCount;
+                        if (emptyCompletionStatusCount <= kEmptyCompletionStatusRetryLimit)
+                        {
+                            continue;
+                        }
+
+                        summary.terminalStatus = TerminalStatus::EmptyCapture;
+                        summary.errorCode = kAcquisitionErrEmptyCapture;
+                        FinalizeSummary(observer_, summary);
+                        return summary;
+                    }
+
                     ddrWriteCompleted = true;
                     maxDdrBytes = availableDdrBytes;
                 }
                 else if (availableDdrBytes == 0)
                 {
+                    emptyCompletionStatusCount = 0;
                     continue;
+                }
+                else
+                {
+                    emptyCompletionStatusCount = 0;
                 }
             }
 
@@ -354,8 +378,22 @@ namespace WaveAcquisition
                     bytesToRead += kEp6ReadAlignmentBytes - remainder;
                 }
             }
+            else
+            {
+                const size_t remainder = bytesToRead % kEp6ReadAlignmentBytes;
+                if (remainder != 0)
+                {
+                    bytesToRead -= remainder;
+                    logicalBytesFromRead = bytesToRead;
+                }
+            }
 
-            if (bytesToRead == 0 || (bytesToRead % kEp6ReadAlignmentBytes) != 0)
+            if (bytesToRead == 0)
+            {
+                continue;
+            }
+
+            if ((bytesToRead % kEp6ReadAlignmentBytes) != 0)
             {
                 summary.terminalStatus = TerminalStatus::AlignmentError;
                 summary.errorCode = kAcquisitionErrAlignment;
@@ -460,6 +498,14 @@ namespace WaveAcquisition
             ++summary.publishedPairCount;
         }
 
+        if (summary.savedWaveCount == 0)
+        {
+            summary.terminalStatus = TerminalStatus::EmptyCapture;
+            summary.errorCode = kAcquisitionErrEmptyCapture;
+            FinalizeSummary(observer_, summary);
+            return summary;
+        }
+
         summary.terminalStatus = TerminalStatus::Success;
         summary.errorCode = kUsbSuccess;
         FinalizeSummary(observer_, summary);
@@ -505,6 +551,8 @@ namespace WaveAcquisition
             return L"write_failed";
         case TerminalStatus::PublishFailed:
             return L"publish_failed";
+        case TerminalStatus::EmptyCapture:
+            return L"empty_capture";
         case TerminalStatus::AlignmentError:
             return L"alignment_error";
         default:

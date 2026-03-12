@@ -169,6 +169,58 @@ void Test_TC_N_03_OptionalWriteFieldsOmitted_UsesStructDefaults()
     TEST_ASSERT(scenario.publishFailAt == 0, "TC-N-03 publishFailAt must stay at the default");
 }
 
+void Test_TC_N_04_NonAlignedProducerStep_LoadsSuccessfully()
+{
+    // Given: A scenario JSON with multi-step non-aligned producer progress.
+    const char* json = R"({
+  "wave_size_low": 2048,
+  "wave_size_high": 2048,
+  "waves_per_file": 10,
+  "total_wave_count": 100,
+  "producer_step_bytes": 4096,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 1,
+  "ep6_results": ["success"]
+})";
+    ScopedTempScenarioFile tempFile(json);
+    SimRunner::SimulationScenario scenario = {};
+    std::wstring error;
+
+    // When: The scenario file is loaded.
+    const bool ok = SimRunner::LoadScenarioFromFile(tempFile.GetPath(), &scenario, &error);
+
+    // Then: Loading succeeds so simulator presets can reproduce non-aligned intermediate progress.
+    TEST_ASSERT(ok, "TC-N-04 load must succeed");
+    TEST_ASSERT(error.empty(), "TC-N-04 error must be empty");
+    TEST_ASSERT(scenario.producerStepBytes == 4096, "TC-N-04 producerStepBytes must preserve the configured value");
+}
+
+void Test_TC_N_05_ZeroWaveScenario_LoadsSuccessfully()
+{
+    // Given: A scenario JSON with zero total waves to simulate empty captures.
+    const char* json = R"({
+  "wave_size_low": 2048,
+  "wave_size_high": 2048,
+  "waves_per_file": 10,
+  "total_wave_count": 0,
+  "producer_step_bytes": 0,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 1,
+  "ep6_results": ["success"]
+})";
+    ScopedTempScenarioFile tempFile(json);
+    SimRunner::SimulationScenario scenario = {};
+    std::wstring error;
+
+    // When: The scenario file is loaded.
+    const bool ok = SimRunner::LoadScenarioFromFile(tempFile.GetPath(), &scenario, &error);
+
+    // Then: Loading succeeds so anomaly presets can simulate empty captures.
+    TEST_ASSERT(ok, "TC-N-05 load must succeed");
+    TEST_ASSERT(error.empty(), "TC-N-05 error must be empty");
+    TEST_ASSERT(scenario.totalWaveCount == 0, "TC-N-05 totalWaveCount must preserve zero");
+}
+
 void Test_TC_A_01_OutOfRangeUnsignedField_IsRejected()
 {
     // Given: A scenario JSON with a required ULONG field above its maximum value.
@@ -310,6 +362,57 @@ void Test_TC_A_06_TotalLogicalBytesOverflow_IsRejected()
     TEST_ASSERT(error == L"total logical bytes exceed supported range", "TC-A-06 error must describe overflow");
 }
 
+void Test_TC_A_07_ConflictingProducerModes_IsRejected()
+{
+    // Given: A scenario JSON that mixes the legacy and burst producer modes.
+    const char* json = R"({
+  "wave_size_low": 32,
+  "wave_size_high": 32,
+  "waves_per_file": 2,
+  "total_wave_count": 4,
+  "producer_step_bytes": 16384,
+  "producer_bursts_per_poll": 1,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 0,
+  "ep6_results": ["success"]
+})";
+    ScopedTempScenarioFile tempFile(json);
+    SimRunner::SimulationScenario scenario = {};
+    std::wstring error;
+
+    // When: The scenario file is loaded.
+    const bool ok = SimRunner::LoadScenarioFromFile(tempFile.GetPath(), &scenario, &error);
+
+    // Then: Loading fails because the two producer modes remain mutually exclusive.
+    TEST_ASSERT(!ok, "TC-A-07 load must fail");
+    TEST_ASSERT(error == L"producer_step_bytes and producer_bursts_per_poll cannot both be set", "TC-A-07 error must describe the conflicting producer modes");
+}
+
+void Test_TC_A_08_ProducerStepBelowDdrUnit_IsRejected()
+{
+    // Given: A scenario JSON whose producer step breaks the 32-byte DDR address unit.
+    const char* json = R"({
+  "wave_size_low": 32,
+  "wave_size_high": 32,
+  "waves_per_file": 2,
+  "total_wave_count": 4,
+  "producer_step_bytes": 31,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 0,
+  "ep6_results": ["success"]
+})";
+    ScopedTempScenarioFile tempFile(json);
+    SimRunner::SimulationScenario scenario = {};
+    std::wstring error;
+
+    // When: The scenario file is loaded.
+    const bool ok = SimRunner::LoadScenarioFromFile(tempFile.GetPath(), &scenario, &error);
+
+    // Then: Loading fails because visible FPGA progress is defined in 32-byte units.
+    TEST_ASSERT(!ok, "TC-A-08 load must fail");
+    TEST_ASSERT(error == L"producer_step_bytes must align to the 32-byte DDR address unit", "TC-A-08 error must describe the 32-byte alignment rule");
+}
+
 int main()
 {
     std::printf("=== SimulationScenario Unit Tests ===\n\n");
@@ -320,9 +423,13 @@ int main()
     RUN_TEST(Test_TC_A_04_NegativeUnsignedField_IsRejected);
     RUN_TEST(Test_TC_A_05_NegativeTimeoutRetryLimit_IsRejected);
     RUN_TEST(Test_TC_A_06_TotalLogicalBytesOverflow_IsRejected);
+    RUN_TEST(Test_TC_A_07_ConflictingProducerModes_IsRejected);
+    RUN_TEST(Test_TC_A_08_ProducerStepBelowDdrUnit_IsRejected);
     RUN_TEST(Test_TC_N_01_ValidScenario_LoadsSuccessfully);
     RUN_TEST(Test_TC_N_02_MultilineEp6Results_LoadsSuccessfully);
     RUN_TEST(Test_TC_N_03_OptionalWriteFieldsOmitted_UsesStructDefaults);
+    RUN_TEST(Test_TC_N_04_NonAlignedProducerStep_LoadsSuccessfully);
+    RUN_TEST(Test_TC_N_05_ZeroWaveScenario_LoadsSuccessfully);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);
