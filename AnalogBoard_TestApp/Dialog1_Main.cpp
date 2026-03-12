@@ -9,6 +9,7 @@
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
+#include "AcquisitionCompletionLogic.h"
 #include "AcquisitionPerfMetrics.h"
 #include "FpgaRegisterLogic.h"
 #include "SavePathValidation.h"
@@ -1412,7 +1413,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	ULONG ulLastReadComByte = 0;
 	ULONG ulLastCanSaveCnt = 0;
 	size_t DDRWaveBytes = 0;
-	size_t MaxDDRBytes = 0;
 	size_t SaveDDRBytes = 0;
 	CFile File_Low;
 	CFile File_High;
@@ -1427,6 +1427,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	PBYTE ReadBuf = NULL;
 	CFileStatus fileStatus;
 	AcquisitionPerfMetrics::CycleMetrics cycleMetrics;
+	AcquisitionCompletionLogic::Ep4CompletionState completionState;
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
 
 	const SavePathValidation::Result savePathValidation =
@@ -1492,7 +1493,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CurObject->m_pMainDlg->PrintLog(strTmp);
 	
 	ulOneTimeMaxSize = 1024 * 1024 * 256;
-	MaxDDRBytes = 0xFFFFFFFF;//DDR size 0xFFFFFFFF byte
 
 	strTmp.Format(_T("One time max size = %dbyte"), ulOneTimeMaxSize);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
@@ -1655,8 +1655,8 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			CurObject->m_CtrlEditCollectedCnt.SetWindowText(strTmp);
 		
 			DDRWrCompleted = FALSE;
+			PcReadCompleted = FALSE;
 			SaveDDRBytes = 0;
-			MaxDDRBytes = 0;
 			DDRWaveBytes = 0;
 			ulSaveWaveCnt = 0;
 			ulRemainSize = 0;
@@ -1669,6 +1669,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			currentTmpPathLow.Empty();
 			currentTmpPathHigh.Empty();
 			cycleMetrics.Reset();
+			completionState.Reset();
 
 			auto SaveWaveDataWithMetrics = [&](
 				CFile* fileLow,
@@ -1695,79 +1696,76 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				return saveResult;
 			};
 
+			auto ReadCompletionSnapshot = [&]() -> AcquisitionCompletionLogic::Ep4CompletionSnapshot
+			{
+				AcquisitionCompletionLogic::Ep4CompletionSnapshot snapshot = {};
+				snapshot.waveWrCnt = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
+				snapshot.waveRdCnt = CurObject->RegGet_DDRReadCnt(pEp4DataBuf);
+				snapshot.ddrWrEnd = CurObject->RegGet_DDRWriteEnd(pEp4DataBuf);
+				snapshot.ddrRdEnd = CurObject->RegGet_DDRReadEnd(pEp4DataBuf);
+				return snapshot;
+			};
+
 			while (g_bEP6ThreadFlag)
 			{
-				if (DDRWrCompleted)
+				Sleep(0);
+
+				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
 				{
-					if (SaveDDRBytes >= MaxDDRBytes)
+					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
+					break;
+				}
+
+				cycleMetrics.IncrementDdrStatusPoll();
+				const AcquisitionCompletionLogic::Ep4CompletionSnapshot completionSnapshot = ReadCompletionSnapshot();
+				cycleMetrics.RecordDdrStatus(
+					completionSnapshot.waveWrCnt,
+					completionSnapshot.waveRdCnt,
+					completionSnapshot.ddrWrEnd,
+					completionSnapshot.ddrRdEnd);
+
+				const AcquisitionCompletionLogic::Ep4CompletionDecision completionDecision =
+					AcquisitionCompletionLogic::ObserveEp4Completion(
+						&completionState,
+						completionSnapshot,
+						SaveDDRBytes);
+
+				DDRWrCompleted = completionDecision.drainingHintSeen ? TRUE : FALSE;
+				PcReadCompleted = completionDecision.acquisitionComplete ? TRUE : FALSE;
+				DDRWaveBytes = completionDecision.readableUpperBoundBytes;
+
+				if (completionDecision.enteredDraining)
+				{
+					strTmp.Format(_T("Fpga ddr write completed. %zu byte readable."), DDRWaveBytes);
+					if (kEnableEp6HotPathLogs)
 					{
-						break;
+						CurObject->m_pMainDlg->PrintLog(strTmp);
+					}
+					CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
+				}
+				else if (!DDRWrCompleted && DDRWaveBytes != 0)
+				{
+					strTmp.Format(_T("DDR data sized %zu byte."), DDRWaveBytes);
+					if (kEnableEp6HotPathLogs)
+					{
+						CurObject->m_pMainDlg->PrintLog(strTmp);
 					}
 				}
-				else
+
+				if (PcReadCompleted)
 				{
-					Sleep(0);
-
-					if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
-					{
-						CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
-						break;
-					}
-
-					cycleMetrics.IncrementDdrStatusPoll();
-					cycleMetrics.RecordDdrStatus(
-						CurObject->RegGet_DDRWaveCnt(pEp4DataBuf),
-						CurObject->RegGet_DDRReadCnt(pEp4DataBuf),
-						CurObject->RegGet_DDRWriteEnd(pEp4DataBuf),
-						CurObject->RegGet_DDRReadEnd(pEp4DataBuf));
-
-					/* Get DDR wave data size */
-					if (cycleMetrics.latestDdrWrEnd == 1)
-					{
-						//Sleep(100);
-						DDRWrCompleted = true;
-						DDRWaveBytes = (size_t)cycleMetrics.latestWaveWrCnt;
-						if (DDRWaveBytes != 0)
-						{
-							DDRWaveBytes += 32;
-						}
-						MaxDDRBytes = DDRWaveBytes;
-						strTmp.Format(_T("Fpga ddr write completed. %zu byte."), MaxDDRBytes);
-						if (kEnableEp6HotPathLogs)
-						{
-							CurObject->m_pMainDlg->PrintLog(strTmp);
-						}
-						CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
-					}
-					else
-					{
-						DDRWaveBytes = (size_t)cycleMetrics.latestWaveWrCnt;
-
-						if (DDRWaveBytes == 0)
-						{
-							continue;
-						}
-						else
-						{
-							DDRWaveBytes += 32;
-						}
-
-						strTmp.Format(_T("DDR data sized %zu byte."), DDRWaveBytes);
-						if (kEnableEp6HotPathLogs)
-						{
-							CurObject->m_pMainDlg->PrintLog(strTmp);
-						}
-					}
+					break;
 				}
 
 				/* Get the size of this usb read */
-				if ((DDRWaveBytes - SaveDDRBytes) > ulOneTimeMaxSize)
+				ulLastReadComByte = 0;
+				if (completionDecision.unreadBytes > ulOneTimeMaxSize)
 				{
 					ulOneTimeSize = ulOneTimeMaxSize;
 				}
 				else
 				{
-					ulOneTimeSize = (ULONG)(DDRWaveBytes - SaveDDRBytes);
+					ulOneTimeSize = static_cast<ULONG>(completionDecision.unreadBytes);
 
 					if (DDRWrCompleted)
 					{					
@@ -2108,34 +2106,45 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			/* Disenable start button */
 			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
 
-			/* Wait fpga write completed... */
-			INT timeout = 0;
-			while (TRUE)
+			if (PcReadCompleted == FALSE)
 			{
-				Sleep(10);
-
-				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
+				/* Wait acquisition completed... */
+				INT timeout = 0;
+				while (TRUE)
 				{
-					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
-					break;
-				}
+					Sleep(10);
 
-				cycleMetrics.IncrementDdrWriteWaitPoll();
-				cycleMetrics.RecordDdrStatus(
-					CurObject->RegGet_DDRWaveCnt(pEp4DataBuf),
-					CurObject->RegGet_DDRReadCnt(pEp4DataBuf),
-					CurObject->RegGet_DDRWriteEnd(pEp4DataBuf),
-					CurObject->RegGet_DDRReadEnd(pEp4DataBuf));
+					if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
+					{
+						CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
+						break;
+					}
 
-				if (cycleMetrics.latestDdrWrEnd == 1)
-				{
-					break;
-				}
+					cycleMetrics.IncrementDdrWriteWaitPoll();
+					const AcquisitionCompletionLogic::Ep4CompletionSnapshot completionSnapshot = ReadCompletionSnapshot();
+					cycleMetrics.RecordDdrStatus(
+						completionSnapshot.waveWrCnt,
+						completionSnapshot.waveRdCnt,
+						completionSnapshot.ddrWrEnd,
+						completionSnapshot.ddrRdEnd);
 
-				if (++timeout > 200)
-				{
-					CurObject->m_pMainDlg->PrintLog(_T("Wait fpga write completed. Timeout"));
-					break;
+					const AcquisitionCompletionLogic::Ep4CompletionDecision completionDecision =
+						AcquisitionCompletionLogic::ObserveEp4Completion(
+							&completionState,
+							completionSnapshot,
+							SaveDDRBytes);
+
+					PcReadCompleted = completionDecision.acquisitionComplete ? TRUE : FALSE;
+					if (PcReadCompleted)
+					{
+						break;
+					}
+
+					if (++timeout > 200)
+					{
+						CurObject->m_pMainDlg->PrintLog(_T("Wait acquisition completed. Timeout"));
+						break;
+					}
 				}
 			}
 

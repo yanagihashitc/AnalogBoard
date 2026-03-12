@@ -45,6 +45,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." AcquisitionCompletionLogic_test.cpp /Fe:AcquisitionCompletionLogic_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(AcquisitionCompletionLogic_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
@@ -91,6 +99,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(AcquisitionPerfMetrics_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%AcquisitionCompletionLogic_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(AcquisitionCompletionLogic_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
