@@ -1,7 +1,7 @@
 # SimulationScenario parser hardening タスクチェックリスト
 
-対象プラン: [simulation-scenario-parser-hardening-design](plans/2026-03-11-simulation-scenario-parser-hardening-design.md)
-プロセスログ: [Process Log](process_log/2026-03-11-simulation-scenario-parser-hardening-log.md)
+対象プラン: [simulation-scenario-parser-hardening-design](./2026-03-11-simulation-scenario-parser-hardening-design.md)
+プロセスログ: [Process Log](./2026-03-11-simulation-scenario-parser-hardening-log.md)
 作成日: 2026-03-11
 
 ---

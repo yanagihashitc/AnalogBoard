@@ -1,7 +1,7 @@
 # simrunner-review-followups タスクチェックリスト
 
-対象プラン: [SimRunner Review Follow-ups Design](./plans/2026-03-11-simrunner-review-followups-design.md)
-プロセスログ: [Process Log](./process_log/2026-03-11-simrunner-review-followups-log.md)
+対象プラン: [SimRunner Review Follow-ups Design](./2026-03-11-simrunner-review-followups-design.md)
+プロセスログ: [Process Log](./2026-03-11-simrunner-review-followups-log.md)
 作成日: 2026-03-11
 
 ---

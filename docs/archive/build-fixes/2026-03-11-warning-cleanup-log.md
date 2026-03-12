@@ -3,7 +3,7 @@
 ## 対象
 
 - compiler warnings: `C4819`, `C4996`, `C4189`
-- [チェックリスト](../2026-03-11-warning-cleanup-checklist.md)
+- [チェックリスト](./2026-03-11-warning-cleanup-checklist.md)
 
 ## Process Log Entries
 

@@ -1,7 +1,7 @@
 # WaveAcquisition stale DDR_WR_END follow-up タスクチェックリスト
 
-対象プラン: [2026-03-12-waveacquisition-stale-ddrwrend-followup-design](./plans/2026-03-12-waveacquisition-stale-ddrwrend-followup-design.md)
-プロセスログ: [Process Log](./process_log/2026-03-12-waveacquisition-stale-ddrwrend-followup-log.md)
+対象プラン: [2026-03-12-waveacquisition-stale-ddrwrend-followup-design](./2026-03-12-waveacquisition-stale-ddrwrend-followup-design.md)
+プロセスログ: [Process Log](./2026-03-12-waveacquisition-stale-ddrwrend-followup-log.md)
 作成日: 2026-03-12
 
 ---

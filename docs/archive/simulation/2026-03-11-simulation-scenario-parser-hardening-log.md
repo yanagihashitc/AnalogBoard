@@ -2,8 +2,8 @@
 
 ## 対象プラン
 
-- [simulation-scenario-parser-hardening-design](../plans/2026-03-11-simulation-scenario-parser-hardening-design.md)
-- [チェックリスト](../2026-03-11-simulation-scenario-parser-hardening-checklist.md)
+- [simulation-scenario-parser-hardening-design](./2026-03-11-simulation-scenario-parser-hardening-design.md)
+- [チェックリスト](./2026-03-11-simulation-scenario-parser-hardening-checklist.md)
 - [Process Log INDEX](INDEX.md)
 
 ## 記入ルール

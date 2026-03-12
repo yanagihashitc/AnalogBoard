@@ -1,6 +1,6 @@
 # review-findings-fix タスクチェックリスト
 
-対象プラン: [2026-03-11-acquisition-preflight-simulation-design](./archive/simulation/2026-03-11-acquisition-preflight-simulation-design.md)
+対象プラン: [2026-03-11-acquisition-preflight-simulation-design](../simulation/2026-03-11-acquisition-preflight-simulation-design.md)
 プロセスログ: [Process Log](./2026-03-11-review-findings-fix-log.md)
 作成日: 2026-03-11
 

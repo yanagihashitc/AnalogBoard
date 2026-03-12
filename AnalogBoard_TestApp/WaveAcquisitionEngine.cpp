@@ -345,7 +345,7 @@ namespace WaveAcquisition
                         {
                             continue;
                         }
-                        // Exhausted settling budget — fall through to
+                        // Exhausted settling budget - fall through to
                         // empty-capture detection below.
                     }
 

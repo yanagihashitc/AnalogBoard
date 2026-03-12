@@ -1,7 +1,7 @@
 # Simulation Regression Coverage タスクチェックリスト
 
-対象プラン: [2026-03-12-simulation-regression-coverage-design](./plans/2026-03-12-simulation-regression-coverage-design.md)
-プロセスログ: [Process Log](./process_log/2026-03-12-simulation-regression-coverage-log.md)
+対象プラン: [2026-03-12-simulation-regression-coverage-design](./2026-03-12-simulation-regression-coverage-design.md)
+プロセスログ: [Process Log](./2026-03-12-simulation-regression-coverage-log.md)
 作成日: 2026-03-12
 
 ---

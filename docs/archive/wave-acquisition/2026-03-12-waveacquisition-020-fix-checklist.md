@@ -1,7 +1,7 @@
 # 0.2.0 WaveAcquisitionEngine Fix タスクチェックリスト
 
-対象プラン: [2026-03-12-waveacquisition-020-fix-design](./plans/2026-03-12-waveacquisition-020-fix-design.md)
-プロセスログ: [Process Log](./process_log/2026-03-12-waveacquisition-020-fix-log.md)
+対象プラン: [2026-03-12-waveacquisition-020-fix-design](./2026-03-12-waveacquisition-020-fix-design.md)
+プロセスログ: [Process Log](./2026-03-12-waveacquisition-020-fix-log.md)
 作成日: 2026-03-12
 
 ---

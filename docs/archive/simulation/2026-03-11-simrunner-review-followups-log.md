@@ -2,9 +2,9 @@
 
 ## 対象プラン
 
-- [SimRunner Review Follow-ups Design](../plans/2026-03-11-simrunner-review-followups-design.md)
-- [チェックリスト](../2026-03-11-simrunner-review-followups-checklist.md)
-- [Process Log INDEX](./INDEX.md)
+- [SimRunner Review Follow-ups Design](./2026-03-11-simrunner-review-followups-design.md)
+- [チェックリスト](./2026-03-11-simrunner-review-followups-checklist.md)
+- [Process Log INDEX](../../process_log/INDEX.md)
 
 ## 記入ルール
 

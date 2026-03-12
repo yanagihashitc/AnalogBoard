@@ -72,3 +72,38 @@ This avoids requiring C++17 in the MFC project and keeps the header self-contain
 
 - `AnalogBoard_TestApp/FileLogger.h`
 - `AnalogBoard_TestApp/AnalogBoard_TestApp.vcxproj`
+
+---
+
+## C4819 in MFC builds when UTF-8 punctuation sneaks into source comments
+
+**Date**: 2026-03-12
+**Category**: environment
+**Severity**: minor
+
+### Symptoms
+
+- `AnalogBoard_TestApp` and `AnalogBoard_SimRunner` rebuilds emit:
+  - `warning C4819: file contains a character that cannot be represented in the current code page (932)`
+- The warning points at `AnalogBoard_TestApp/WaveAcquisitionEngine.cpp(1,1)` even though the code logic compiles and links normally
+
+### Root Cause
+
+The source file remained in the existing project encoding, but a comment introduced a UTF-8 em dash (`U+2014`). Visual C++ reports `C4819` at file scope when any source character cannot be represented in CP932, so a single Unicode punctuation mark in a comment is enough to trigger the warning.
+
+### Solution
+
+Keep source comments ASCII-only unless the project is explicitly migrated to Unicode source handling.
+
+For this case:
+
+1. Search the file for non-ASCII characters:
+   - `rg -n "[^\x00-\x7F]" AnalogBoard_TestApp/WaveAcquisitionEngine.cpp`
+2. Replace the em dash with a plain ASCII hyphen.
+3. Rebuild the affected projects through `scripts\run_with_vsdevcmd.bat` and confirm `C4819` is gone.
+
+### Related Files
+
+- `AnalogBoard_TestApp/WaveAcquisitionEngine.cpp`
+- `AnalogBoard_TestApp/AnalogBoard_TestApp.vcxproj`
+- `AnalogBoard_SimRunner/AnalogBoard_SimRunner.vcxproj`

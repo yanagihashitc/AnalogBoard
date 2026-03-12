@@ -2,9 +2,9 @@
 
 ## 対象プラン
 
-- [2026-03-12-simulation-regression-coverage-design](../plans/2026-03-12-simulation-regression-coverage-design.md)
-- [チェックリスト](../2026-03-12-simulation-regression-coverage-checklist.md)
-- [Process Log INDEX](./INDEX.md)
+- [2026-03-12-simulation-regression-coverage-design](./2026-03-12-simulation-regression-coverage-design.md)
+- [チェックリスト](./2026-03-12-simulation-regression-coverage-checklist.md)
+- [Process Log INDEX](../../process_log/INDEX.md)
 
 ## 記入ルール
 

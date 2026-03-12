@@ -2,9 +2,9 @@
 
 ## 対象プラン
 
-- [2026-03-12-waveacquisition-020-fix-design](../plans/2026-03-12-waveacquisition-020-fix-design.md)
-- [チェックリスト](../2026-03-12-waveacquisition-020-fix-checklist.md)
-- [Process Log INDEX](./INDEX.md)
+- [2026-03-12-waveacquisition-020-fix-design](./2026-03-12-waveacquisition-020-fix-design.md)
+- [チェックリスト](./2026-03-12-waveacquisition-020-fix-checklist.md)
+- [Process Log INDEX](../../process_log/INDEX.md)
 
 ## 記入ルール
 
