@@ -13,6 +13,7 @@
 #include "AcquisitionPerfMetrics.h"
 #include "FileIoLoggingPolicy.h"
 #include "FpgaRegisterLogic.h"
+#include "ReadRequestBurstPolicy.h"
 #include "SavePathValidation.h"
 #include "WaveDataFileIO.h"
 #include "WavePairPublishPolicy.h"
@@ -1509,7 +1510,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	strTmp.Format(_T("High file size = %dbyte, Low file size = %dbyte"), OneFileSize_H, OneFileSize_L);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
 	
-	ulOneTimeMaxSize = 1024 * 1024 * 256;
+	constexpr ULONG kLegacyReadBurstCapBytes = 1024 * 1024 * 256;
+	ulOneTimeMaxSize = ReadRequestBurstPolicy::ResolveReadBurstCapBytes(
+		OneFileSize,
+		kLegacyReadBurstCapBytes);
 
 	strTmp.Format(_T("One time max size = %dbyte"), ulOneTimeMaxSize);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
