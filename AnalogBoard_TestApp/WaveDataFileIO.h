@@ -305,9 +305,18 @@ namespace WaveDataFileIO
         {
             result.rollbackAttempted = true;
 
+            const bool restoredLowTmp =
+                (::MoveFileExW(finalPathLow, tmpPathLow, MOVEFILE_REPLACE_EXISTING) != FALSE);
+            if (!restoredLowTmp)
+            {
+                result.rollbackLastError = ::GetLastError();
+                return result;
+            }
+
             if (lowBackupExists)
             {
-                const bool restoredLow = (::MoveFileExW(lowBackupPath.c_str(), finalPathLow, MOVEFILE_REPLACE_EXISTING) != FALSE);
+                const bool restoredLow =
+                    (::MoveFileExW(lowBackupPath.c_str(), finalPathLow, MOVEFILE_REPLACE_EXISTING) != FALSE);
                 if (!restoredLow)
                 {
                     result.rollbackLastError = ::GetLastError();
@@ -316,12 +325,7 @@ namespace WaveDataFileIO
             }
             else
             {
-                const bool deletedLow = (::DeleteFileW(finalPathLow) != FALSE);
-                if (!deletedLow)
-                {
-                    result.rollbackLastError = ::GetLastError();
-                }
-                result.rollbackSucceeded = deletedLow;
+                result.rollbackSucceeded = true;
             }
             return result;
         }

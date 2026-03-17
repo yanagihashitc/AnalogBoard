@@ -597,7 +597,9 @@ void Test_T2_AtomicPublish_FhRenameFail_RollbackLow()
     TEST_ASSERT(result.low.success, "Low rename should succeed first");
     TEST_ASSERT(!result.high.success, "High rename should fail");
     TEST_ASSERT(result.rollbackAttempted, "Rollback must be attempted");
-    TEST_ASSERT(!fs::exists(finalFl), "Low final must be deleted by rollback");
+    TEST_ASSERT(result.rollbackSucceeded, "Rollback should restore low tmp");
+    TEST_ASSERT(fs::exists(tmpFl), "Low tmp should be restored when high rename fails");
+    TEST_ASSERT(!fs::exists(finalFl), "Low final must not remain published");
     TEST_ASSERT(fs::exists(tmpFh), "High tmp should remain");
 
     if (lock != INVALID_HANDLE_VALUE)
@@ -635,10 +637,11 @@ void Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow()
     TEST_ASSERT(result.low.success, "Low rename should succeed before high failure");
     TEST_ASSERT(!result.high.success, "High rename should fail");
     TEST_ASSERT(result.rollbackAttempted, "Rollback must be attempted");
-    TEST_ASSERT(result.rollbackSucceeded, "Rollback should restore existing low");
+    TEST_ASSERT(result.rollbackSucceeded, "Rollback should restore tmp pair and existing low");
     TEST_ASSERT(fs::exists(finalFl), "Existing low final should remain after rollback");
     TEST_ASSERT(ReadBinaryFile(finalFl) == existingLow, "Existing low final content must be preserved");
-    TEST_ASSERT(!fs::exists(tmpFl), "Low tmp should be consumed by low rename");
+    TEST_ASSERT(fs::exists(tmpFl), "Low tmp should be restored when high rename fails");
+    TEST_ASSERT(ReadBinaryFile(tmpFl) == newLow, "Low tmp content must remain for retry");
     TEST_ASSERT(fs::exists(tmpFh), "High tmp should remain when high rename fails");
 
     if (lock != INVALID_HANDLE_VALUE)
@@ -736,8 +739,8 @@ void Test_T2_AtomicPublish_FhRenameFail_BackupLocked_FinalLowRemains()
             TEST_ASSERT(!result.high.success, "High rename should fail");
             TEST_ASSERT(result.rollbackAttempted, "Rollback must be attempted");
             TEST_ASSERT(!result.rollbackSucceeded, "Rollback should fail when backup is locked");
-            TEST_ASSERT(fs::exists(finalFl), "Final low should remain when restore fails");
-            TEST_ASSERT(ReadBinaryFile(finalFl) == newLow, "Final low should keep new low data");
+            TEST_ASSERT(fs::exists(tmpFl), "Low tmp should still remain for retry");
+            TEST_ASSERT(ReadBinaryFile(tmpFl) == newLow, "Low tmp should keep new low data");
             TEST_ASSERT(fs::exists(tmpFh), "High tmp should remain when high rename fails");
             observedBackupLockRollbackFail = true;
         }
@@ -783,6 +786,60 @@ void Test_T3_PseudoIntegration_TmpOnlyThenPublishedPair()
     TEST_ASSERT(result.success, "T3-1 publish success");
     TEST_ASSERT(CountCompleteBinPairs(root) == 1, "T3-1 complete pair appears after publish");
     TEST_ASSERT(CountFilesBySuffix(root, L".bin.tmp") == 0, "T3-1 no tmp after publish");
+}
+
+void Test_T5_PublishFailure_FirstPairRetained_SecondPairPublishes()
+{
+    const fs::path root = fs::temp_directory_path() / L"wave_data_io_tests" / L"tmp_wave_data_io_t5_nonfatal_publish";
+    EnsureCleanDir(root);
+
+    const fs::path firstTmpFl = root / L"260317_1700_fl_1.bin.tmp";
+    const fs::path firstTmpFh = root / L"260317_1700_fh_1.bin.tmp";
+    const fs::path firstFinalFl = root / L"260317_1700_fl_1.bin";
+    const fs::path firstFinalFh = root / L"260317_1700_fh_1.bin";
+
+    const fs::path secondTmpFl = root / L"260317_1700_fl_2.bin.tmp";
+    const fs::path secondTmpFh = root / L"260317_1700_fh_2.bin.tmp";
+    const fs::path secondFinalFl = root / L"260317_1700_fl_2.bin";
+    const fs::path secondFinalFh = root / L"260317_1700_fh_2.bin";
+
+    // Given: The first pair will fail during high publish, while the second pair is valid.
+    TEST_ASSERT(WriteBinaryFile(firstTmpFl, { 0x10, 0x11, 0x12 }), "T5 write first low tmp");
+    TEST_ASSERT(WriteBinaryFile(firstTmpFh, { 0x13, 0x14, 0x15 }), "T5 write first high tmp");
+    TEST_ASSERT(WriteBinaryFile(firstFinalFh, { 0x99 }), "T5 write blocking final high");
+
+    HANDLE highLock = ::CreateFileW(
+        firstFinalFh.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    TEST_ASSERT(highLock != INVALID_HANDLE_VALUE, "T5 lock first final high");
+
+    // When: The first publish fails.
+    const WaveDataFileIO::PublishPairResult firstPublishResult = WaveDataFileIO::PublishWavePairAtomic(
+        firstTmpFl.c_str(), firstFinalFl.c_str(), firstTmpFh.c_str(), firstFinalFh.c_str(), 100);
+
+    if (highLock != INVALID_HANDLE_VALUE)
+    {
+        ::CloseHandle(highLock);
+    }
+
+    // Then: The failed pair remains as tmp and no published pair is visible yet.
+    TEST_ASSERT(!firstPublishResult.success, "T5 first publish should fail");
+    TEST_ASSERT(fs::exists(firstTmpFl), "T5 first low tmp should remain");
+    TEST_ASSERT(fs::exists(firstTmpFh), "T5 first high tmp should remain");
+    TEST_ASSERT(CountCompleteBinPairs(root) == 0, "T5 no complete .bin pair should be visible after failed publish");
+
+    TEST_ASSERT(WriteBinaryFile(secondTmpFl, { 0x20, 0x21, 0x22 }), "T5 write second low tmp");
+    TEST_ASSERT(WriteBinaryFile(secondTmpFh, { 0x23, 0x24, 0x25 }), "T5 write second high tmp");
+
+    // When: The next pair is published.
+    const WaveDataFileIO::PublishPairResult secondPublishResult = WaveDataFileIO::PublishWavePairAtomic(
+        secondTmpFl.c_str(), secondFinalFl.c_str(), secondTmpFh.c_str(), secondFinalFh.c_str(), 100);
+
+    // Then: Acquisition can continue and the second pair becomes visible.
+    TEST_ASSERT(secondPublishResult.success, "T5 second publish should succeed");
+    TEST_ASSERT(fs::exists(secondFinalFl), "T5 second low final should exist");
+    TEST_ASSERT(fs::exists(secondFinalFh), "T5 second high final should exist");
+    TEST_ASSERT(CountCompleteBinPairs(root) == 1, "T5 exactly one published pair should be visible");
+    TEST_ASSERT(CountFilesBySuffix(root, L".bin.tmp") == 2, "T5 failed first pair should remain as tmp");
 }
 
 void Test_T3_ForcedStop_TmpRemains_ExcludedFromDownstream()
@@ -1129,6 +1186,7 @@ int main()
     RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_RestoreExistingLow);
     RUN_TEST(Test_T2_AtomicPublish_FhRenameFail_BackupLocked_FinalLowRemains);
     RUN_TEST(Test_T3_PseudoIntegration_TmpOnlyThenPublishedPair);
+    RUN_TEST(Test_T5_PublishFailure_FirstPairRetained_SecondPairPublishes);
     RUN_TEST(Test_T3_ForcedStop_TmpRemains_ExcludedFromDownstream);
     RUN_TEST(Test_T3_RestartCleanup_DeletesTargetPatternOnly);
     RUN_TEST(Test_T3_RestartCleanup_NoTarget_NoDelete);

@@ -53,10 +53,34 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(Ep6TransferRetryPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileLogger_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FileIoLoggingPolicy_test.cpp /Fe:FileIoLoggingPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(FileIoLoggingPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." WavePairPublishPolicy_test.cpp /Fe:WavePairPublishPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(WavePairPublishPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
@@ -111,10 +135,34 @@ if errorlevel 1 (
     exit /b 1
 )
 
+"%SCRIPT_DIR%Ep6TransferRetryPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(Ep6TransferRetryPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 "%SCRIPT_DIR%FileLogger_test.exe"
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(FileLogger_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%FileIoLoggingPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(FileIoLoggingPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%WavePairPublishPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(WavePairPublishPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

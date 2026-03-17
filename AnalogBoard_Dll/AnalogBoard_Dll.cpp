@@ -16,6 +16,7 @@
 #include <winioctl.h>
 #include <tchar.h>
 #include <new>
+#include "Ep6TransferRetryPolicy.h"
 #include "AnalogBoard_Dll.h"
 #include "..\CyLib\header\CyAPI.h"
 
@@ -45,11 +46,13 @@ HANDLE m_hEP2EP4Mutex;
 // Diagnostic counters for EP6 debug logging. They are reset on connect/disconnect.
 static LONG g_ep6CallCount = 0;
 static LONG g_ep6TimeoutCount = 0;
+static LONG g_ep6RetryCount = 0;
 
 static void ResetEp6DiagnosticCounters()
 {
 	::InterlockedExchange(&g_ep6CallCount, 0);
 	::InterlockedExchange(&g_ep6TimeoutCount, 0);
+	::InterlockedExchange(&g_ep6RetryCount, 0);
 }
 
 /*******************************************************************************
@@ -427,6 +430,7 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
 	const ULONGLONG callStartMs = ::GetTickCount64();
+	int callRetryCount = 0;
 
 	/* Endpoint is null or not */
 	if (!m_pInEndpt6)
@@ -470,7 +474,23 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 		}
 
 		/* Receive fpga return packet */
-		if (m_pInEndpt6->XferData(pOneTimeBuffer, lOneTimeSize, FALSE))
+		const LONG requestedChunkSize = lOneTimeSize;
+		int chunkRetryCount = 0;
+		const bool chunkSuccess = Ep6TransferRetryPolicy::ExecuteWithRetry(
+			[&]() -> bool
+			{
+				lOneTimeSize = requestedChunkSize;
+				return m_pInEndpt6->XferData(pOneTimeBuffer, lOneTimeSize, FALSE) ? true : false;
+			},
+			[](DWORD backoffMs)
+			{
+				::Sleep(backoffMs);
+			},
+			nullptr,
+			&chunkRetryCount);
+		callRetryCount += chunkRetryCount;
+
+		if (chunkSuccess)
 		{
 			memcpy(pRevData + ulRecvDataSize, pOneTimeBuffer, lOneTimeSize);
 		}
@@ -491,16 +511,19 @@ INT USB_Lib_Info::EP6_GetData(BYTE* pRevData, UINT  DataSizeCount)
 
 	const LONG currentCallCount = ::InterlockedIncrement(&g_ep6CallCount);
 	const LONG currentTimeoutCount = ::InterlockedCompareExchange(&g_ep6TimeoutCount, 0, 0);
+	const LONG currentRetryCount = ::InterlockedAdd(&g_ep6RetryCount, callRetryCount);
 	const ULONGLONG elapsedMs = ::GetTickCount64() - callStartMs;
 	char perfLog[256] = { 0 };
 	sprintf_s(
 		perfLog,
-		"[PR01][DLL][EP6] call=%ld requestBytes=%u recvBytes=%u elapsedMs=%llu result=%d timeoutCount=%ld\n",
+		"[PR01][DLL][EP6] call=%ld requestBytes=%u recvBytes=%u elapsedMs=%llu result=%d retryCount=%d totalRetryCount=%ld timeoutCount=%ld\n",
 		currentCallCount,
 		DataSizeCount,
 		ulRecvDataSize,
 		elapsedMs,
 		iRet,
+		callRetryCount,
+		currentRetryCount,
 		currentTimeoutCount);
 	::OutputDebugStringA(perfLog);
 

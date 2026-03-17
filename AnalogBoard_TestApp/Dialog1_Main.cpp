@@ -11,9 +11,11 @@
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
 #include "AcquisitionCompletionLogic.h"
 #include "AcquisitionPerfMetrics.h"
+#include "FileIoLoggingPolicy.h"
 #include "FpgaRegisterLogic.h"
 #include "SavePathValidation.h"
 #include "WaveDataFileIO.h"
+#include "WavePairPublishPolicy.h"
 
 #define LOG_SWITCH		0
 
@@ -218,14 +220,20 @@ namespace
 			LogFileIoEvent(curObject, _T("Close"), index, tmpPathLow, finalPathLow, closeErrorLow, _T("close low failed"));
 			return kUsbErrFileIo;
 		}
-		LogFileIoEvent(curObject, _T("Close"), index, tmpPathLow, finalPathLow, ERROR_SUCCESS, _T("close low success"));
+		if (FileIoLoggingPolicy::ShouldLogCloseSuccess())
+		{
+			LogFileIoEvent(curObject, _T("Close"), index, tmpPathLow, finalPathLow, ERROR_SUCCESS, _T("close low success"));
+		}
 
 		if (!FlushAndCloseFile(fileHigh, &closeErrorHigh))
 		{
 			LogFileIoEvent(curObject, _T("Close"), index, tmpPathHigh, finalPathHigh, closeErrorHigh, _T("close high failed"));
 			return kUsbErrFileIo;
 		}
-		LogFileIoEvent(curObject, _T("Close"), index, tmpPathHigh, finalPathHigh, ERROR_SUCCESS, _T("close high success"));
+		if (FileIoLoggingPolicy::ShouldLogCloseSuccess())
+		{
+			LogFileIoEvent(curObject, _T("Close"), index, tmpPathHigh, finalPathHigh, ERROR_SUCCESS, _T("close high success"));
+		}
 
 		const WaveDataFileIO::PublishPairResult publishResult = WaveDataFileIO::PublishWavePairAtomic(
 			tmpPathLow.GetString(),
@@ -235,34 +243,43 @@ namespace
 			kRenameRetryWaitMs,
 			kRenameMaxRetries);
 
+		const WavePairPublishPolicy::FinalizeOutcome finalizeOutcome =
+			WavePairPublishPolicy::ClassifyFinalizeOutcome(true, true, publishResult);
+
 		if (publishResult.low.success)
 		{
-			CString detail;
-			detail.Format(_T("rename success retried=%d"), publishResult.low.retried ? 1 : 0);
-			LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathLow, finalPathLow, ERROR_SUCCESS, detail);
+			if (FileIoLoggingPolicy::ShouldLogPublishSuccess(publishResult.low))
+			{
+				CString detail;
+				detail.Format(_T("rename success retried=%d"), publishResult.low.retried ? 1 : 0);
+				LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathLow, finalPathLow, ERROR_SUCCESS, detail);
+			}
 		}
 		else
 		{
 			CString detail;
-			detail.Format(_T("rename fail retried=%d"), publishResult.low.retried ? 1 : 0);
+			detail.Format(_T("rename fail retried=%d retained_tmp=1 nonfatal=1"), publishResult.low.retried ? 1 : 0);
 			LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathLow, finalPathLow, publishResult.low.lastError, detail);
-			return kUsbErrFileRename;
+			return finalizeOutcome == WavePairPublishPolicy::FinalizeOutcome::kFatal ? kUsbErrFileRename : USB_SUCCESS;
 		}
 
 		if (publishResult.high.success)
 		{
-			CString detail;
-			detail.Format(_T("rename success retried=%d"), publishResult.high.retried ? 1 : 0);
-			LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathHigh, finalPathHigh, ERROR_SUCCESS, detail);
+			if (FileIoLoggingPolicy::ShouldLogPublishSuccess(publishResult.high))
+			{
+				CString detail;
+				detail.Format(_T("rename success retried=%d"), publishResult.high.retried ? 1 : 0);
+				LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathHigh, finalPathHigh, ERROR_SUCCESS, detail);
+			}
 			return USB_SUCCESS;
 		}
 
 		CString highDetail;
-		highDetail.Format(_T("rename fail retried=%d"), publishResult.high.retried ? 1 : 0);
+		highDetail.Format(_T("rename fail retried=%d retained_tmp=1 nonfatal=1"), publishResult.high.retried ? 1 : 0);
 		LogFileIoEvent(curObject, _T("MoveFileEx"), index, tmpPathHigh, finalPathHigh, publishResult.high.lastError, highDetail);
 
 		CString rollbackDetail;
-		rollbackDetail.Format(_T("rename rollback low deleted=%d"), publishResult.rollbackSucceeded ? 1 : 0);
+		rollbackDetail.Format(_T("rename rollback restored_tmp=%d"), publishResult.rollbackSucceeded ? 1 : 0);
 		LogFileIoEvent(
 			curObject,
 			_T("DeleteFile"),
@@ -271,7 +288,7 @@ namespace
 			finalPathHigh,
 			publishResult.rollbackSucceeded ? ERROR_SUCCESS : publishResult.rollbackLastError,
 			rollbackDetail);
-		return kUsbErrFileRename;
+		return finalizeOutcome == WavePairPublishPolicy::FinalizeOutcome::kFatal ? kUsbErrFileRename : USB_SUCCESS;
 	}
 }
 
@@ -1876,9 +1893,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								ErrExit = TRUE;
 								break;
 							}
-							CString writeDetail;
-							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
+							{
+								CString writeDetail;
+								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							}
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
 						}
 						else
@@ -1896,9 +1916,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								ErrExit = TRUE;
 								break;
 							}
-							CString writeDetail;
-							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
+							{
+								CString writeDetail;
+								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							}
 
 							iRet = FlushCloseAndPublishWavePair(
 								CurObject,
@@ -1948,8 +1971,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 							ErrExit = TRUE;
 							break;
 						}
-						LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, _T("tmp open success"));
-						LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathHigh, currentFinalPathHigh, ERROR_SUCCESS, _T("tmp open success"));
+						if (FileIoLoggingPolicy::ShouldLogOpenSuccess())
+						{
+							LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, _T("tmp open success"));
+							LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathHigh, currentFinalPathHigh, ERROR_SUCCESS, _T("tmp open success"));
+						}
 
 						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
 						{
@@ -1966,9 +1992,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								ErrExit = TRUE;
 								break;
 							}
-							CString writeDetail;
-							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
+							{
+								CString writeDetail;
+								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							}
 
 							iRet = FlushCloseAndPublishWavePair(
 								CurObject,
@@ -2005,9 +2034,12 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 								ErrExit = TRUE;
 								break;
 							}
-							CString writeDetail;
-							writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-							LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
+							{
+								CString writeDetail;
+								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
+								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
+							}
 							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
 						}
 
