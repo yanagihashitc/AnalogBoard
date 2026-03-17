@@ -112,6 +112,57 @@ void Test_TC_B_04_RecordSaveTransfer_SingleSampleUsesSameAvgAndMax()
     TEST_ASSERT(metrics.GetSaveAverageElapsedMs() == 25, "TC-B-04 save avg must be 25");
 }
 
+void Test_TC_N_03_RecordTimeoutTelemetry_CapturesTimeoutSnapshot()
+{
+    // Given: A collector with a timeout-time EP6 snapshot.
+    AcquisitionPerfMetrics::CycleMetrics metrics;
+
+    // When: Timeout telemetry is recorded.
+    metrics.RecordTimeoutTelemetry(65536, 123456, 222222, 300000, 176544, 1, 0);
+
+    // Then: The timeout snapshot is preserved for later logging.
+    TEST_ASSERT(metrics.timeout.observed == true, "TC-N-03 timeout must be observed");
+    TEST_ASSERT(metrics.timeout.requestedReadSizeBytes == 65536, "TC-N-03 read size must be captured");
+    TEST_ASSERT(metrics.timeout.unreadBytes == 123456, "TC-N-03 unread bytes must be captured");
+    TEST_ASSERT(metrics.timeout.readableUpperBoundBytes == 222222, "TC-N-03 readable upper bound must be captured");
+    TEST_ASSERT(metrics.timeout.backlogBytes == 123456, "TC-N-03 backlog bytes must be captured");
+    TEST_ASSERT(metrics.timeout.waveWrCnt == 300000, "TC-N-03 WR count must be captured");
+    TEST_ASSERT(metrics.timeout.waveRdCnt == 176544, "TC-N-03 RD count must be captured");
+    TEST_ASSERT(metrics.timeout.ddrWrEnd == 1, "TC-N-03 DDR_WR_END must be captured");
+    TEST_ASSERT(metrics.timeout.ddrRdEnd == 0, "TC-N-03 DDR_RD_END must be captured");
+}
+
+void Test_TC_N_04_MarkTimeoutPostOutcome_CapturesWaitTimeoutAndEp4Failure()
+{
+    // Given: A collector with one timeout already recorded.
+    AcquisitionPerfMetrics::CycleMetrics metrics;
+    metrics.RecordTimeoutTelemetry(98304, 4000, 8000, 16000, 12000, 0, 0);
+
+    // When: Post-timeout outcomes are recorded.
+    metrics.MarkTimeoutWaitTimeout();
+    metrics.MarkTimeoutEp4ReadFailure();
+
+    // Then: The follow-up outcome is preserved for the cycle summary.
+    TEST_ASSERT(metrics.timeout.waitTimeoutObserved == true, "TC-N-04 wait timeout must be captured");
+    TEST_ASSERT(metrics.timeout.ep4ReadFailureObserved == true, "TC-N-04 EP4 read failure must be captured");
+}
+
+void Test_TC_B_05_WithoutTimeout_TelemetryRemainsDefault()
+{
+    // Given: A fresh collector without timeout events.
+    AcquisitionPerfMetrics::CycleMetrics metrics;
+
+    // When: Timeout telemetry is never recorded.
+    metrics.MarkTimeoutWaitTimeout();
+    metrics.MarkTimeoutEp4ReadFailure();
+
+    // Then: Timeout telemetry remains at the default state.
+    TEST_ASSERT(metrics.timeout.observed == false, "TC-B-05 timeout must remain unobserved");
+    TEST_ASSERT(metrics.timeout.requestedReadSizeBytes == 0, "TC-B-05 read size must remain 0");
+    TEST_ASSERT(metrics.timeout.waitTimeoutObserved == false, "TC-B-05 wait timeout must remain false");
+    TEST_ASSERT(metrics.timeout.ep4ReadFailureObserved == false, "TC-B-05 EP4 read failure must remain false");
+}
+
 int main()
 {
     std::printf("=== AcquisitionPerfMetrics Unit Tests ===\n\n");
@@ -122,6 +173,9 @@ int main()
     RUN_TEST(Test_TC_B_02_RecordDdrStatus_InvertedCounters_ClampBacklogToZero);
     RUN_TEST(Test_TC_B_03_RecordEp6Transfer_TimeoutsIncreaseCounter);
     RUN_TEST(Test_TC_B_04_RecordSaveTransfer_SingleSampleUsesSameAvgAndMax);
+    RUN_TEST(Test_TC_N_03_RecordTimeoutTelemetry_CapturesTimeoutSnapshot);
+    RUN_TEST(Test_TC_N_04_MarkTimeoutPostOutcome_CapturesWaitTimeoutAndEp4Failure);
+    RUN_TEST(Test_TC_B_05_WithoutTimeout_TelemetryRemainsDefault);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

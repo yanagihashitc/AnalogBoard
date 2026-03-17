@@ -1712,6 +1712,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
 				{
+					cycleMetrics.MarkTimeoutEp4ReadFailure();
 					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
 					break;
 				}
@@ -1799,6 +1800,33 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 				if (iRet != USB_SUCCESS)
 				{
+					if (iRet == USB_ERR_TRANSFER_TIMEOUT)
+					{
+						cycleMetrics.RecordTimeoutTelemetry(
+							ulOneTimeSize,
+							static_cast<ULONGLONG>(completionDecision.unreadBytes),
+							static_cast<ULONGLONG>(completionDecision.readableUpperBoundBytes),
+							completionSnapshot.waveWrCnt,
+							completionSnapshot.waveRdCnt,
+							completionSnapshot.ddrWrEnd,
+							completionSnapshot.ddrRdEnd);
+
+						const TCHAR* timeoutStage =
+							completionDecision.drainingHintSeen ? _T("draining") : _T("active");
+						strTmp.Format(
+							_T("[PR01][TIMEOUT] readSize=%lu unreadBytes=%I64u readableUpperBoundBytes=%I64u backlogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d stage=%s"),
+							ulOneTimeSize,
+							cycleMetrics.timeout.unreadBytes,
+							cycleMetrics.timeout.readableUpperBoundBytes,
+							cycleMetrics.timeout.backlogBytes,
+							cycleMetrics.timeout.waveWrCnt,
+							cycleMetrics.timeout.waveRdCnt,
+							cycleMetrics.timeout.ddrWrEnd,
+							cycleMetrics.timeout.ddrRdEnd,
+							timeoutStage);
+						CurObject->m_pMainDlg->PrintLog(strTmp);
+					}
+
 					strTmp.Format(_T("EP6 Read %u byte NG."), ulOneTimeSize);
 					CurObject->m_pMainDlg->PrintLog(strTmp);
 					CurObject->m_pMainDlg->PrintLog(CurObject->m_pMainDlg->strUSBLibError(iRet));
@@ -2116,6 +2144,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
 					{
+						cycleMetrics.MarkTimeoutEp4ReadFailure();
 						CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
 						break;
 					}
@@ -2142,6 +2171,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 					if (++timeout > 200)
 					{
+						cycleMetrics.MarkTimeoutWaitTimeout();
 						CurObject->m_pMainDlg->PrintLog(_T("Wait acquisition completed. Timeout"));
 						break;
 					}
@@ -2151,7 +2181,7 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			const ULONGLONG ep6AvgElapsedMs = cycleMetrics.GetEp6AverageElapsedMs();
 			const ULONGLONG saveFileAvgElapsedMs = cycleMetrics.GetSaveAverageElapsedMs();
 			strTmp.Format(
-				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d"),
+				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d timeoutReadSize=%lu timeoutUnreadBytes=%I64u timeoutReadableUpperBoundBytes=%I64u timeoutBacklogBytes=%lu timeoutWait=%d timeoutEp4Fail=%d"),
 				cycleMetrics.ep6.callCount,
 				cycleMetrics.ep6.totalBytes,
 				cycleMetrics.ep6TimeoutCount,
@@ -2167,7 +2197,13 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				cycleMetrics.latestWaveWrCnt,
 				cycleMetrics.latestWaveRdCnt,
 				cycleMetrics.latestDdrWrEnd,
-				cycleMetrics.latestDdrRdEnd);
+				cycleMetrics.latestDdrRdEnd,
+				cycleMetrics.timeout.requestedReadSizeBytes,
+				cycleMetrics.timeout.unreadBytes,
+				cycleMetrics.timeout.readableUpperBoundBytes,
+				cycleMetrics.timeout.backlogBytes,
+				cycleMetrics.timeout.waitTimeoutObserved ? 1 : 0,
+				cycleMetrics.timeout.ep4ReadFailureObserved ? 1 : 0);
 			if (kEnablePhase0CycleSummaryLog)
 			{
 				CurObject->m_pMainDlg->PrintLog(strTmp);

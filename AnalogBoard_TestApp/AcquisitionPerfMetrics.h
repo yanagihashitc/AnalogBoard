@@ -29,8 +29,24 @@ namespace AcquisitionPerfMetrics
 
     struct CycleMetrics
     {
+        struct TimeoutTelemetry
+        {
+            bool observed = false;
+            ULONG requestedReadSizeBytes = 0;
+            ULONGLONG unreadBytes = 0;
+            ULONGLONG readableUpperBoundBytes = 0;
+            ULONG backlogBytes = 0;
+            ULONG waveWrCnt = 0;
+            ULONG waveRdCnt = 0;
+            INT ddrWrEnd = 0;
+            INT ddrRdEnd = 0;
+            bool waitTimeoutObserved = false;
+            bool ep4ReadFailureObserved = false;
+        };
+
         TransferMetrics ep6;
         TransferMetrics save;
+        TimeoutTelemetry timeout;
         ULONG ep6TimeoutCount = 0;
         ULONG ddrStatusPollCount = 0;
         ULONG ddrWriteWaitPollCount = 0;
@@ -57,6 +73,42 @@ namespace AcquisitionPerfMetrics
         void RecordSaveTransfer(ULONGLONG elapsedMs, ULONGLONG bytes)
         {
             save.Record(elapsedMs, bytes);
+        }
+
+        void RecordTimeoutTelemetry(
+            ULONG requestedReadSizeBytes,
+            ULONGLONG unreadBytes,
+            ULONGLONG readableUpperBoundBytes,
+            ULONG waveWrCnt,
+            ULONG waveRdCnt,
+            INT ddrWrEnd,
+            INT ddrRdEnd)
+        {
+            timeout.observed = true;
+            timeout.requestedReadSizeBytes = requestedReadSizeBytes;
+            timeout.unreadBytes = unreadBytes;
+            timeout.readableUpperBoundBytes = readableUpperBoundBytes;
+            timeout.waveWrCnt = waveWrCnt;
+            timeout.waveRdCnt = waveRdCnt;
+            timeout.ddrWrEnd = ddrWrEnd;
+            timeout.ddrRdEnd = ddrRdEnd;
+            timeout.backlogBytes = (waveWrCnt >= waveRdCnt) ? (waveWrCnt - waveRdCnt) : 0;
+        }
+
+        void MarkTimeoutWaitTimeout()
+        {
+            if (timeout.observed)
+            {
+                timeout.waitTimeoutObserved = true;
+            }
+        }
+
+        void MarkTimeoutEp4ReadFailure()
+        {
+            if (timeout.observed)
+            {
+                timeout.ep4ReadFailureObserved = true;
+            }
         }
 
         void IncrementDdrStatusPoll()

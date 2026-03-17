@@ -73,3 +73,6 @@ coverage/
 # unit test temporary outputs
 tmp_wave_data_io_*/
 AnalogBoard_UnitTest/tmp_wave_data_io_*/
+
+# temporary upload artifacts
+.tmp.driveupload/
