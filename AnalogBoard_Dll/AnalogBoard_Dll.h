@@ -39,6 +39,13 @@ extern "C" {
 #define USB_ERR_PRODUCT_ID_ERR		(-9)//Invalid Product ID
 #define USB_ERR_TRANSFER_TIMEOUT	(-10)//USB transfer timeout
 #define USB_ERR_UNAVAILABLE			(-11)//USB transfer block
+#define USB_ERR_INVALID_OUTPUT_PATH	(-20001)//Invalid output path
+#define USB_ERR_OUTPUT_PATH_NOT_FOUND (-20002)//Output path not found
+#define USB_ERR_OUTPUT_PATH_NOT_WRITABLE (-20003)//Output path not writable
+#define USB_ERR_INVALID_STATE		(-20010)//Invalid engine state
+#define USB_ERR_DEVICE_DISCONNECTED (-20011)//USB device disconnected
+#define USB_ERR_THREAD_STOP_TIMEOUT (-20012)//Thread stop timeout
+#define USB_ERR_QUEUE_FULL_TIMEOUT	(-20013)//Queue full timeout
 
 /**********************************************************************************
 * Class Define

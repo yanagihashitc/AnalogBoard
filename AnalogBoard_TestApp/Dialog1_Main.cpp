@@ -15,6 +15,7 @@
 #include "FpgaRegisterLogic.h"
 #include "ReadRequestBurstPolicy.h"
 #include "SavePathValidation.h"
+#include "WaveAcquisitionEngine.h"
 #include "WaveDataFileIO.h"
 #include "WavePairPublishPolicy.h"
 
@@ -64,6 +65,8 @@ namespace
 
 	constexpr INT kUsbErrFileIo = -10020;
 	constexpr INT kUsbErrFileRename = -10021;
+	constexpr ULONG kDefaultQueueCapacity = 8u;
+	constexpr DWORD kDefaultQueueWaitTimeoutMs = 200u;
 	constexpr DWORD kRenameRetryWaitMs = 100;
 	// Total attempts = 1 initial attempt + kRenameMaxRetries.
 	constexpr int kRenameMaxRetries = 3;
@@ -290,6 +293,286 @@ namespace
 			publishResult.rollbackSucceeded ? ERROR_SUCCESS : publishResult.rollbackLastError,
 			rollbackDetail);
 		return finalizeOutcome == WavePairPublishPolicy::FinalizeOutcome::kFatal ? kUsbErrFileRename : USB_SUCCESS;
+	}
+
+	class RealUsbSessionAdapter : public WaveAcquisition::IUsbSession
+	{
+	public:
+		explicit RealUsbSessionAdapter(USB_Lib_Info* usbLibInfo)
+			: usbLibInfo_(usbLibInfo)
+		{
+		}
+
+		INT Connect() override
+		{
+			return USB_SUCCESS;
+		}
+
+		void Disconnect() override
+		{
+		}
+
+		INT EP2_SendData(BYTE* buffer, size_t bufferSize) override
+		{
+			UNREFERENCED_PARAMETER(bufferSize);
+			return usbLibInfo_ != nullptr ? usbLibInfo_->EP2_SendData(buffer) : WaveAcquisition::kAcquisitionErrInvalidConfig;
+		}
+
+		INT EP4_GetData(BYTE* buffer, size_t bufferSize) override
+		{
+			UNREFERENCED_PARAMETER(bufferSize);
+			return usbLibInfo_ != nullptr ? usbLibInfo_->EP4_GetData(buffer) : WaveAcquisition::kAcquisitionErrInvalidConfig;
+		}
+
+		INT EP6_GetData(BYTE* buffer, ULONG size) override
+		{
+			return usbLibInfo_ != nullptr ? usbLibInfo_->EP6_GetData(buffer, size) : WaveAcquisition::kAcquisitionErrInvalidConfig;
+		}
+
+	private:
+		USB_Lib_Info* usbLibInfo_ = nullptr;
+	};
+
+	class DialogWavePairSink : public WaveAcquisition::IWavePairSink
+	{
+	public:
+		DialogWavePairSink(Dialog1_Main* curObject, const CString& timeStampBase)
+			: curObject_(curObject)
+			, timeStampBase_(timeStampBase)
+		{
+		}
+
+		INT OpenPair(INT index) override
+		{
+			DWORD openLastError = ERROR_SUCCESS;
+			const INT result = CreateWaveDataFile(
+				&fileHigh_,
+				&fileLow_,
+				timeStampBase_,
+				index,
+				&currentFinalPathLow_,
+				&currentFinalPathHigh_,
+				&currentTmpPathLow_,
+				&currentTmpPathHigh_,
+				&openLastError);
+			if (result != CreateWaveDataFileOk)
+			{
+				LogFileIoEvent(curObject_, _T("Open"), index, currentTmpPathLow_, currentFinalPathLow_, openLastError, _T("tmp open fail"));
+				return WaveAcquisition::kAcquisitionErrOpenPair;
+			}
+
+			if (FileIoLoggingPolicy::ShouldLogOpenSuccess())
+			{
+				LogFileIoEvent(curObject_, _T("Open"), index, currentTmpPathLow_, currentFinalPathLow_, ERROR_SUCCESS, _T("tmp open success"));
+				LogFileIoEvent(curObject_, _T("Open"), index, currentTmpPathHigh_, currentFinalPathHigh_, ERROR_SUCCESS, _T("tmp open success"));
+			}
+			currentIndex_ = index;
+			hasOpenPair_ = true;
+			return USB_SUCCESS;
+		}
+
+		INT Write(const BYTE* waveData, ULONG frameSizeLow, ULONG frameSizeHigh, INT waveCnt) override
+		{
+			const INT saveResult = SaveWaveDataToFile(
+				&fileLow_,
+				&fileHigh_,
+				const_cast<PBYTE>(waveData),
+				frameSizeLow,
+				frameSizeHigh,
+				waveCnt);
+			if (saveResult != USB_SUCCESS)
+			{
+				LogFileIoEvent(curObject_, _T("Write"), currentIndex_, currentTmpPathLow_, currentFinalPathLow_, ::GetLastError(), _T("write low/high failed"));
+				return WaveAcquisition::kAcquisitionErrWritePair;
+			}
+
+			if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
+			{
+				CString writeDetail;
+				writeDetail.Format(_T("write bytes=%zu"), static_cast<size_t>(waveCnt) * static_cast<size_t>(frameSizeLow + frameSizeHigh));
+				LogFileIoEvent(curObject_, _T("Write"), currentIndex_, currentTmpPathLow_, currentFinalPathLow_, ERROR_SUCCESS, writeDetail);
+			}
+			return USB_SUCCESS;
+		}
+
+		INT PublishPair() override
+		{
+			const INT publishResult = FlushCloseAndPublishWavePair(
+				curObject_,
+				&fileLow_,
+				&fileHigh_,
+				currentTmpPathLow_,
+				currentFinalPathLow_,
+				currentTmpPathHigh_,
+				currentFinalPathHigh_,
+				currentIndex_);
+			if (publishResult != USB_SUCCESS)
+			{
+				return WaveAcquisition::kAcquisitionErrPublishPair;
+			}
+
+			currentFinalPathLow_.Empty();
+			currentFinalPathHigh_.Empty();
+			currentTmpPathLow_.Empty();
+			currentTmpPathHigh_.Empty();
+			currentIndex_ = 0;
+			hasOpenPair_ = false;
+			return USB_SUCCESS;
+		}
+
+		void AbortPair() override
+		{
+			DWORD closeLastErrorLow = ERROR_SUCCESS;
+			DWORD closeLastErrorHigh = ERROR_SUCCESS;
+			if (!FlushAndCloseFile(&fileLow_, &closeLastErrorLow))
+			{
+				LogFileIoEvent(curObject_, _T("Close"), currentIndex_, currentTmpPathLow_, currentFinalPathLow_, closeLastErrorLow, _T("abort low close failed"));
+			}
+			if (!FlushAndCloseFile(&fileHigh_, &closeLastErrorHigh))
+			{
+				LogFileIoEvent(curObject_, _T("Close"), currentIndex_, currentTmpPathHigh_, currentFinalPathHigh_, closeLastErrorHigh, _T("abort high close failed"));
+			}
+			if (!currentTmpPathLow_.IsEmpty())
+			{
+				::DeleteFile(currentTmpPathLow_);
+			}
+			if (!currentTmpPathHigh_.IsEmpty())
+			{
+				::DeleteFile(currentTmpPathHigh_);
+			}
+
+			currentFinalPathLow_.Empty();
+			currentFinalPathHigh_.Empty();
+			currentTmpPathLow_.Empty();
+			currentTmpPathHigh_.Empty();
+			currentIndex_ = 0;
+			hasOpenPair_ = false;
+		}
+
+		bool HasOpenPair() const override
+		{
+			return hasOpenPair_;
+		}
+
+	private:
+		Dialog1_Main* curObject_ = nullptr;
+		CString timeStampBase_;
+		CFile fileLow_;
+		CFile fileHigh_;
+		CString currentFinalPathLow_;
+		CString currentFinalPathHigh_;
+		CString currentTmpPathLow_;
+		CString currentTmpPathHigh_;
+		INT currentIndex_ = 0;
+		bool hasOpenPair_ = false;
+	};
+
+	class DialogAcquisitionObserver : public WaveAcquisition::IAcquisitionObserver
+	{
+	public:
+		explicit DialogAcquisitionObserver(Dialog1_Main* curObject)
+			: curObject_(curObject)
+		{
+		}
+
+		void OnLog(const std::wstring& message) override
+		{
+			if (curObject_ != nullptr && curObject_->m_pMainDlg != nullptr)
+			{
+				curObject_->m_pMainDlg->PrintLog(message.c_str());
+			}
+		}
+
+		void OnCollectedWaveCount(ULONG collectedWaveCount) override
+		{
+			if (curObject_ != nullptr)
+			{
+				CString countText;
+				countText.Format(_T("%lu"), collectedWaveCount);
+				curObject_->m_CtrlEditCollectedCnt.SetWindowText(countText);
+			}
+		}
+
+		void OnCycleSummary(const WaveAcquisition::AcquisitionSummary& summary) override
+		{
+			if (curObject_ == nullptr || curObject_->m_pMainDlg == nullptr)
+			{
+				return;
+			}
+
+			CString line;
+			line.Format(
+				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d timeoutReadSize=%lu timeoutUnreadBytes=%I64u timeoutReadableUpperBoundBytes=%I64u timeoutBacklogBytes=%lu timeoutWait=%d timeoutEp4Fail=%d status=%s error=%d ignoredTail=%lu publishedPairs=%d"),
+				summary.metrics.ep6.callCount,
+				summary.metrics.ep6.totalBytes,
+				summary.metrics.ep6TimeoutCount,
+				summary.metrics.GetEp6AverageElapsedMs(),
+				summary.metrics.ep6.maxElapsedMs,
+				summary.metrics.save.callCount,
+				summary.metrics.save.totalBytes,
+				summary.metrics.GetSaveAverageElapsedMs(),
+				summary.metrics.save.maxElapsedMs,
+				summary.metrics.ddrStatusPollCount,
+				summary.metrics.ddrWriteWaitPollCount,
+				summary.metrics.maxWaveBacklogBytes,
+				summary.metrics.latestWaveWrCnt,
+				summary.metrics.latestWaveRdCnt,
+				summary.metrics.latestDdrWrEnd,
+				summary.metrics.latestDdrRdEnd,
+				summary.metrics.timeout.requestedReadSizeBytes,
+				summary.metrics.timeout.unreadBytes,
+				summary.metrics.timeout.readableUpperBoundBytes,
+				summary.metrics.timeout.backlogBytes,
+				summary.metrics.timeout.waitTimeoutObserved ? 1 : 0,
+				summary.metrics.timeout.ep4ReadFailureObserved ? 1 : 0,
+				WaveAcquisition::WaveAcquisitionEngine::ToString(summary.terminalStatus),
+				summary.errorCode,
+				summary.ignoredTailBytes,
+				summary.publishedPairCount);
+			if (kEnablePhase0CycleSummaryLog)
+			{
+				curObject_->m_pMainDlg->PrintLog(line);
+			}
+		}
+
+	private:
+		Dialog1_Main* curObject_ = nullptr;
+	};
+
+	class GlobalFlagStopToken : public WaveAcquisition::IStopToken
+	{
+	public:
+		bool IsStopRequested() const override
+		{
+			return g_bEP6ThreadFlag == 0;
+		}
+	};
+
+	WaveAcquisition::AcquisitionSummary RunAcquisitionCycleWithEngine(
+		Dialog1_Main* curObject,
+		const CString& timeStampBase,
+		ULONG oneWaveSizeLow,
+		ULONG oneWaveSizeHigh,
+		ULONG maxReadChunkBytes)
+	{
+		RealUsbSessionAdapter usbSession(
+			curObject != nullptr && curObject->m_pMainDlg != nullptr ? &curObject->m_pMainDlg->UsbLibInfo : nullptr);
+		DialogWavePairSink sink(curObject, timeStampBase);
+		DialogAcquisitionObserver observer(curObject);
+		GlobalFlagStopToken stopToken;
+
+		WaveAcquisition::RunConfig config = {};
+		config.waveSizeLow = oneWaveSizeLow;
+		config.waveSizeHigh = oneWaveSizeHigh;
+		config.wavesPerFile = packetConfig.WaveNum;
+		config.maxReadChunkBytes = maxReadChunkBytes;
+		config.ep6TimeoutRetryLimit = 1;
+		config.ep4PollSleepMs = 0;
+		config.queueCapacity = kDefaultQueueCapacity;
+		config.queueWaitTimeoutMs = kDefaultQueueWaitTimeoutMs;
+
+		WaveAcquisition::WaveAcquisitionEngine engine(&usbSession, &sink, &observer, &stopToken);
+		return engine.RunCycle(config);
 	}
 }
 
@@ -1520,29 +1803,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 	do
 	{
-		/* Initial ep6 read buffer */
-		pEp6DataBuf1 = (PBYTE)malloc(ulOneTimeMaxSize + (size_t)0x20000);
-		if (!pEp6DataBuf1)
-		{
-			CurObject->m_pMainDlg->PrintLog(_T("EP6 DATA BUF1 alloc failed."));
-			break;
-		}
-		else
-		{
-			memset(pEp6DataBuf1, 0x00, ulOneTimeMaxSize + (size_t)0x20000);
-		}
-
-		pEp6DataBuf2 = (PBYTE)malloc(ulOneTimeMaxSize + (size_t)0x20000);
-		if (!pEp6DataBuf2)
-		{
-			CurObject->m_pMainDlg->PrintLog(_T("EP6 DATA BUF2 alloc failed."));
-			break;
-		}
-		else
-		{
-			memset(pEp6DataBuf2, 0x00, ulOneTimeMaxSize + (size_t)0x20000);
-		}
-
 		/* Set button status */
 		if (CurObject->m_bManualMode == TRUE)
 		{
@@ -1674,576 +1934,24 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			/* Reset collected wave num -> 0 */
 			strTmp.Format(_T("%d"), 0);
 			CurObject->m_CtrlEditCollectedCnt.SetWindowText(strTmp);
-		
-			DDRWrCompleted = FALSE;
-			PcReadCompleted = FALSE;
-			SaveDDRBytes = 0;
-			DDRWaveBytes = 0;
-			ulSaveWaveCnt = 0;
-			ulRemainSize = 0;
-			ulLastReadComByte = 0;
-			iUSBIndex = 1;
-			iIndex = 0;
-			ReadBuf = pEp6DataBuf1;
-			currentFinalPathLow.Empty();
-			currentFinalPathHigh.Empty();
-			currentTmpPathLow.Empty();
-			currentTmpPathHigh.Empty();
-			cycleMetrics.Reset();
-			completionState.Reset();
 
-			auto SaveWaveDataWithMetrics = [&](
-				CFile* fileLow,
-				CFile* fileHigh,
-				PBYTE waveData,
-				INT waveCnt,
-				INT fileIndex) -> INT
+			const WaveAcquisition::AcquisitionSummary summary = RunAcquisitionCycleWithEngine(
+				CurObject,
+				strTimeStamp_use,
+				OneWaveSize_L,
+				OneWaveSize_H,
+				ulOneTimeMaxSize);
+			ErrExit = summary.terminalStatus != WaveAcquisition::TerminalStatus::Success;
+			if (summary.terminalStatus == WaveAcquisition::TerminalStatus::Stopped)
 			{
-				const ULONGLONG startMs = ::GetTickCount64();
-				const INT saveResult = SaveWaveDataToFile(
-					fileLow,
-					fileHigh,
-					waveData,
-					OneWaveSize_L,
-					OneWaveSize_H,
-					waveCnt);
-				const ULONGLONG elapsedMs = ::GetTickCount64() - startMs;
-
-				UNREFERENCED_PARAMETER(fileIndex);
-				cycleMetrics.RecordSaveTransfer(
-					elapsedMs,
-					static_cast<ULONGLONG>(waveCnt) * static_cast<ULONGLONG>(OneWaveSize));
-
-				return saveResult;
-			};
-
-			auto ReadCompletionSnapshot = [&]() -> AcquisitionCompletionLogic::Ep4CompletionSnapshot
-			{
-				AcquisitionCompletionLogic::Ep4CompletionSnapshot snapshot = {};
-				snapshot.waveWrCnt = CurObject->RegGet_DDRWaveCnt(pEp4DataBuf);
-				snapshot.waveRdCnt = CurObject->RegGet_DDRReadCnt(pEp4DataBuf);
-				snapshot.ddrWrEnd = CurObject->RegGet_DDRWriteEnd(pEp4DataBuf);
-				snapshot.ddrRdEnd = CurObject->RegGet_DDRReadEnd(pEp4DataBuf);
-				return snapshot;
-			};
-
-			while (g_bEP6ThreadFlag)
-			{
-				Sleep(0);
-
-				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
-				{
-					cycleMetrics.MarkTimeoutEp4ReadFailure();
-					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
-					break;
-				}
-
-				cycleMetrics.IncrementDdrStatusPoll();
-				const AcquisitionCompletionLogic::Ep4CompletionSnapshot completionSnapshot = ReadCompletionSnapshot();
-				cycleMetrics.RecordDdrStatus(
-					completionSnapshot.waveWrCnt,
-					completionSnapshot.waveRdCnt,
-					completionSnapshot.ddrWrEnd,
-					completionSnapshot.ddrRdEnd);
-
-				const AcquisitionCompletionLogic::Ep4CompletionDecision completionDecision =
-					AcquisitionCompletionLogic::ObserveEp4Completion(
-						&completionState,
-						completionSnapshot,
-						SaveDDRBytes);
-
-				DDRWrCompleted = completionDecision.drainingHintSeen ? TRUE : FALSE;
-				PcReadCompleted = completionDecision.acquisitionComplete ? TRUE : FALSE;
-				DDRWaveBytes = completionDecision.readableUpperBoundBytes;
-
-				if (completionDecision.enteredDraining)
-				{
-					strTmp.Format(_T("Fpga ddr write completed. %zu byte readable."), DDRWaveBytes);
-					if (kEnableEp6HotPathLogs)
-					{
-						CurObject->m_pMainDlg->PrintLog(strTmp);
-					}
-					CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
-				}
-				else if (!DDRWrCompleted && DDRWaveBytes != 0)
-				{
-					strTmp.Format(_T("DDR data sized %zu byte."), DDRWaveBytes);
-					if (kEnableEp6HotPathLogs)
-					{
-						CurObject->m_pMainDlg->PrintLog(strTmp);
-					}
-				}
-
-				if (PcReadCompleted)
-				{
-					break;
-				}
-
-				/* Get the size of this usb read */
-				ulLastReadComByte = 0;
-				if (completionDecision.unreadBytes > ulOneTimeMaxSize)
-				{
-					ulOneTimeSize = ulOneTimeMaxSize;
-				}
-				else
-				{
-					ulOneTimeSize = static_cast<ULONG>(completionDecision.unreadBytes);
-
-					if (DDRWrCompleted)
-					{					
-						if (ulOneTimeSize % 0x4000)
-						{
-							ulLastReadComByte = 0x4000 - (ulOneTimeSize % 0x4000);
-							ulOneTimeSize = ulOneTimeSize + ulLastReadComByte;
-						}
-					}
-				}
-
-				if (ulOneTimeSize == 0)
-				{
-					continue;
-				}
-
-				if (ulOneTimeSize % 0x4000)
-				{
-					CurObject->m_pMainDlg->PrintLog(_T("Usb transfer size error(16K)."));
-					break;
-				}
-
-				/* Get data from Ep6 */
-				const ULONGLONG ep6StartMs = ::GetTickCount64();
-				iRet = CurObject->m_pMainDlg->UsbLibInfo.EP6_GetData(ReadBuf + ulRemainSize, ulOneTimeSize);
-				const ULONGLONG ep6ElapsedMs = ::GetTickCount64() - ep6StartMs;
-				cycleMetrics.RecordEp6Transfer(
-					ep6ElapsedMs,
-					static_cast<ULONGLONG>(ulOneTimeSize),
-					iRet == USB_ERR_TRANSFER_TIMEOUT);
-
-				if (iRet != USB_SUCCESS)
-				{
-					if (iRet == USB_ERR_TRANSFER_TIMEOUT)
-					{
-						cycleMetrics.RecordTimeoutTelemetry(
-							ulOneTimeSize,
-							static_cast<ULONGLONG>(completionDecision.unreadBytes),
-							static_cast<ULONGLONG>(completionDecision.readableUpperBoundBytes),
-							completionSnapshot.waveWrCnt,
-							completionSnapshot.waveRdCnt,
-							completionSnapshot.ddrWrEnd,
-							completionSnapshot.ddrRdEnd);
-
-						const TCHAR* timeoutStage =
-							completionDecision.drainingHintSeen ? _T("draining") : _T("active");
-						strTmp.Format(
-							_T("[PR01][TIMEOUT] readSize=%lu unreadBytes=%I64u readableUpperBoundBytes=%I64u backlogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d stage=%s"),
-							ulOneTimeSize,
-							cycleMetrics.timeout.unreadBytes,
-							cycleMetrics.timeout.readableUpperBoundBytes,
-							cycleMetrics.timeout.backlogBytes,
-							cycleMetrics.timeout.waveWrCnt,
-							cycleMetrics.timeout.waveRdCnt,
-							cycleMetrics.timeout.ddrWrEnd,
-							cycleMetrics.timeout.ddrRdEnd,
-							timeoutStage);
-						CurObject->m_pMainDlg->PrintLog(strTmp);
-					}
-
-					strTmp.Format(_T("EP6 Read %u byte NG."), ulOneTimeSize);
-					CurObject->m_pMainDlg->PrintLog(strTmp);
-					CurObject->m_pMainDlg->PrintLog(CurObject->m_pMainDlg->strUSBLibError(iRet));
-					ErrExit = TRUE;
-					break;
-				}
-#if true
-				else//Save (ulOneTimeCnt) wave data to file
-				{ 
-					if (ulLastReadComByte == 0)
-					{
-						ulOneTimeCnt = (ulOneTimeSize + ulRemainSize) / OneWaveSize;
-					}
-					else//Last time, Delete the supplementary size
-					{
-						ulOneTimeCnt = (ulOneTimeSize - ulLastReadComByte + ulRemainSize) / OneWaveSize;
-					}
-				
-					File_OnetimeWriteCnt = 0;
-					File_WriteCnt = 0;		
-
-					//strTmp.Format(_T("EP6 Read %u byte OK. Wave cnt %d."), ulOneTimeSize, ulOneTimeCnt);
-					strTmp.Format(_T("EP6 Read %u byte OK. Save into bin file..."), ulOneTimeSize);
-					if (kEnableEp6HotPathLogs)
-					{
-						CurObject->m_pMainDlg->PrintLog(strTmp);
-					}
-
-					if (ulSaveWaveCnt % packetConfig.WaveNum != 0)//Save in last file
-					{
-						ulLastCanSaveCnt = packetConfig.WaveNum - (ulSaveWaveCnt % packetConfig.WaveNum);
-						//strTmp.Format(_T("Last file you can save wave count %d."), ulLastCanSaveCnt);
-						//CurObject->m_pMainDlg->PrintLog(strTmp);
-
-						if (ulLastCanSaveCnt > ulOneTimeCnt)
-						{
-							File_OnetimeWriteCnt = (INT)ulOneTimeCnt;
-							iRet = SaveWaveDataWithMetrics(
-								&File_Low,
-								&File_High,
-								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
-							if (iRet != USB_SUCCESS)
-							{
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
-								ErrExit = TRUE;
-								break;
-							}
-							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
-							{
-								CString writeDetail;
-								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
-							}
-							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H * TrgRange), (ULONG)(80 * TrgRange));
-						}
-						else
-						{
-							File_OnetimeWriteCnt = (INT)ulLastCanSaveCnt;
-							iRet = SaveWaveDataWithMetrics(
-								&File_Low,
-								&File_High,
-								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
-							if (iRet != USB_SUCCESS)
-							{
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
-								ErrExit = TRUE;
-								break;
-							}
-							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
-							{
-								CString writeDetail;
-								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
-							}
-
-							iRet = FlushCloseAndPublishWavePair(
-								CurObject,
-								&File_Low,
-								&File_High,
-								currentTmpPathLow,
-								currentFinalPathLow,
-								currentTmpPathHigh,
-								currentFinalPathHigh,
-								iIndex);
-							if (iRet != USB_SUCCESS)
-							{
-								ErrExit = TRUE;
-								break;
-							}
-							currentFinalPathLow.Empty();
-							currentFinalPathHigh.Empty();
-							currentTmpPathLow.Empty();
-							currentTmpPathHigh.Empty();
-							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));				
-						}
-
-						File_WriteCnt += File_OnetimeWriteCnt;
-					}
-
-					if (ErrExit == TRUE)
-					{
-						break;
-					}
-
-					while (File_WriteCnt < (INT)ulOneTimeCnt)
-					{
-						DWORD openLastError = ERROR_SUCCESS;
-						iRet = CreateWaveDataFile(
-							&File_High,
-							&File_Low,
-							strTimeStamp_use,
-							++iIndex,
-							&currentFinalPathLow,
-							&currentFinalPathHigh,
-							&currentTmpPathLow,
-							&currentTmpPathHigh,
-							&openLastError);
-						if (iRet != CreateWaveDataFileOk)
-						{
-							LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathLow, currentFinalPathLow, openLastError, _T("tmp open fail"));
-							ErrExit = TRUE;
-							break;
-						}
-						if (FileIoLoggingPolicy::ShouldLogOpenSuccess())
-						{
-							LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, _T("tmp open success"));
-							LogFileIoEvent(CurObject, _T("Open"), iIndex, currentTmpPathHigh, currentFinalPathHigh, ERROR_SUCCESS, _T("tmp open success"));
-						}
-
-						if (ulOneTimeCnt - File_WriteCnt >= packetConfig.WaveNum)
-						{
-							File_OnetimeWriteCnt = (INT)packetConfig.WaveNum;
-							iRet = SaveWaveDataWithMetrics(
-								&File_Low,
-								&File_High,
-								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
-							if (iRet != USB_SUCCESS)
-							{
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
-								ErrExit = TRUE;
-								break;
-							}
-							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
-							{
-								CString writeDetail;
-								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
-							}
-
-							iRet = FlushCloseAndPublishWavePair(
-								CurObject,
-								&File_Low,
-								&File_High,
-								currentTmpPathLow,
-								currentFinalPathLow,
-								currentTmpPathHigh,
-								currentFinalPathHigh,
-								iIndex);
-							if (iRet != USB_SUCCESS)
-							{
-								ErrExit = TRUE;
-								break;
-							}
-							currentFinalPathLow.Empty();
-							currentFinalPathHigh.Empty();
-							currentTmpPathLow.Empty();
-							currentTmpPathHigh.Empty();
-							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
-						}
-						else
-						{
-							File_OnetimeWriteCnt = (INT)(ulOneTimeCnt - File_WriteCnt);
-							iRet = SaveWaveDataWithMetrics(
-								&File_Low,
-								&File_High,
-								ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize),
-								File_OnetimeWriteCnt,
-								iIndex);
-							if (iRet != USB_SUCCESS)
-							{
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ::GetLastError(), _T("write low/high failed"));
-								ErrExit = TRUE;
-								break;
-							}
-							if (FileIoLoggingPolicy::ShouldLogWriteSuccess())
-							{
-								CString writeDetail;
-								writeDetail.Format(_T("write bytes=%zu"), (size_t)File_OnetimeWriteCnt * (size_t)OneWaveSize);
-								LogFileIoEvent(CurObject, _T("Write"), iIndex, currentTmpPathLow, currentFinalPathLow, ERROR_SUCCESS, writeDetail);
-							}
-							//SaveWaveDataToCHFile(WavedataFile, ReadBuf + ((size_t)File_WriteCnt * (size_t)OneWaveSize), OneWaveSize_L, OneWaveSize_H, File_OnetimeWriteCnt, (ULONG)(OneCHSize_H* TrgRange), (ULONG)(80 * TrgRange));
-						}
-
-						File_WriteCnt += File_OnetimeWriteCnt;
-					}
-
-					if (ErrExit == TRUE)
-					{
-						break;
-					}
-
-					SaveDDRBytes += ulOneTimeSize;
-					ulSaveWaveCnt += ulOneTimeCnt;
-
-					ULONG ulLastRemainSize = ulRemainSize;
-					ulRemainSize = (ulOneTimeSize + ulRemainSize) - (ulOneTimeCnt * OneWaveSize);
-
-					if ((SaveDDRBytes - ((size_t)ulSaveWaveCnt * (size_t)OneWaveSize)) != ulRemainSize)
-					{
-						CurObject->m_pMainDlg->PrintLog(_T("Remain size error."));
-						break;
-					}
-
-					//strTmp.Format(_T("Total size %zu byte. Total save wave %u. Remain size %u byte."), SaveDDRBytes, ulSaveWaveCnt, ulRemainSize);
-					strTmp.Format(_T("Save OK.(Total size %zu byte)"), SaveDDRBytes);
-					if (kEnableEp6HotPathLogs)
-					{
-						CurObject->m_pMainDlg->PrintLog(strTmp);
-					}
-
-					if (iUSBIndex == 1)
-					{
-						iUSBIndex = 2;
-						memcpy(pEp6DataBuf2, ReadBuf + ulLastRemainSize + ulOneTimeSize - ulRemainSize, ulRemainSize);
-						ReadBuf = pEp6DataBuf2;
-					}
-					else if (iUSBIndex == 2)
-					{
-						iUSBIndex = 1;
-						memcpy(pEp6DataBuf1, ReadBuf + ulLastRemainSize + ulOneTimeSize - ulRemainSize, ulRemainSize);
-						ReadBuf = pEp6DataBuf1;
-					}
-					else
-					{
-						CurObject->m_pMainDlg->PrintLog(_T("Usb read buffer index error."));
-						break;
-					}
-				}	
-
-				/* Upadte collected waveforms count */
-				strTmp.Format(_T("%d"), ulSaveWaveCnt);
-				CurObject->m_CtrlEditCollectedCnt.SetWindowText(strTmp);
-#else
-				else
-				{
-					SaveDDRBytes += ulOneTimeSize;
-					strTmp.Format(_T("EP6 Read %u byte OK.Total size %zu byte."), ulOneTimeSize, SaveDDRBytes);
-					if (kEnableEp6HotPathLogs)
-					{
-						CurObject->m_pMainDlg->PrintLog(strTmp);
-					}
-					strTmp.Format(_T("%zu"), SaveDDRBytes);
-					CurObject->m_CtrlEditCollectedCnt.SetWindowText(strTmp);
-				}
-#endif
+				runtime = false;
 			}
 
-#if false
-			for (int i = 0; i < 12; i++)
-			{
-				if (packetConfig.CHSelect[i] == 1)
-				{
-					WavedataFile[i].Close();
-				}
-			}
-#endif
+			strTmp.Format(_T("Read over, saved wave count %lu."), summary.savedWaveCount);
+			CurObject->m_pMainDlg->PrintLog(strTmp);
 
-			strTmp.Format(_T("Read over, total size %zu."), SaveDDRBytes);
-			CurObject->m_pMainDlg->PrintLog(strTmp);	
-
-			const bool hasPendingWavePair =
-				!currentTmpPathLow.IsEmpty() &&
-				!currentFinalPathLow.IsEmpty() &&
-				!currentTmpPathHigh.IsEmpty() &&
-				!currentFinalPathHigh.IsEmpty();
-
-			/* Publish the last not-full pair if loop ended normally. */
-			if (ErrExit == FALSE && hasPendingWavePair)
-			{
-				iRet = FlushCloseAndPublishWavePair(
-					CurObject,
-					&File_Low,
-					&File_High,
-					currentTmpPathLow,
-					currentFinalPathLow,
-					currentTmpPathHigh,
-					currentFinalPathHigh,
-					iIndex);
-				if (iRet != USB_SUCCESS)
-				{
-					ErrExit = TRUE;
-				}
-				else
-				{
-					currentFinalPathLow.Empty();
-					currentFinalPathHigh.Empty();
-					currentTmpPathLow.Empty();
-					currentTmpPathHigh.Empty();
-				}
-			}
-
-			/* Close any remaining handles (error path / safety). */
-			DWORD closeLastErrorLow = ERROR_SUCCESS;
-			DWORD closeLastErrorHigh = ERROR_SUCCESS;
-			if (!FlushAndCloseFile(&File_Low, &closeLastErrorLow))
-			{
-				LogFileIoEvent(CurObject, _T("Close"), iIndex, currentTmpPathLow, currentFinalPathLow, closeLastErrorLow, _T("close low failed at loop end"));
-			}
-			if (!FlushAndCloseFile(&File_High, &closeLastErrorHigh))
-			{
-				LogFileIoEvent(CurObject, _T("Close"), iIndex, currentTmpPathHigh, currentFinalPathHigh, closeLastErrorHigh, _T("close high failed at loop end"));
-			}
-			
 			/* Disenable start button */
 			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
-
-			if (PcReadCompleted == FALSE)
-			{
-				/* Wait acquisition completed... */
-				INT timeout = 0;
-				while (TRUE)
-				{
-					Sleep(10);
-
-					if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
-					{
-						cycleMetrics.MarkTimeoutEp4ReadFailure();
-						CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
-						break;
-					}
-
-					cycleMetrics.IncrementDdrWriteWaitPoll();
-					const AcquisitionCompletionLogic::Ep4CompletionSnapshot completionSnapshot = ReadCompletionSnapshot();
-					cycleMetrics.RecordDdrStatus(
-						completionSnapshot.waveWrCnt,
-						completionSnapshot.waveRdCnt,
-						completionSnapshot.ddrWrEnd,
-						completionSnapshot.ddrRdEnd);
-
-					const AcquisitionCompletionLogic::Ep4CompletionDecision completionDecision =
-						AcquisitionCompletionLogic::ObserveEp4Completion(
-							&completionState,
-							completionSnapshot,
-							SaveDDRBytes);
-
-					PcReadCompleted = completionDecision.acquisitionComplete ? TRUE : FALSE;
-					if (PcReadCompleted)
-					{
-						break;
-					}
-
-					if (++timeout > 200)
-					{
-						cycleMetrics.MarkTimeoutWaitTimeout();
-						CurObject->m_pMainDlg->PrintLog(_T("Wait acquisition completed. Timeout"));
-						break;
-					}
-				}
-			}
-
-			const ULONGLONG ep6AvgElapsedMs = cycleMetrics.GetEp6AverageElapsedMs();
-			const ULONGLONG saveFileAvgElapsedMs = cycleMetrics.GetSaveAverageElapsedMs();
-			strTmp.Format(
-				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d timeoutReadSize=%lu timeoutUnreadBytes=%I64u timeoutReadableUpperBoundBytes=%I64u timeoutBacklogBytes=%lu timeoutWait=%d timeoutEp4Fail=%d"),
-				cycleMetrics.ep6.callCount,
-				cycleMetrics.ep6.totalBytes,
-				cycleMetrics.ep6TimeoutCount,
-				ep6AvgElapsedMs,
-				cycleMetrics.ep6.maxElapsedMs,
-				cycleMetrics.save.callCount,
-				cycleMetrics.save.totalBytes,
-				saveFileAvgElapsedMs,
-				cycleMetrics.save.maxElapsedMs,
-				cycleMetrics.ddrStatusPollCount,
-				cycleMetrics.ddrWriteWaitPollCount,
-				cycleMetrics.maxWaveBacklogBytes,
-				cycleMetrics.latestWaveWrCnt,
-				cycleMetrics.latestWaveRdCnt,
-				cycleMetrics.latestDdrWrEnd,
-				cycleMetrics.latestDdrRdEnd,
-				cycleMetrics.timeout.requestedReadSizeBytes,
-				cycleMetrics.timeout.unreadBytes,
-				cycleMetrics.timeout.readableUpperBoundBytes,
-				cycleMetrics.timeout.backlogBytes,
-				cycleMetrics.timeout.waitTimeoutObserved ? 1 : 0,
-				cycleMetrics.timeout.ep4ReadFailureObserved ? 1 : 0);
-			if (kEnablePhase0CycleSummaryLog)
-			{
-				CurObject->m_pMainDlg->PrintLog(strTmp);
-			}
 
 			/* Manual Mode: Stop FPGA sampling */
 			if (CurObject->m_bManualMode == TRUE)
