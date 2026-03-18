@@ -57,7 +57,19 @@ namespace AcquisitionCompletionLogic
         const std::size_t currentReadableUpperBoundBytes =
             ToReadableUpperBoundBytes(snapshot.waveWrCnt);
 
-        if (snapshot.ddrWrEnd == 0 || snapshot.ddrRdEnd == 0 || savedBytes != 0u)
+        const bool startupStaleCompletionSnapshot =
+            !state->activeCycleObserved &&
+            savedBytes == 0u &&
+            snapshot.ddrWrEnd == 1 &&
+            snapshot.ddrRdEnd == 1;
+        if (startupStaleCompletionSnapshot)
+        {
+            decision.activeCycleObserved = state->activeCycleObserved;
+            decision.drainingHintSeen = state->drainingHintSeen;
+            return decision;
+        }
+
+        if (snapshot.ddrWrEnd == 0 || currentReadableUpperBoundBytes != 0u || savedBytes != 0u)
         {
             state->activeCycleObserved = true;
         }
