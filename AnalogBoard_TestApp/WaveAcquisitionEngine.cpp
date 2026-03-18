@@ -3,14 +3,13 @@
 #include <algorithm>
 #include <vector>
 
+#include "AcquisitionCompletionLogic.h"
 #include "FpgaRegisterLogic.h"
 
 namespace WaveAcquisition
 {
     namespace
     {
-        constexpr INT kEmptyCompletionStatusRetryLimit = 3;
-
         bool IsStopRequested(IStopToken* stopToken)
         {
             return stopToken != nullptr && stopToken->IsStopRequested();
@@ -33,6 +32,36 @@ namespace WaveAcquisition
             {
                 observer->OnLog(message);
             }
+        }
+
+        void NotifyTimeoutSnapshot(
+            IAcquisitionObserver* observer,
+            ULONG requestedReadSizeBytes,
+            ULONGLONG unreadBytes,
+            ULONGLONG readableUpperBoundBytes,
+            ULONG waveWrCnt,
+            ULONG waveRdCnt,
+            INT ddrWrEnd,
+            INT ddrRdEnd,
+            bool drainingHintSeen)
+        {
+            if (observer == nullptr)
+            {
+                return;
+            }
+
+            std::wstring stage = drainingHintSeen ? L"draining" : L"active";
+            std::wstring message =
+                L"[timeout] stage=" + stage +
+                L" read_size=" + std::to_wstring(requestedReadSizeBytes) +
+                L" unread_bytes=" + std::to_wstring(unreadBytes) +
+                L" readable_upper_bound_bytes=" + std::to_wstring(readableUpperBoundBytes) +
+                L" backlog_bytes=" + std::to_wstring((waveWrCnt >= waveRdCnt) ? (waveWrCnt - waveRdCnt) : 0u) +
+                L" wave_wr_cnt=" + std::to_wstring(waveWrCnt) +
+                L" wave_rd_cnt=" + std::to_wstring(waveRdCnt) +
+                L" ddr_wr_end=" + std::to_wstring(ddrWrEnd) +
+                L" ddr_rd_end=" + std::to_wstring(ddrRdEnd);
+            observer->OnLog(message);
         }
 
         void FinalizeSummary(
@@ -274,15 +303,12 @@ namespace WaveAcquisition
         const size_t oneWaveSize =
             static_cast<size_t>(config.waveSizeLow) + static_cast<size_t>(config.waveSizeHigh);
 
-        bool ddrWriteCompleted = false;
-        size_t maxDdrBytes = 0;
         size_t savedDdrBytes = 0;
         INT nextPairIndex = 0;
         INT consecutiveTimeoutCount = 0;
-        INT emptyCompletionStatusCount = 0;
-        bool sawVisibleDdrBytes = false;
         bool sawDdrWrEndClear = false;
         INT settlingPollCount = 0;
+        AcquisitionCompletionLogic::Ep4CompletionState completionState = {};
 
         std::vector<BYTE> ep4Buffer(kEp4StatusBufferBytes, 0);
         std::vector<BYTE> transferBuffer;
@@ -300,110 +326,74 @@ namespace WaveAcquisition
                 return summary;
             }
 
-            size_t availableDdrBytes = ddrWriteCompleted ? maxDdrBytes : 0;
+            WaitBeforeEp4Poll(pollWaiter_, config.ep4PollSleepMs);
 
-            if (!ddrWriteCompleted)
+            const INT ep4Result = usbSession_->EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
+            if (ep4Result != kUsbSuccess)
             {
-                WaitBeforeEp4Poll(pollWaiter_, config.ep4PollSleepMs);
+                summary.terminalStatus = TerminalStatus::Ep4ReadFailed;
+                summary.errorCode = ep4Result;
+                AbortIfNeeded(wavePairSink_);
+                FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
+                return summary;
+            }
 
-                const INT ep4Result = usbSession_->EP4_GetData(ep4Buffer.data(), ep4Buffer.size());
-                if (ep4Result != kUsbSuccess)
+            summary.metrics.IncrementDdrStatusPoll();
+            const DdrStatusSnapshot snapshot = DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
+            summary.metrics.RecordDdrStatus(
+                snapshot.waveWrCnt,
+                snapshot.waveRdCnt,
+                snapshot.ddrWrEnd,
+                snapshot.ddrRdEnd);
+
+            if (snapshot.ddrWrEnd == 0)
+            {
+                sawDdrWrEndClear = true;
+            }
+
+            const bool isStartupStalePoll =
+                !completionState.activeCycleObserved &&
+                savedDdrBytes == 0 &&
+                snapshot.ddrWrEnd == 1 &&
+                (snapshot.waveWrCnt == 0 || snapshot.ddrRdEnd == 1);
+            if (isStartupStalePoll)
+            {
+                ++settlingPollCount;
+                if (settlingPollCount > kDdrSettlingPollLimit)
                 {
-                    summary.terminalStatus = TerminalStatus::Ep4ReadFailed;
-                    summary.errorCode = ep4Result;
-                    AbortIfNeeded(wavePairSink_);
+                    summary.terminalStatus = TerminalStatus::EmptyCapture;
+                    summary.errorCode = kAcquisitionErrEmptyCapture;
                     FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
                     return summary;
                 }
-
-                summary.metrics.IncrementDdrStatusPoll();
-                const DdrStatusSnapshot snapshot = DecodeDdrStatus(ep4Buffer.data(), ep4Buffer.size());
-                summary.metrics.RecordDdrStatus(
-                    snapshot.waveWrCnt,
-                    snapshot.waveRdCnt,
-                    snapshot.ddrWrEnd,
-                    snapshot.ddrRdEnd);
-
-                availableDdrBytes = static_cast<size_t>(snapshot.waveWrCnt);
-                if (availableDdrBytes != 0)
-                {
-                    availableDdrBytes += kDdrCompletionPaddingBytes;
-                    sawVisibleDdrBytes = true;
-                }
-
-                if (snapshot.ddrWrEnd == 1)
-                {
-                    // Stale DDR_WR_END guard: FPGA registers retain
-                    // DDR_WR_END=1 from the previous acquisition cycle.
-                    // Ignore the completion signal until we have observed
-                    // ddrWrEnd==0 at least once (proving the FPGA has
-                    // started the new measurement cycle).
-                    if (!sawDdrWrEndClear && !sawVisibleDdrBytes)
-                    {
-                        ++settlingPollCount;
-                        if (settlingPollCount < kDdrSettlingPollLimit)
-                        {
-                            continue;
-                        }
-                        // Exhausted settling budget - fall through to
-                        // empty-capture detection below.
-                    }
-
-                    if (availableDdrBytes == 0 && !sawVisibleDdrBytes)
-                    {
-                        ++emptyCompletionStatusCount;
-                        if (emptyCompletionStatusCount <= kEmptyCompletionStatusRetryLimit)
-                        {
-                            continue;
-                        }
-
-                        summary.terminalStatus = TerminalStatus::EmptyCapture;
-                        summary.errorCode = kAcquisitionErrEmptyCapture;
-                        FinalizeSummary(observer_, &summary, settlingPollCount, sawDdrWrEndClear);
-                        return summary;
-                    }
-
-                    ddrWriteCompleted = true;
-                    maxDdrBytes = availableDdrBytes;
-                }
-                else
-                {
-                    sawDdrWrEndClear = true;
-
-                    if (availableDdrBytes == 0)
-                    {
-                        emptyCompletionStatusCount = 0;
-                        continue;
-                    }
-
-                    emptyCompletionStatusCount = 0;
-                }
+                continue;
             }
 
-            if (ddrWriteCompleted && savedDdrBytes >= maxDdrBytes)
+            const AcquisitionCompletionLogic::Ep4CompletionDecision completionDecision =
+                AcquisitionCompletionLogic::ObserveEp4Completion(
+                    &completionState,
+                    {
+                        snapshot.waveWrCnt,
+                        snapshot.waveRdCnt,
+                        snapshot.ddrWrEnd,
+                        snapshot.ddrRdEnd,
+                    },
+                    savedDdrBytes);
+
+            if (completionDecision.acquisitionComplete)
             {
                 break;
             }
 
-            if (availableDdrBytes < savedDdrBytes)
-            {
-                availableDdrBytes = savedDdrBytes;
-            }
-
-            size_t unreadLogicalBytes = availableDdrBytes - savedDdrBytes;
+            size_t unreadLogicalBytes = completionDecision.unreadBytes;
             if (unreadLogicalBytes == 0)
             {
-                if (ddrWriteCompleted)
-                {
-                    break;
-                }
-
                 continue;
             }
 
             size_t bytesToRead = (std::min)(static_cast<size_t>(config.maxReadChunkBytes), unreadLogicalBytes);
             size_t logicalBytesFromRead = bytesToRead;
-            if (ddrWriteCompleted && bytesToRead == unreadLogicalBytes)
+            if (completionDecision.drainingHintSeen && bytesToRead == unreadLogicalBytes)
             {
                 const size_t remainder = bytesToRead % kEp6ReadAlignmentBytes;
                 if (remainder != 0)
@@ -449,6 +439,25 @@ namespace WaveAcquisition
 
             if (ep6Result == kUsbErrTransferTimeout)
             {
+                summary.metrics.RecordTimeoutTelemetry(
+                    static_cast<ULONG>(bytesToRead),
+                    unreadLogicalBytes,
+                    completionDecision.readableUpperBoundBytes,
+                    snapshot.waveWrCnt,
+                    snapshot.waveRdCnt,
+                    snapshot.ddrWrEnd,
+                    snapshot.ddrRdEnd,
+                    completionDecision.drainingHintSeen);
+                NotifyTimeoutSnapshot(
+                    observer_,
+                    static_cast<ULONG>(bytesToRead),
+                    unreadLogicalBytes,
+                    completionDecision.readableUpperBoundBytes,
+                    snapshot.waveWrCnt,
+                    snapshot.waveRdCnt,
+                    snapshot.ddrWrEnd,
+                    snapshot.ddrRdEnd,
+                    completionDecision.drainingHintSeen);
                 if (consecutiveTimeoutCount >= config.ep6TimeoutRetryLimit)
                 {
                     summary.terminalStatus = TerminalStatus::Ep6Timeout;

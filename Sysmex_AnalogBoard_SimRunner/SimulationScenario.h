@@ -25,6 +25,8 @@ namespace SimRunner
         ULONG producerBurstsPerPoll = 0;
         INT initPollCount = 1;
         INT waitPollCount = 1;
+        INT startupStaleDdrWrEndPolls = 0;
+        ULONG startupStaleWaveWrCntBytes = 0;
         ULONG maxReadChunkBytes = 0x4000u;
         INT timeoutRetryLimit = 0;
         DWORD writeDelayMs = 0;

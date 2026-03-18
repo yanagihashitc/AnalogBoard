@@ -221,6 +221,61 @@ void Test_TC_N_05_ZeroWaveScenario_LoadsSuccessfully()
     TEST_ASSERT(scenario.totalWaveCount == 0, "TC-N-05 totalWaveCount must preserve zero");
 }
 
+void Test_TC_N_06_StartupStalePolls_LoadsSuccessfully()
+{
+    // Given: A scenario JSON that configures stale DDR_WR_END polls at startup.
+    const char* json = R"({
+  "wave_size_low": 32,
+  "wave_size_high": 32,
+  "waves_per_file": 2,
+  "total_wave_count": 4,
+  "producer_step_bytes": 256,
+  "startup_stale_ddr_wr_end_polls": 3,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 0,
+  "ep6_results": ["success"]
+})";
+    ScopedTempScenarioFile tempFile(json);
+    SimRunner::SimulationScenario scenario = {};
+    std::wstring error;
+
+    // When: The scenario file is loaded.
+    const bool ok = SimRunner::LoadScenarioFromFile(tempFile.GetPath(), &scenario, &error);
+
+    // Then: Loading succeeds and preserves the configured startup stale count.
+    TEST_ASSERT(ok, "TC-N-06 load must succeed");
+    TEST_ASSERT(error.empty(), "TC-N-06 error must be empty");
+    TEST_ASSERT(scenario.startupStaleDdrWrEndPolls == 3, "TC-N-06 startup stale poll count must be preserved");
+}
+
+void Test_TC_N_07_StartupStaleWaveWrCnt_LoadsSuccessfully()
+{
+    // Given: A scenario JSON that configures a stale startup WAVE_WR_CNT.
+    const char* json = R"({
+  "wave_size_low": 32,
+  "wave_size_high": 32,
+  "waves_per_file": 2,
+  "total_wave_count": 4,
+  "producer_step_bytes": 256,
+  "startup_stale_ddr_wr_end_polls": 2,
+  "startup_stale_wave_wr_cnt_bytes": 16384,
+  "max_read_chunk_bytes": 16384,
+  "timeout_retry_limit": 0,
+  "ep6_results": ["success"]
+})";
+    ScopedTempScenarioFile tempFile(json);
+    SimRunner::SimulationScenario scenario = {};
+    std::wstring error;
+
+    // When: The scenario file is loaded.
+    const bool ok = SimRunner::LoadScenarioFromFile(tempFile.GetPath(), &scenario, &error);
+
+    // Then: Loading succeeds and preserves the configured stale WAVE_WR_CNT.
+    TEST_ASSERT(ok, "TC-N-07 load must succeed");
+    TEST_ASSERT(error.empty(), "TC-N-07 error must be empty");
+    TEST_ASSERT(scenario.startupStaleWaveWrCntBytes == 16384, "TC-N-07 stale WAVE_WR_CNT must be preserved");
+}
+
 void Test_TC_A_01_OutOfRangeUnsignedField_IsRejected()
 {
     // Given: A scenario JSON with a required ULONG field above its maximum value.
@@ -430,6 +485,8 @@ int main()
     RUN_TEST(Test_TC_N_03_OptionalWriteFieldsOmitted_UsesStructDefaults);
     RUN_TEST(Test_TC_N_04_NonAlignedProducerStep_LoadsSuccessfully);
     RUN_TEST(Test_TC_N_05_ZeroWaveScenario_LoadsSuccessfully);
+    RUN_TEST(Test_TC_N_06_StartupStalePolls_LoadsSuccessfully);
+    RUN_TEST(Test_TC_N_07_StartupStaleWaveWrCnt_LoadsSuccessfully);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

@@ -8,6 +8,7 @@
 | Date | Feature | Log |
 |---|---|---|
 | 2026-03-02 | USB acquisition stability | [log](2026-03-02-usb-acquisition-stability-log.md) |
+| 2026-03-17 | Lab semantics RD_WAIT + DDR_WSTOP | [log](2026-03-17-lab-semantics-rdwait-wstop-log.md) |
 
 ## Archived Logs
 

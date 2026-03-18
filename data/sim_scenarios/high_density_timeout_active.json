@@ -1,0 +1,15 @@
+{
+  "wave_size_low": 2048,
+  "wave_size_high": 2048,
+  "waves_per_file": 2,
+  "total_wave_count": 128,
+  "producer_bursts_per_poll": 8,
+  "init_poll_count": 1,
+  "wait_poll_count": 1,
+  "max_read_chunk_bytes": 32768,
+  "timeout_retry_limit": 0,
+  "write_delay_ms": 0,
+  "write_fail_at": 0,
+  "publish_fail_at": 0,
+  "ep6_results": ["timeout"]
+}

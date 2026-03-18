@@ -286,8 +286,10 @@ namespace
 
             // First `settlingPolls` calls: ddrWrEnd=0 (FPGA has started
             // new cycle and cleared stale completion flag).
-            // After that: ddrWrEnd=1 with 0 bytes (genuine empty capture).
+            // Next call: ddrWrEnd=1 / ddrRdEnd=0 (draining entry).
+            // Final calls: ddrWrEnd=1 / ddrRdEnd=1 (empty capture completed).
             const bool ddrWrEnd = (ep4CallCount > settlingPolls);
+            const bool ddrRdEnd = (ep4CallCount > (settlingPolls + 1));
             SimulationEp4StatusHelper::WriteStatusBuffer(
                 buffer,
                 bufferSize,
@@ -296,7 +298,7 @@ namespace
                 true,
                 true,
                 ddrWrEnd,
-                false,
+                ddrRdEnd,
                 false);
             return kUsbSuccess;
         }
@@ -306,6 +308,79 @@ namespace
             (void)buffer;
             (void)size;
             ++ep6CallCount;
+            return kUsbSuccess;
+        }
+    };
+
+    struct RdWaitRequiresDdrRdEndUsbSession : IUsbSession
+    {
+        INT ep4CallCount = 0;
+        INT ep6CallCount = 0;
+
+        INT Connect() override
+        {
+            return kUsbSuccess;
+        }
+
+        void Disconnect() override
+        {
+        }
+
+        INT EP2_SendData(BYTE* buffer, size_t bufferSize) override
+        {
+            (void)buffer;
+            (void)bufferSize;
+            return kUsbSuccess;
+        }
+
+        INT EP4_GetData(BYTE* buffer, size_t bufferSize) override
+        {
+            ++ep4CallCount;
+            if (buffer == nullptr || bufferSize < kEp4StatusBufferBytes)
+            {
+                return kAcquisitionErrEp4Read;
+            }
+
+            if (ep4CallCount == 1)
+            {
+                SimulationEp4StatusHelper::WriteStatusBuffer(
+                    buffer, bufferSize,
+                    kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes),
+                    0,
+                    true, true, false, false, true);
+                return kUsbSuccess;
+            }
+
+            if (ep4CallCount == 2)
+            {
+                SimulationEp4StatusHelper::WriteStatusBuffer(
+                    buffer, bufferSize,
+                    kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes),
+                    kBurstSizeBytes,
+                    true, true, true, false, false);
+                return kUsbSuccess;
+            }
+
+            SimulationEp4StatusHelper::WriteStatusBuffer(
+                buffer, bufferSize,
+                kBurstSizeBytes - static_cast<ULONG>(kDdrCompletionPaddingBytes),
+                kBurstSizeBytes,
+                true, true, true, true, false);
+            return kUsbSuccess;
+        }
+
+        INT EP6_GetData(BYTE* buffer, ULONG size) override
+        {
+            ++ep6CallCount;
+            if (buffer == nullptr)
+            {
+                return kAcquisitionErrEp6Read;
+            }
+
+            for (ULONG i = 0; i < size; ++i)
+            {
+                buffer[i] = static_cast<BYTE>(i & 0xFFu);
+            }
             return kUsbSuccess;
         }
     };
@@ -916,6 +991,56 @@ void Test_L2_04_RdWaitPhase_DdrRdEndAssertedWhenCaughtUp()
     // Then: DDR read completion becomes visible.
     TEST_ASSERT(snapshot.ddrWrEnd == 1, "L2-04 RD_WAIT phase must keep DDR_WR_END asserted");
     TEST_ASSERT(snapshot.ddrRdEnd == 1, "L2-04 RD_WAIT phase must assert DDR_RD_END");
+    TEST_ASSERT(model.IsDdrWStop(), "L2-04 RD_WAIT phase must assert internal DDR_WSTOP");
+}
+
+void Test_L2_05_WaitPhase_InternalDdrWstop_RemainsLow()
+{
+    // Given: A DDR model that has entered WAIT but not internal RD_WAIT yet.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    config.waitPollCount = 2;
+    SimRunner::FpgaDdrModel model(config);
+    TEST_ASSERT(AdvanceModelUntilState(&model, SimRunner::MeasState::Wait), "L2-05 wait state must be reachable");
+
+    // When: The host-visible WAIT snapshot is decoded.
+    const DdrStatusSnapshot snapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+
+    // Then: Host-visible DDR_WR_END is high, but internal DDR_WSTOP is still low.
+    TEST_ASSERT(snapshot.ddrWrEnd == 1, "L2-05 WAIT phase must assert DDR_WR_END");
+    TEST_ASSERT(snapshot.ddrRdEnd == 0, "L2-05 WAIT phase must keep DDR_RD_END low");
+    TEST_ASSERT(!model.IsDdrWStop(), "L2-05 WAIT phase must keep internal DDR_WSTOP low");
+}
+
+void Test_L2_06_StartupStaleDdrWrEnd_PrecedesRealCycle()
+{
+    // Given: A DDR model configured with startup stale DDR_WR_END polls.
+    SimRunner::FpgaDdrModelConfig config = {};
+    config.totalWaveBytes = kBurstSizeBytes;
+    config.burstSizeBytes = kBurstSizeBytes;
+    config.producerBurstsPerPoll = 1;
+    config.initPollCount = 1;
+    config.waitPollCount = 1;
+    config.startupStaleDdrWrEndPolls = 2;
+    SimRunner::FpgaDdrModel model(config);
+
+    // When: The first two polls are emitted before the new active cycle starts.
+    model.AdvanceOnePoll();
+    const DdrStatusSnapshot firstSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+    model.AdvanceOnePoll();
+    const DdrStatusSnapshot secondSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+    model.AdvanceOnePoll();
+    const DdrStatusSnapshot thirdSnapshot = WaveAcquisitionEngine::DecodeDdrStatus(BuildStatusBufferFromModel(model).data(), kEp4StatusBufferBytes);
+
+    // Then: Startup stale polls keep DDR_WR_END high with zero bytes, and the real cycle starts afterward.
+    TEST_ASSERT(firstSnapshot.ddrWrEnd == 1, "L2-06 first stale poll must keep DDR_WR_END high");
+    TEST_ASSERT(firstSnapshot.waveWrCnt == 0, "L2-06 first stale poll must expose zero bytes");
+    TEST_ASSERT(secondSnapshot.ddrWrEnd == 1, "L2-06 second stale poll must keep DDR_WR_END high");
+    TEST_ASSERT(secondSnapshot.waveWrCnt == 0, "L2-06 second stale poll must expose zero bytes");
+    TEST_ASSERT(thirdSnapshot.ddrWrEnd == 0, "L2-06 first real-cycle poll must clear DDR_WR_END");
 }
 
 void Test_L3_01_BurstBoundary_AvailableBytesAlignedToChunk()
@@ -1106,6 +1231,7 @@ struct StaleDdrWrEndUsbSession : IUsbSession
     INT ep6CallCount = 0;
     INT stalePollCount = 5;    // How many polls return stale ddrWrEnd=1
     bool staleMeasTrg = true;
+    ULONG staleWaveWrCntBytes = 0;
     ULONG totalLogicalBytes = 0;
     SimRunner::FpgaDdrModel ddrModel;
     bool modelInitialized = false;
@@ -1151,7 +1277,13 @@ struct StaleDdrWrEndUsbSession : IUsbSession
         {
             SimulationEp4StatusHelper::WriteStatusBuffer(
                 buffer, bufferSize,
-                0, 0, true, true, true, false, staleMeasTrg);
+                staleWaveWrCntBytes,
+                staleWaveWrCntBytes,
+                true,
+                true,
+                true,
+                (staleWaveWrCntBytes != 0) ? true : false,
+                staleMeasTrg);
             return kUsbSuccess;
         }
 
@@ -1248,6 +1380,77 @@ void Test_TC_A_12_StaleDdrWrEnd_ExceedsSettlingBudget_ReturnsEmptyCapture()
     // Must have polled at least kDdrSettlingPollLimit times.
     TEST_ASSERT(usb.ep4CallCount > static_cast<INT>(kDdrSettlingPollLimit),
         "TC-A-12 must poll EP4 at least settling limit times");
+}
+
+void Test_TC_A_14_StaleWaveWrCnt_IsIgnoredUntilTheNewCycleStarts()
+{
+    // Given: Startup status leaks both DDR_WR_END and a stale WAVE_WR_CNT from the previous cycle.
+    StaleDdrWrEndUsbSession usb = {};
+    usb.totalLogicalBytes = kSmallWaveSize * 4u;
+    usb.stalePollCount = 3;
+    usb.staleWaveWrCntBytes = kBurstSizeBytes;
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kSmallWaveSizeLow, kSmallWaveSizeHigh, 2u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine runs the cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The engine must ignore the stale upper bound and acquire only the new cycle's data.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-A-14 terminal status must be success");
+    TEST_ASSERT(summary.savedWaveCount == 4u, "TC-A-14 must save only the new cycle's waves");
+    TEST_ASSERT(summary.settlingPollCount == 3, "TC-A-14 stale WAVE_WR_CNT polls must still count as settling");
+    TEST_ASSERT(summary.metrics.ep6.callCount > 0, "TC-A-14 EP6 must start only after the new cycle begins");
+}
+
+void Test_TC_A_15_TimeoutSummary_CapturesActiveStageSnapshot()
+{
+    // Given: A high-backlog run that times out before draining starts.
+    FakeUsbSession usb = {};
+    usb.totalLogicalBytes = kBurstSizeBytes * 8u;
+    usb.producerBurstsPerPoll = 4;
+    usb.initPollCount = 1;
+    usb.waitPollCount = 1;
+    usb.ep6Results = { kUsbErrTransferTimeout };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kLargeWaveSizeLow, kLargeWaveSizeHigh, 2u);
+    config.maxReadChunkBytes = kBurstSizeBytes * 2u;
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine hits a non-recoverable timeout.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The timeout snapshot must capture the active-stage read intent.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Ep6Timeout, "TC-A-15 terminal status must be ep6_timeout");
+    TEST_ASSERT(summary.metrics.timeout.observed, "TC-A-15 timeout telemetry must be observed");
+    TEST_ASSERT(!summary.metrics.timeout.drainingHintSeen, "TC-A-15 timeout must still be in the active stage");
+    TEST_ASSERT(summary.metrics.timeout.requestedReadSizeBytes == (kBurstSizeBytes * 2u), "TC-A-15 requested read size must match the chunk");
+    TEST_ASSERT(summary.metrics.timeout.ddrRdEnd == 0, "TC-A-15 DDR_RD_END must stay low at timeout");
+    TEST_ASSERT(observer.logs.size() >= 1, "TC-A-15 observer must receive timeout log");
+}
+
+void Test_TC_A_13_RdWait_DoesNotCompleteBeforeDdrRdEnd()
+{
+    // Given: EP4 transitions from measuring to RD_WAIT before final DDR_RD_END.
+    RdWaitRequiresDdrRdEndUsbSession usb = {};
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(kLargeWaveSizeLow, kLargeWaveSizeHigh, 2u);
+    config.maxReadChunkBytes = kBurstSizeBytes;
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine drains the visible bytes and reaches the RD_WAIT boundary.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The engine must keep polling until DDR_RD_END is observed.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-A-13 terminal status must still be success");
+    TEST_ASSERT(summary.metrics.latestDdrRdEnd == 1, "TC-A-13 summary must end on DDR_RD_END");
+    TEST_ASSERT(usb.ep4CallCount >= 3, "TC-A-13 engine must poll past RD_WAIT until DDR_RD_END");
 }
 
 void Test_TC_N_11_CycleSummary_ReportsSettlingTelemetry()
@@ -1358,6 +1561,8 @@ int main()
     RUN_TEST(Test_L2_02_MeasPhase_WaveWrCntIncreasesInBurstSteps);
     RUN_TEST(Test_L2_03_WaitPhase_DdrWrEndAsserted);
     RUN_TEST(Test_L2_04_RdWaitPhase_DdrRdEndAssertedWhenCaughtUp);
+    RUN_TEST(Test_L2_05_WaitPhase_InternalDdrWstop_RemainsLow);
+    RUN_TEST(Test_L2_06_StartupStaleDdrWrEnd_PrecedesRealCycle);
     RUN_TEST(Test_L3_01_BurstBoundary_AvailableBytesAlignedToChunk);
     RUN_TEST(Test_L3_02_PartialWaveAtBurstBoundary_PreservesPendingBytes);
     RUN_TEST(Test_L3_03_LastBurst_PaddedRead_PreservesWaveCount);
@@ -1368,6 +1573,9 @@ int main()
     RUN_TEST(Test_TC_A_10_EmptyCapture_IsRejected);
     RUN_TEST(Test_TC_A_11_StaleDdrWrEnd_SettlesAndAcquiresData);
     RUN_TEST(Test_TC_A_12_StaleDdrWrEnd_ExceedsSettlingBudget_ReturnsEmptyCapture);
+    RUN_TEST(Test_TC_A_13_RdWait_DoesNotCompleteBeforeDdrRdEnd);
+    RUN_TEST(Test_TC_A_14_StaleWaveWrCnt_IsIgnoredUntilTheNewCycleStarts);
+    RUN_TEST(Test_TC_A_15_TimeoutSummary_CapturesActiveStageSnapshot);
     RUN_TEST(Test_TC_N_11_CycleSummary_ReportsSettlingTelemetry);
     RUN_TEST(Test_TC_B_11_StaleDdrWrEnd_JustBelowLimit_Succeeds);
     RUN_TEST(Test_TC_B_12_StaleDdrWrEnd_ExactLimit_SucceedsAfterClear);

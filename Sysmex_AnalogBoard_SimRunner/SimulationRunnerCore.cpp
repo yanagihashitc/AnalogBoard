@@ -16,6 +16,25 @@ namespace SimRunner
 {
     namespace
     {
+        const wchar_t* ToString(MeasState state)
+        {
+            switch (state)
+            {
+            case MeasState::Idle:
+                return L"idle";
+            case MeasState::Init:
+                return L"init";
+            case MeasState::Measuring:
+                return L"measuring";
+            case MeasState::Wait:
+                return L"wait";
+            case MeasState::RdWait:
+                return L"rd_wait";
+            default:
+                return L"unknown";
+            }
+        }
+
         bool IsRepoRoot(const fs::path& candidate)
         {
             std::error_code error;
@@ -163,7 +182,8 @@ namespace SimRunner
                         << WaveAcquisition::WaveAcquisitionEngine::ToString(summary.terminalStatus)
                         << L" error=" << summary.errorCode
                         << L" ep6_calls=" << summary.metrics.ep6.callCount
-                        << L" timeouts=" << summary.metrics.ep6TimeoutCount;
+                        << L" timeouts=" << summary.metrics.ep6TimeoutCount
+                        << L" timeout_stage=" << (summary.metrics.timeout.drainingHintSeen ? L"draining" : L"active");
                     logger_->Append(line.str());
                 }
             }
@@ -175,8 +195,9 @@ namespace SimRunner
         class FakeUsbSession : public WaveAcquisition::IUsbSession
         {
         public:
-            explicit FakeUsbSession(const SimulationScenario& scenario)
+            explicit FakeUsbSession(const SimulationScenario& scenario, RunnerLogFile* logger)
                 : scenario_(scenario)
+                , logger_(logger)
                 , totalLogicalBytes_(scenario.waveSizeLow + scenario.waveSizeHigh)
             {
                 totalLogicalBytes_ *= scenario.totalWaveCount;
@@ -188,6 +209,8 @@ namespace SimRunner
                 modelConfig.producerBurstsPerPoll = scenario.producerBurstsPerPoll;
                 modelConfig.initPollCount = scenario.initPollCount;
                 modelConfig.waitPollCount = scenario.waitPollCount;
+                modelConfig.startupStaleDdrWrEndPolls = scenario.startupStaleDdrWrEndPolls;
+                modelConfig.startupStaleWaveWrCntBytes = scenario.startupStaleWaveWrCntBytes;
                 ddrModel_ = FpgaDdrModel(modelConfig);
             }
 
@@ -214,7 +237,9 @@ namespace SimRunner
                     return WaveAcquisition::kAcquisitionErrEp4Read;
                 }
 
+                ++ep4PollCount_;
                 ddrModel_.AdvanceOnePoll();
+                const bool startupStale = ddrModel_.IsStartupStaleDdrWrEndActive();
                 SimulationEp4StatusHelper::WriteStatusBuffer(
                     buffer,
                     bufferSize,
@@ -225,6 +250,7 @@ namespace SimRunner
                     ddrModel_.IsDdrWrEnd(),
                     ddrModel_.IsDdrRdEnd(),
                     ddrModel_.IsMeasTrg());
+                LogEp4SnapshotIfChanged(startupStale);
                 return WaveAcquisition::kUsbSuccess;
             }
 
@@ -266,10 +292,38 @@ namespace SimRunner
             }
 
         private:
+            void LogEp4SnapshotIfChanged(bool startupStale)
+            {
+                if (logger_ == nullptr)
+                {
+                    return;
+                }
+
+                std::wstringstream line;
+                line << L"[ep4] poll=" << ep4PollCount_
+                    << L" state=" << ToString(ddrModel_.GetState())
+                    << L" startup_stale=" << (startupStale ? 1 : 0)
+                    << L" wave_wr_cnt=" << ddrModel_.GetWrittenBytes()
+                    << L" wave_rd_cnt=" << ddrModel_.GetReadBytes()
+                    << L" ddr_wr_end=" << (ddrModel_.IsDdrWrEnd() ? 1 : 0)
+                    << L" ddr_rd_end=" << (ddrModel_.IsDdrRdEnd() ? 1 : 0)
+                    << L" ddr_wstop=" << (ddrModel_.IsDdrWStop() ? 1 : 0);
+
+                const std::wstring signature = line.str();
+                if (signature != lastEp4Signature_)
+                {
+                    logger_->Append(signature);
+                    lastEp4Signature_ = signature;
+                }
+            }
+
             SimulationScenario scenario_;
+            RunnerLogFile* logger_ = nullptr;
             ULONG totalLogicalBytes_ = 0;
             INT ep6CallCount_ = 0;
+            INT ep4PollCount_ = 0;
             FpgaDdrModel ddrModel_;
+            std::wstring lastEp4Signature_;
         };
 
         class ScriptedWavePairSink : public WaveAcquisition::IWavePairSink
@@ -457,6 +511,15 @@ namespace SimRunner
             json << "  \"WAVE_RD_CNT\": " << summary.metrics.latestWaveRdCnt << ",\n";
             json << "  \"DDR_WR_END\": " << summary.metrics.latestDdrWrEnd << ",\n";
             json << "  \"DDR_RD_END\": " << summary.metrics.latestDdrRdEnd << ",\n";
+            json << "  \"settling_poll_count\": " << summary.settlingPollCount << ",\n";
+            json << "  \"saw_ddr_wr_end_clear\": " << (summary.sawDdrWrEndClear ? 1 : 0) << ",\n";
+            json << "  \"timeout_stage\": \"" << (summary.metrics.timeout.drainingHintSeen ? "draining" : "active") << "\",\n";
+            json << "  \"timeout_read_size\": " << summary.metrics.timeout.requestedReadSizeBytes << ",\n";
+            json << "  \"timeout_unread_bytes\": " << summary.metrics.timeout.unreadBytes << ",\n";
+            json << "  \"timeout_readable_upper_bound_bytes\": " << summary.metrics.timeout.readableUpperBoundBytes << ",\n";
+            json << "  \"timeout_backlog_bytes\": " << summary.metrics.timeout.backlogBytes << ",\n";
+            json << "  \"timeout_wait\": " << (summary.metrics.timeout.waitTimeoutObserved ? 1 : 0) << ",\n";
+            json << "  \"timeout_ep4_fail\": " << (summary.metrics.timeout.ep4ReadFailureObserved ? 1 : 0) << ",\n";
             json << "  \"saved_wave_count\": " << summary.savedWaveCount << ",\n";
             json << "  \"published_pair_count\": " << summary.publishedPairCount << "\n";
             json << "}\n";
@@ -573,7 +636,7 @@ namespace SimRunner
         }
 
         RunnerObserver observer(&logger);
-        FakeUsbSession usbSession(scenario);
+        FakeUsbSession usbSession(scenario, &logger);
         ScriptedWavePairSink sink(outputDirectory, presetName, scenario, &logger);
 
         WaveAcquisition::RunConfig config = {};

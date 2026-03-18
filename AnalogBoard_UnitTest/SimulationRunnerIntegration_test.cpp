@@ -212,6 +212,59 @@ void Test_IT_A_05_EmptyCapture_ProducesFailureSummary()
     RunPresetAndAssert(L"empty_capture", 12, "empty_capture", BinExpectation::None);
 }
 
+void Test_IT_N_06_StaleDdrWrEndRdWait_LogsInternalWstopLag()
+{
+    // Given: A preset that starts with stale DDR_WR_END and later enters RD_WAIT.
+    SimRunner::SimulationRunResult result = {};
+    std::wstring error;
+
+    // When: The preset is executed through the runner core.
+    const bool ok = SimRunner::RunPreset(GetRepoRoot(), L"stale_ddrwrend_rdwait", &result, &error);
+
+    // Then: The runner succeeds and the log captures the host/internal lag at drain entry.
+    TEST_ASSERT(ok, "stale_ddrwrend_rdwait preset must load and run");
+    if (!ok)
+    {
+        std::printf("  detail: %ls\n", error.c_str());
+        return;
+    }
+
+    const std::string runnerLog = ReadTextFileUtf8(result.runnerLogPath);
+    TEST_ASSERT(runnerLog.find("startup_stale=1") != std::string::npos, "runner log must record startup stale DDR_WR_END");
+    TEST_ASSERT(runnerLog.find("startup_stale=1 wave_wr_cnt=16384 wave_rd_cnt=16384 ddr_wr_end=1 ddr_rd_end=1 ddr_wstop=0") != std::string::npos, "runner log must capture stale WAVE_WR_CNT before the new cycle starts");
+    TEST_ASSERT(runnerLog.find("ddr_wr_end=1 ddr_rd_end=0 ddr_wstop=0") != std::string::npos, "runner log must capture RD_WAIT entry before internal WSTOP");
+    TEST_ASSERT(runnerLog.find("ddr_wstop=1") != std::string::npos, "runner log must later capture internal WSTOP assertion");
+    TEST_ASSERT(RemoveDirectoryRecursively(result.outputDirectory), "simulation output directory cleanup must succeed");
+}
+
+void Test_IT_A_06_HighDensityTimeoutActive_CapturesTimeoutSnapshot()
+{
+    // Given: A preset that times out during active acquisition with a large backlog.
+    SimRunner::SimulationRunResult result = {};
+    std::wstring error;
+
+    // When: The preset is executed through the runner core.
+    const bool ok = SimRunner::RunPreset(GetRepoRoot(), L"high_density_timeout_active", &result, &error);
+
+    // Then: Summary and runner log preserve the timeout snapshot and incomplete terminal state.
+    TEST_ASSERT(ok, "high_density_timeout_active preset must load and run");
+    if (!ok)
+    {
+        std::printf("  detail: %ls\n", error.c_str());
+        return;
+    }
+
+    const std::string summaryText = ReadTextFileUtf8(result.summaryPath);
+    const std::string runnerLog = ReadTextFileUtf8(result.runnerLogPath);
+    TEST_ASSERT(summaryText.find("\"terminal_status\": \"ep6_timeout\"") != std::string::npos, "summary must keep ep6_timeout terminal status");
+    TEST_ASSERT(summaryText.find("\"DDR_RD_END\": 0") != std::string::npos, "summary must preserve incomplete DDR_RD_END");
+    TEST_ASSERT(summaryText.find("\"timeout_read_size\":") != std::string::npos, "summary must include timeout read size");
+    TEST_ASSERT(summaryText.find("\"timeout_stage\": \"active\"") != std::string::npos, "summary must mark the timeout stage as active");
+    TEST_ASSERT(runnerLog.find("[timeout] stage=active") != std::string::npos, "runner log must record the timeout stage");
+    TEST_ASSERT(runnerLog.find("readable_upper_bound_bytes=") != std::string::npos, "runner log must record timeout upper bound");
+    TEST_ASSERT(RemoveDirectoryRecursively(result.outputDirectory), "simulation output directory cleanup must succeed");
+}
+
 int main()
 {
     std::printf("=== SimulationRunner Integration Tests ===\n\n");
@@ -226,6 +279,8 @@ int main()
     RUN_TEST(Test_IT_A_05_EmptyCapture_ProducesFailureSummary);
     RUN_TEST(Test_IT_N_04_SlowProducer_ProducesSuccessArtifacts);
     RUN_TEST(Test_IT_N_05_BurstBoundaryStress_ProducesSuccessArtifacts);
+    RUN_TEST(Test_IT_N_06_StaleDdrWrEndRdWait_LogsInternalWstopLag);
+    RUN_TEST(Test_IT_A_06_HighDensityTimeoutActive_CapturesTimeoutSnapshot);
     RUN_TEST(Test_IT_B_01_ResolveRepoRootFromExecutablePath_FindsRepositoryRoot);
     RUN_TEST(Test_IT_B_02_ResolveRepoRootFromRelativeExecutablePath_FindsRepositoryRoot);
 

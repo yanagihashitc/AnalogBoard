@@ -251,6 +251,17 @@ namespace SimRunner
                 return FailValidation(L"timeout_retry_limit must be non-negative", outError);
             }
 
+            if (scenario.startupStaleDdrWrEndPolls < 0)
+            {
+                return FailValidation(L"startup_stale_ddr_wr_end_polls must be non-negative", outError);
+            }
+
+            if (scenario.startupStaleWaveWrCntBytes != 0 &&
+                (scenario.startupStaleWaveWrCntBytes % FpgaRegEncoding::kDdrAddressUnitBytes) != 0)
+            {
+                return FailValidation(L"startup_stale_wave_wr_cnt_bytes must align to the 32-byte DDR address unit", outError);
+            }
+
             if (scenario.maxReadChunkBytes == 0)
             {
                 return FailValidation(L"max_read_chunk_bytes must be greater than zero", outError);
@@ -468,6 +479,16 @@ namespace SimRunner
                 }
                 return false;
             }
+        }
+
+        if (!LoadOptionalIntField(L"startup_stale_ddr_wr_end_polls", &scenario.startupStaleDdrWrEndPolls))
+        {
+            return false;
+        }
+
+        if (!LoadOptionalUnsignedField(L"startup_stale_wave_wr_cnt_bytes", &scenario.startupStaleWaveWrCntBytes))
+        {
+            return false;
         }
 
         if (!LoadRequiredUnsignedField(L"max_read_chunk_bytes", &scenario.maxReadChunkBytes))

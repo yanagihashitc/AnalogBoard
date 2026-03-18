@@ -23,6 +23,8 @@ namespace SimRunner
         ULONG producerBurstsPerPoll = 0;
         INT initPollCount = 1;
         INT waitPollCount = 1;
+        INT startupStaleDdrWrEndPolls = 0;
+        ULONG startupStaleWaveWrCntBytes = 0;
     };
 
     class FpgaDdrModel
@@ -30,6 +32,7 @@ namespace SimRunner
     public:
         explicit FpgaDdrModel(const FpgaDdrModelConfig& config)
             : config_(config)
+            , startupStaleRemainingPolls_((config.startupStaleDdrWrEndPolls > 0) ? config.startupStaleDdrWrEndPolls : 0)
         {
         }
 
@@ -37,6 +40,14 @@ namespace SimRunner
 
         void AdvanceOnePoll()
         {
+            if (startupStaleRemainingPolls_ > 0)
+            {
+                startupStaleActive_ = true;
+                --startupStaleRemainingPolls_;
+                return;
+            }
+
+            startupStaleActive_ = false;
             switch (state_)
             {
             case MeasState::Idle:
@@ -88,32 +99,57 @@ namespace SimRunner
 
         ULONG GetWrittenBytes() const
         {
+            if (startupStaleActive_)
+            {
+                return config_.startupStaleWaveWrCntBytes;
+            }
+
             return writtenBytes_;
         }
 
         ULONG GetReadBytes() const
         {
+            if (startupStaleActive_)
+            {
+                return config_.startupStaleWaveWrCntBytes;
+            }
+
             return readBytes_;
         }
 
         bool IsAdcSetEnd() const
         {
-            return state_ != MeasState::Idle;
+            return IsStartupStaleDdrWrEndActive() || state_ != MeasState::Idle;
         }
 
         bool IsDdrWrEnd() const
         {
-            return state_ == MeasState::Wait || state_ == MeasState::RdWait;
+            return IsStartupStaleDdrWrEndActive() || state_ == MeasState::Wait || state_ == MeasState::RdWait;
         }
 
         bool IsDdrRdEnd() const
         {
+            if (startupStaleActive_)
+            {
+                return (config_.startupStaleWaveWrCntBytes != 0u);
+            }
+
             return state_ == MeasState::RdWait && readBytes_ >= writtenBytes_;
         }
 
         bool IsMeasTrg() const
         {
-            return state_ == MeasState::Init || state_ == MeasState::Measuring;
+            return IsStartupStaleDdrWrEndActive() || state_ == MeasState::Init || state_ == MeasState::Measuring;
+        }
+
+        bool IsDdrWStop() const
+        {
+            return state_ == MeasState::RdWait;
+        }
+
+        bool IsStartupStaleDdrWrEndActive() const
+        {
+            return startupStaleActive_;
         }
 
     private:
@@ -177,6 +213,8 @@ namespace SimRunner
         }
 
         FpgaDdrModelConfig config_ = {};
+        INT startupStaleRemainingPolls_ = 0;
+        bool startupStaleActive_ = false;
         MeasState state_ = MeasState::Idle;
         INT stateCounter_ = 0;
         ULONG writtenBytes_ = 0;
