@@ -5,6 +5,7 @@
 #include "AnalogBoard_TestApp.h"
 #include "afxdialogex.h"
 #include "Dialog1_Main.h"
+#include "DialogMainBindingPolicy.h"
 #include "AnalogBoard_TestAppDlg.h"
 #include "locale.h"
 #include "afxwin.h"
@@ -299,8 +300,9 @@ namespace
 	class RealUsbSessionAdapter : public WaveAcquisition::IUsbSession
 	{
 	public:
-		explicit RealUsbSessionAdapter(USB_Lib_Info* usbLibInfo)
+		RealUsbSessionAdapter(USB_Lib_Info* usbLibInfo, CAnalogBoardTestAppDlg* mainDlg)
 			: usbLibInfo_(usbLibInfo)
+			, mainDlg_(mainDlg)
 		{
 		}
 
@@ -316,22 +318,50 @@ namespace
 		INT EP2_SendData(BYTE* buffer, size_t bufferSize) override
 		{
 			UNREFERENCED_PARAMETER(bufferSize);
-			return usbLibInfo_ != nullptr ? usbLibInfo_->EP2_SendData(buffer) : WaveAcquisition::kAcquisitionErrInvalidConfig;
+			if (usbLibInfo_ == nullptr)
+			{
+				LogNullUsbSession(L"EP2_SendData");
+				return WaveAcquisition::kAcquisitionErrInvalidConfig;
+			}
+
+			return usbLibInfo_->EP2_SendData(buffer);
 		}
 
 		INT EP4_GetData(BYTE* buffer, size_t bufferSize) override
 		{
 			UNREFERENCED_PARAMETER(bufferSize);
-			return usbLibInfo_ != nullptr ? usbLibInfo_->EP4_GetData(buffer) : WaveAcquisition::kAcquisitionErrInvalidConfig;
+			if (usbLibInfo_ == nullptr)
+			{
+				LogNullUsbSession(L"EP4_GetData");
+				return WaveAcquisition::kAcquisitionErrInvalidConfig;
+			}
+
+			return usbLibInfo_->EP4_GetData(buffer);
 		}
 
 		INT EP6_GetData(BYTE* buffer, ULONG size) override
 		{
-			return usbLibInfo_ != nullptr ? usbLibInfo_->EP6_GetData(buffer, size) : WaveAcquisition::kAcquisitionErrInvalidConfig;
+			if (usbLibInfo_ == nullptr)
+			{
+				LogNullUsbSession(L"EP6_GetData");
+				return WaveAcquisition::kAcquisitionErrInvalidConfig;
+			}
+
+			return usbLibInfo_->EP6_GetData(buffer, size);
 		}
 
 	private:
+		void LogNullUsbSession(const wchar_t* apiName) const
+		{
+			if (mainDlg_ != nullptr)
+			{
+				const std::wstring line = AcquisitionLogMessageFormatter::BuildUsbSessionNullLog(apiName);
+				mainDlg_->PrintLog(line.c_str());
+			}
+		}
+
 		USB_Lib_Info* usbLibInfo_ = nullptr;
+		CAnalogBoardTestAppDlg* mainDlg_ = nullptr;
 	};
 
 	class DialogWavePairSink : public WaveAcquisition::IWavePairSink
@@ -527,8 +557,25 @@ namespace
 		ULONG oneWaveSizeHigh,
 		ULONG maxReadChunkBytes)
 	{
+		const std::uintptr_t curObjectAddress = reinterpret_cast<std::uintptr_t>(curObject);
+		const std::uintptr_t mainDialogAddress =
+			(curObject != nullptr) ? reinterpret_cast<std::uintptr_t>(curObject->m_pMainDlg) : 0u;
+		const std::uintptr_t usbLibInfoAddress =
+			(curObject != nullptr && curObject->m_pMainDlg != nullptr)
+			? reinterpret_cast<std::uintptr_t>(&curObject->m_pMainDlg->UsbLibInfo)
+			: 0u;
+		if (curObject != nullptr && curObject->m_pMainDlg != nullptr)
+		{
+			const std::wstring contextLine = AcquisitionLogMessageFormatter::BuildEngineContextLog(
+				curObjectAddress,
+				mainDialogAddress,
+				usbLibInfoAddress);
+			curObject->m_pMainDlg->PrintLog(contextLine.c_str());
+		}
+
 		RealUsbSessionAdapter usbSession(
-			curObject != nullptr && curObject->m_pMainDlg != nullptr ? &curObject->m_pMainDlg->UsbLibInfo : nullptr);
+			curObject != nullptr && curObject->m_pMainDlg != nullptr ? &curObject->m_pMainDlg->UsbLibInfo : nullptr,
+			curObject != nullptr ? curObject->m_pMainDlg : nullptr);
 		DialogWavePairSink sink(curObject, timeStampBase);
 		DialogAcquisitionObserver observer(curObject);
 		GlobalFlagStopToken stopToken;
@@ -775,6 +822,11 @@ Dialog1_Main::~Dialog1_Main()
 	pEp4DataBuf = NULL;
 	//free(pEp6DataBuf);
 	//pEp6DataBuf = NULL;
+}
+
+void Dialog1_Main::BindMainDialog(CAnalogBoardTestAppDlg* mainDlg)
+{
+	m_pMainDlg = DialogMainBindingPolicy::ResolveMainDialog(m_pMainDlg, mainDlg);
 }
 
 

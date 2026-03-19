@@ -110,6 +110,41 @@ void Test_TC_B_01_BuildCycleSummaryLog_AllowsZeroAndNegativeFields()
     TEST_ASSERT(line.find(L"error=-10") != std::wstring::npos, "TC-B-01 error should be present");
 }
 
+void Test_TC_N_04_BuildEngineContextLog_FormatsPointerFieldsAsHex()
+{
+    // Given: Concrete addresses whose hexadecimal and decimal representations differ.
+    // When: The context marker is formatted.
+    const std::wstring line = AcquisitionLogMessageFormatter::BuildEngineContextLog(0x1au, 0x2bu, 0x3cu);
+
+    // Then: All three pointer fields are rendered in hexadecimal.
+    TEST_ASSERT(
+        line == L"[PR04][ENGINE_CONTEXT] curObject=0x1a mainDlg=0x2b usbLibInfo=0x3c",
+        "TC-N-04 context addresses should be formatted as hexadecimal");
+}
+
+void Test_TC_B_02_BuildEngineContextLog_FormatsZeroAddressesAsHexZero()
+{
+    // Given: Zero addresses in the engine call context.
+    // When: The context marker is formatted.
+    const std::wstring line = AcquisitionLogMessageFormatter::BuildEngineContextLog(0u, 0u, 0u);
+
+    // Then: Zero is rendered consistently as hexadecimal.
+    TEST_ASSERT(
+        line == L"[PR04][ENGINE_CONTEXT] curObject=0x0 mainDlg=0x0 usbLibInfo=0x0",
+        "TC-B-02 zero addresses should be formatted as hexadecimal");
+}
+
+void Test_TC_B_03_BuildUsbSessionNullLog_FallsBackForNullApiName()
+{
+    // Given: A null API name while reporting a null USB session.
+    // When: The null-session marker is formatted.
+    const std::wstring line = AcquisitionLogMessageFormatter::BuildUsbSessionNullLog(nullptr);
+
+    // Then: The marker remains well-formed and uses a fallback label.
+    TEST_ASSERT(line.find(L"[PR04][ENGINE_USB_SESSION_NULL]") == 0u, "TC-B-03 null-session marker prefix should exist");
+    TEST_ASSERT(line.find(L"api=(null)") != std::wstring::npos, "TC-B-03 fallback api label should be present");
+}
+
 int main()
 {
     std::printf("=== AcquisitionLogMessageFormatter Unit Tests ===\n\n");
@@ -117,7 +152,10 @@ int main()
     RUN_TEST(Test_TC_N_01_BuildEngineEnterLog_ReturnsFixedMarker);
     RUN_TEST(Test_TC_N_02_BuildEngineExitLog_ContainsTerminalFields);
     RUN_TEST(Test_TC_N_03_BuildCycleSummaryLog_ContainsKeyCounters);
+    RUN_TEST(Test_TC_N_04_BuildEngineContextLog_FormatsPointerFieldsAsHex);
     RUN_TEST(Test_TC_B_01_BuildCycleSummaryLog_AllowsZeroAndNegativeFields);
+    RUN_TEST(Test_TC_B_02_BuildEngineContextLog_FormatsZeroAddressesAsHexZero);
+    RUN_TEST(Test_TC_B_03_BuildUsbSessionNullLog_FallsBackForNullApiName);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

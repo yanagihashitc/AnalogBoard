@@ -47,6 +47,7 @@ protected:
 
 public:
 	virtual BOOL OnInitDialog();
+	void BindMainDialog(CAnalogBoardTestAppDlg* mainDlg);
 	CString m_ImportFile;
 	CString m_OutFile;
 	CString m_ExportFile;

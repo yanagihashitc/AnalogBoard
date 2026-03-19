@@ -1,11 +1,20 @@
 #pragma once
 
+#include <cstdint>
+#include <sstream>
 #include <string>
 
 #include "WaveAcquisitionEngine.h"
 
 namespace AcquisitionLogMessageFormatter
 {
+    inline std::wstring FormatAddressHex(const std::uintptr_t address)
+    {
+        std::wstringstream stream;
+        stream << std::hex << address;
+        return L"0x" + stream.str();
+    }
+
     inline std::wstring BuildEngineEnterLog()
     {
         return L"[PR04][ENGINE_ENTER] run_cycle";
@@ -50,5 +59,22 @@ namespace AcquisitionLogMessageFormatter
             L" error=" + std::to_wstring(summary.errorCode) +
             L" ignoredTail=" + std::to_wstring(summary.ignoredTailBytes) +
             L" publishedPairs=" + std::to_wstring(summary.publishedPairCount);
+    }
+
+    inline std::wstring BuildEngineContextLog(
+        const std::uintptr_t curObjectAddress,
+        const std::uintptr_t mainDialogAddress,
+        const std::uintptr_t usbLibInfoAddress)
+    {
+        return
+            L"[PR04][ENGINE_CONTEXT] curObject=" + FormatAddressHex(curObjectAddress) +
+            L" mainDlg=" + FormatAddressHex(mainDialogAddress) +
+            L" usbLibInfo=" + FormatAddressHex(usbLibInfoAddress);
+    }
+
+    inline std::wstring BuildUsbSessionNullLog(const wchar_t* apiName)
+    {
+        const std::wstring api = apiName != nullptr ? apiName : L"(null)";
+        return L"[PR04][ENGINE_USB_SESSION_NULL] api=" + api;
     }
 }

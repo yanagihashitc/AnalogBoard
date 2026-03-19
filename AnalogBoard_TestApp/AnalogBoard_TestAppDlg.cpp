@@ -113,6 +113,7 @@ BOOL CAnalogBoardTestAppDlg::OnInitDialog()
 	m_tab_main.InsertItem(0, _T("Data Get"));
 	//m_tab_main.InsertItem(1, _T("FPGA Debug"));
 
+	m_tabpage1_DataGet.BindMainDialog(this);
 	m_tabpage1_DataGet.Create(IDD_DIALOG1_MAIN, &m_tab_main);
 	//m_tabpage2_FpgaDbg.Create(IDD_DIALOG2_DEBUG, &m_tab_main);
 
