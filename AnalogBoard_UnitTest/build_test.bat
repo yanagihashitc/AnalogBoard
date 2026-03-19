@@ -77,6 +77,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionRunMetadata_test.pdb AcquisitionRunMetadata_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:AcquisitionRunMetadata_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(AcquisitionRunMetadata_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:Ep6TransferRetryPolicy_test.pdb Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
@@ -121,6 +129,14 @@ call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:DialogMain
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(DialogMainBindingPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionCycleRecoveryPolicy_test.pdb AcquisitionCycleRecoveryPolicy_test.cpp /Fe:AcquisitionCycleRecoveryPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(AcquisitionCycleRecoveryPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
@@ -199,6 +215,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+"%SCRIPT_DIR%AcquisitionRunMetadata_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(AcquisitionRunMetadata_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 "%SCRIPT_DIR%Ep6TransferRetryPolicy_test.exe"
 if errorlevel 1 (
     echo.
@@ -243,6 +267,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(DialogMainBindingPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%AcquisitionCycleRecoveryPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(AcquisitionCycleRecoveryPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

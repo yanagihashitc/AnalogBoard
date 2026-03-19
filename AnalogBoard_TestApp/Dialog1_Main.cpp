@@ -5,6 +5,8 @@
 #include "AnalogBoard_TestApp.h"
 #include "afxdialogex.h"
 #include "Dialog1_Main.h"
+#include "AcquisitionRunMetadata.h"
+#include "AcquisitionCycleRecoveryPolicy.h"
 #include "DialogMainBindingPolicy.h"
 #include "AnalogBoard_TestAppDlg.h"
 #include "locale.h"
@@ -592,6 +594,40 @@ namespace
 
 		WaveAcquisition::WaveAcquisitionEngine engine(&usbSession, &sink, &observer, &stopToken);
 		return engine.RunCycle(config);
+	}
+
+	bool TryStopSamplingAfterCycle(
+		Dialog1_Main* curObject,
+		const WaveAcquisition::TerminalStatus terminalStatus)
+	{
+		if (curObject == nullptr || curObject->m_pMainDlg == nullptr || pEp2DataBuf == NULL)
+		{
+			return false;
+		}
+
+		const CString statusLabel(WaveAcquisition::WaveAcquisitionEngine::ToString(terminalStatus));
+		CString line;
+		line.Format(_T("[PR04][RECOVERY_STOP] status=%s stage=begin"), statusLabel.GetString());
+		curObject->m_pMainDlg->PrintLog(line);
+
+		if (curObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp2DataBuf) != USB_SUCCESS)
+		{
+			line.Format(_T("[PR04][RECOVERY_STOP] status=%s stage=ep4_failed"), statusLabel.GetString());
+			curObject->m_pMainDlg->PrintLog(line);
+			return false;
+		}
+
+		curObject->RegSet_GetWaveDataStart(FALSE, pEp2DataBuf);
+		if (curObject->m_pMainDlg->UsbLibInfo.EP2_SendData(pEp2DataBuf) != USB_SUCCESS)
+		{
+			line.Format(_T("[PR04][RECOVERY_STOP] status=%s stage=ep2_failed"), statusLabel.GetString());
+			curObject->m_pMainDlg->PrintLog(line);
+			return false;
+		}
+
+		line.Format(_T("[PR04][RECOVERY_STOP] status=%s stage=sent"), statusLabel.GetString());
+		curObject->m_pMainDlg->PrintLog(line);
+		return true;
 	}
 }
 
@@ -1818,9 +1854,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CurObject->m_pMainDlg->PrintLog(strTmp);
 	
 	constexpr ULONG kLegacyReadBurstCapBytes = 1024 * 1024 * 256;
+	constexpr int kPhase2ReadBurstFilesPerRead = 1;
 	ulOneTimeMaxSize = ReadRequestBurstPolicy::ResolveReadBurstCapBytes(
 		OneFileSize,
-		kLegacyReadBurstCapBytes);
+		kLegacyReadBurstCapBytes,
+		kPhase2ReadBurstFilesPerRead);
 
 	strTmp.Format(_T("One time max size = %dbyte"), ulOneTimeMaxSize);
 	CurObject->m_pMainDlg->PrintLog(strTmp);
@@ -1967,10 +2005,26 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				OneWaveSize_H,
 				ulOneTimeMaxSize);
 			CurObject->m_pMainDlg->PrintLog(AcquisitionLogMessageFormatter::BuildEngineExitLog(summary).c_str());
-			ErrExit = summary.terminalStatus != WaveAcquisition::TerminalStatus::Success;
-			if (summary.terminalStatus == WaveAcquisition::TerminalStatus::Stopped)
+			const CString cfgPath = strTimeStamp_use + _T("_cfg.txt");
+			const AcquisitionRunMetadata::AppendResult appendRunMetadataResult =
+				AcquisitionRunMetadata::AppendRunResultMetadata(cfgPath.GetString(), summary);
+			if (!appendRunMetadataResult.success)
 			{
-				runtime = false;
+				strTmp.Format(
+					_T("[PR04][CFG_RESULT_APPEND_FAILED] GetLastError=%lu path=%s"),
+					appendRunMetadataResult.lastError,
+					cfgPath.GetString());
+				CurObject->m_pMainDlg->PrintLog(strTmp);
+			}
+			ErrExit = summary.terminalStatus != WaveAcquisition::TerminalStatus::Success;
+			runtime = AcquisitionCycleRecoveryPolicy::ShouldContinueRuntimeAfterCycle(
+				CurObject->m_bManualMode == TRUE,
+				summary.terminalStatus);
+			if (AcquisitionCycleRecoveryPolicy::ShouldAttemptStopSamplingAfterCycle(
+				CurObject->m_bManualMode == TRUE,
+				summary.terminalStatus))
+			{
+				TryStopSamplingAfterCycle(CurObject, summary.terminalStatus);
 			}
 
 			strTmp.Format(_T("Read over, saved wave count %lu."), summary.savedWaveCount);
@@ -1978,24 +2032,6 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 			/* Disenable start button */
 			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
-
-			/* Manual Mode: Stop FPGA sampling */
-			if (CurObject->m_bManualMode == TRUE)
-			{
-				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp2DataBuf) != USB_SUCCESS)
-				{
-					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
-					break;
-				}
-
-				CurObject->RegSet_GetWaveDataStart(FALSE, pEp2DataBuf);
-
-				if (CurObject->m_pMainDlg->UsbLibInfo.EP2_SendData(pEp2DataBuf) != USB_SUCCESS)
-				{
-					CurObject->m_pMainDlg->PrintLog(_T("Send ep2 register data failed."));
-					break;
-				}
-			}
 
 			/* Set sampling UI status */
 			CurObject->SamplingUISet(TRUE, CurObject->m_bManualMode);
