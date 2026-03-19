@@ -31,6 +31,7 @@ namespace
     constexpr ULONG kFrameSizeLow = 4096u;
     constexpr ULONG kFrameSizeHigh = 4096u;
     constexpr ULONG kOneWaveSize = kFrameSizeLow + kFrameSizeHigh;
+    constexpr wchar_t kStartupEp4LogPrefix[] = L"[PR04][STARTUP_EP4]";
 
     std::array<BYTE, kEp4StatusBufferBytes> BuildStatusBuffer(const DdrStatusSnapshot& snapshot)
     {
@@ -235,6 +236,19 @@ namespace
             return pairOpen;
         }
     };
+
+    size_t CountLogsWithPrefix(const FakeObserver& observer, const wchar_t* prefix)
+    {
+        size_t count = 0u;
+        for (const std::wstring& line : observer.logs)
+        {
+            if (line.find(prefix) == 0u)
+            {
+                ++count;
+            }
+        }
+        return count;
+    }
 }
 
 void Test_TC_N_01_PartialFinalPair_PublishesAtCycleEnd()
@@ -369,14 +383,79 @@ void Test_TC_I_01_LastNPlus1Probe_ObservesOnlyPublishedPairs()
     TEST_ASSERT(sink.publishedWaveCounts[1] == 1u, "TC-I-01 second visible pair should be the later flushed partial pair");
 }
 
+void Test_TC_N_03_StartupEp4Observation_LogsSnapshotFields()
+{
+    // Given: A startup-stale snapshot is observed before the real cycle begins.
+    ScriptedUsbSession usb = {};
+    usb.snapshots = {
+        { 0u, 0u, 0, 1 },
+        { 2u * kOneWaveSize, 0u, 0, 0 },
+        { 2u * kOneWaveSize, 2u * kOneWaveSize, 1, 1 }
+    };
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    const RunConfig config = MakeConfig(3u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine processes the startup snapshots.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The observer receives a startup EP4 log with the raw register fields.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-N-03 terminal status should be success");
+    const size_t startupLogCount = CountLogsWithPrefix(observer, kStartupEp4LogPrefix);
+    TEST_ASSERT(startupLogCount >= 1u, "TC-N-03 startup EP4 log should be emitted");
+    std::wstring startupLog;
+    for (const std::wstring& line : observer.logs)
+    {
+        if (line.find(kStartupEp4LogPrefix) == 0u)
+        {
+            startupLog = line;
+            break;
+        }
+    }
+    TEST_ASSERT(startupLog.find(L"WAVE_WR_CNT=0") != std::wstring::npos, "TC-N-03 startup log should contain WAVE_WR_CNT");
+    TEST_ASSERT(startupLog.find(L"WAVE_RD_CNT=0") != std::wstring::npos, "TC-N-03 startup log should contain WAVE_RD_CNT");
+    TEST_ASSERT(startupLog.find(L"DDR_WR_END=0") != std::wstring::npos, "TC-N-03 startup log should contain DDR_WR_END");
+    TEST_ASSERT(startupLog.find(L"DDR_RD_END=1") != std::wstring::npos, "TC-N-03 startup log should contain DDR_RD_END");
+}
+
+void Test_TC_B_03_StartupEp4Observation_IsCappedToThreeLogs()
+{
+    // Given: More than three startup polls occur before any active cycle is observed.
+    ScriptedUsbSession usb = {};
+    usb.snapshots = {
+        { 0u, 0u, 1, 1 },
+        { 0u, 0u, 1, 1 },
+        { 0u, 0u, 1, 1 },
+        { 0u, 0u, 1, 1 },
+        { 0u, 0u, 1, 1 }
+    };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    const RunConfig config = MakeConfig(3u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine keeps polling the startup-stale status until it gives up.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The startup EP4 observation is capped and does not spam the log.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::EmptyCapture, "TC-B-03 terminal status should be empty_capture");
+    TEST_ASSERT(CountLogsWithPrefix(observer, kStartupEp4LogPrefix) == 3u, "TC-B-03 startup EP4 logs should be capped to three");
+}
+
 int main()
 {
     std::printf("=== WaveAcquisitionEngine Unit Tests ===\n\n");
 
     RUN_TEST(Test_TC_N_01_PartialFinalPair_PublishesAtCycleEnd);
     RUN_TEST(Test_TC_N_02_NonFatalPublish_StillCompletesCycle);
+    RUN_TEST(Test_TC_N_03_StartupEp4Observation_LogsSnapshotFields);
     RUN_TEST(Test_TC_B_01_QueueFullTimeout_StopsReaderBeforeWriterCatchesUp);
     RUN_TEST(Test_TC_B_02_PublishSequence_KeepsCompletedPairsMonotonic);
+    RUN_TEST(Test_TC_B_03_StartupEp4Observation_IsCappedToThreeLogs);
     RUN_TEST(Test_TC_I_01_LastNPlus1Probe_ObservesOnlyPublishedPairs);
 
     std::printf("\n=== Summary ===\n");

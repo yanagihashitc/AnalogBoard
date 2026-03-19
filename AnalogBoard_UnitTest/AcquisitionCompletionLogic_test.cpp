@@ -126,6 +126,50 @@ void Test_TC_R_05_StartupStaleWaveWrCnt_IsIgnoredUntilClear()
     TEST_ASSERT(measuring.readableUpperBoundBytes == 288u, "TC-R-05 first real measuring poll must expose the new upper bound");
 }
 
+void Test_TC_R_06_StartupStaleDdrRdEndOnly_DoesNotCompleteImmediately()
+{
+    // Given: A fresh tracker that first sees stale DDR_RD_END without any readable bytes.
+    AcquisitionCompletionLogic::Ep4CompletionState state;
+
+    // When: The first EP4 snapshot reports DDR_RD_END=1 while DDR_WR_END is still low.
+    const auto startup = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 0u, 0u, 0, 1 },
+        0u);
+
+    // Then: The helper must ignore the stale completion and keep waiting for a real cycle.
+    TEST_ASSERT(startup.readableUpperBoundBytes == 0u, "TC-R-06 stale DDR_RD_END must not latch readable bytes");
+    TEST_ASSERT(!startup.activeCycleObserved, "TC-R-06 stale DDR_RD_END must not mark an active cycle");
+    TEST_ASSERT(!startup.acquisitionComplete, "TC-R-06 stale DDR_RD_END must not complete acquisition");
+}
+
+void Test_TC_R_07_StartupStaleDdrRdEndOnly_AllowsNextRealCycle()
+{
+    // Given: A fresh tracker that first sees stale DDR_RD_END only.
+    AcquisitionCompletionLogic::Ep4CompletionState state;
+
+    const auto startup = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 0u, 0u, 0, 1 },
+        0u);
+
+    // When: The stale bit clears and the next poll exposes a real active cycle.
+    const auto clear = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 0u, 0u, 0, 0 },
+        0u);
+    const auto measuring = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 256u, 0u, 0, 0 },
+        0u);
+
+    // Then: The stale completion is ignored and the following real cycle proceeds normally.
+    TEST_ASSERT(!startup.acquisitionComplete, "TC-R-07 startup stale DDR_RD_END must stay incomplete");
+    TEST_ASSERT(clear.readableUpperBoundBytes == 0u, "TC-R-07 clear poll must keep readable bytes at zero");
+    TEST_ASSERT(measuring.activeCycleObserved, "TC-R-07 first real measuring poll must mark an active cycle");
+    TEST_ASSERT(measuring.readableUpperBoundBytes == 288u, "TC-R-07 first real measuring poll must expose the new upper bound");
+}
+
 int main()
 {
     std::printf("=== AcquisitionCompletionLogic Unit Tests ===\n\n");
@@ -135,6 +179,8 @@ int main()
     RUN_TEST(Test_TC_R_03_DdrRdEnd_IsFinalCompletionSignal);
     RUN_TEST(Test_TC_R_04_ReadableUpperBound_CanGrowAfterDdrWrEnd);
     RUN_TEST(Test_TC_R_05_StartupStaleWaveWrCnt_IsIgnoredUntilClear);
+    RUN_TEST(Test_TC_R_06_StartupStaleDdrRdEndOnly_DoesNotCompleteImmediately);
+    RUN_TEST(Test_TC_R_07_StartupStaleDdrRdEndOnly_AllowsNextRealCycle);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);

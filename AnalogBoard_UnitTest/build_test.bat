@@ -69,6 +69,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionLogMessageFormatter_test.pdb AcquisitionLogMessageFormatter_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:AcquisitionLogMessageFormatter_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(AcquisitionLogMessageFormatter_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:Ep6TransferRetryPolicy_test.pdb Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
@@ -171,6 +179,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(WaveAcquisitionEngine_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%AcquisitionLogMessageFormatter_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(AcquisitionLogMessageFormatter_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

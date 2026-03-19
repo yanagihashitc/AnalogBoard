@@ -66,6 +66,27 @@ namespace WaveAcquisition
             observer->OnLog(message);
         }
 
+        void NotifyStartupSnapshot(
+            IAcquisitionObserver* observer,
+            INT pollIndex,
+            const DdrStatusSnapshot& snapshot,
+            size_t savedDdrBytes)
+        {
+            if (observer == nullptr)
+            {
+                return;
+            }
+
+            const std::wstring message =
+                L"[PR04][STARTUP_EP4] poll=" + std::to_wstring(pollIndex) +
+                L" WAVE_WR_CNT=" + std::to_wstring(snapshot.waveWrCnt) +
+                L" WAVE_RD_CNT=" + std::to_wstring(snapshot.waveRdCnt) +
+                L" DDR_WR_END=" + std::to_wstring(snapshot.ddrWrEnd) +
+                L" DDR_RD_END=" + std::to_wstring(snapshot.ddrRdEnd) +
+                L" savedBytes=" + std::to_wstring(savedDdrBytes);
+            observer->OnLog(message);
+        }
+
         void FinalizeSummary(
             IAcquisitionObserver* observer,
             AcquisitionSummary* summary,
@@ -407,6 +428,7 @@ namespace WaveAcquisition
 
         size_t savedDdrBytes = 0u;
         INT consecutiveTimeoutCount = 0;
+        INT startupObservationLogCount = 0;
         bool sawDdrWrEndClear = false;
         INT settlingPollCount = 0;
         AcquisitionCompletionLogic::Ep4CompletionState completionState = {};
@@ -448,6 +470,18 @@ namespace WaveAcquisition
             if (snapshot.ddrWrEnd == 0)
             {
                 sawDdrWrEndClear = true;
+            }
+
+            if (!completionState.activeCycleObserved &&
+                savedDdrBytes == 0u &&
+                startupObservationLogCount < 3)
+            {
+                ++startupObservationLogCount;
+                NotifyStartupSnapshot(
+                    observer_,
+                    startupObservationLogCount,
+                    snapshot,
+                    savedDdrBytes);
             }
 
             const bool isStartupStalePoll =

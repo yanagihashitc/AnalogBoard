@@ -60,8 +60,8 @@ namespace AcquisitionCompletionLogic
         const bool startupStaleCompletionSnapshot =
             !state->activeCycleObserved &&
             savedBytes == 0u &&
-            snapshot.ddrWrEnd == 1 &&
-            snapshot.ddrRdEnd == 1;
+            snapshot.ddrRdEnd == 1 &&
+            (snapshot.waveWrCnt == 0u || snapshot.ddrWrEnd == 1);
         if (startupStaleCompletionSnapshot)
         {
             decision.activeCycleObserved = state->activeCycleObserved;

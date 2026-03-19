@@ -9,6 +9,7 @@
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
+#include "AcquisitionLogMessageFormatter.h"
 #include "AcquisitionCompletionLogic.h"
 #include "AcquisitionPerfMetrics.h"
 #include "FileIoLoggingPolicy.h"
@@ -499,39 +500,10 @@ namespace
 			{
 				return;
 			}
-
-			CString line;
-			line.Format(
-				_T("[PR01][CYCLE] ep6Calls=%I64u ep6Bytes=%I64u ep6Timeouts=%lu ep6AvgMs=%I64u ep6MaxMs=%I64u saveCalls=%I64u saveBytes=%I64u saveAvgMs=%I64u saveMaxMs=%I64u ddrPolls=%lu ddrWaitPolls=%lu maxBacklogBytes=%lu WAVE_WR_CNT=%lu WAVE_RD_CNT=%lu DDR_WR_END=%d DDR_RD_END=%d timeoutReadSize=%lu timeoutUnreadBytes=%I64u timeoutReadableUpperBoundBytes=%I64u timeoutBacklogBytes=%lu timeoutWait=%d timeoutEp4Fail=%d status=%s error=%d ignoredTail=%lu publishedPairs=%d"),
-				summary.metrics.ep6.callCount,
-				summary.metrics.ep6.totalBytes,
-				summary.metrics.ep6TimeoutCount,
-				summary.metrics.GetEp6AverageElapsedMs(),
-				summary.metrics.ep6.maxElapsedMs,
-				summary.metrics.save.callCount,
-				summary.metrics.save.totalBytes,
-				summary.metrics.GetSaveAverageElapsedMs(),
-				summary.metrics.save.maxElapsedMs,
-				summary.metrics.ddrStatusPollCount,
-				summary.metrics.ddrWriteWaitPollCount,
-				summary.metrics.maxWaveBacklogBytes,
-				summary.metrics.latestWaveWrCnt,
-				summary.metrics.latestWaveRdCnt,
-				summary.metrics.latestDdrWrEnd,
-				summary.metrics.latestDdrRdEnd,
-				summary.metrics.timeout.requestedReadSizeBytes,
-				summary.metrics.timeout.unreadBytes,
-				summary.metrics.timeout.readableUpperBoundBytes,
-				summary.metrics.timeout.backlogBytes,
-				summary.metrics.timeout.waitTimeoutObserved ? 1 : 0,
-				summary.metrics.timeout.ep4ReadFailureObserved ? 1 : 0,
-				WaveAcquisition::WaveAcquisitionEngine::ToString(summary.terminalStatus),
-				summary.errorCode,
-				summary.ignoredTailBytes,
-				summary.publishedPairCount);
 			if (kEnablePhase0CycleSummaryLog)
 			{
-				curObject_->m_pMainDlg->PrintLog(line);
+				const std::wstring line = AcquisitionLogMessageFormatter::BuildCycleSummaryLog(summary);
+				curObject_->m_pMainDlg->PrintLog(line.c_str());
 			}
 		}
 
@@ -1935,12 +1907,14 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			strTmp.Format(_T("%d"), 0);
 			CurObject->m_CtrlEditCollectedCnt.SetWindowText(strTmp);
 
+			CurObject->m_pMainDlg->PrintLog(AcquisitionLogMessageFormatter::BuildEngineEnterLog().c_str());
 			const WaveAcquisition::AcquisitionSummary summary = RunAcquisitionCycleWithEngine(
 				CurObject,
 				strTimeStamp_use,
 				OneWaveSize_L,
 				OneWaveSize_H,
 				ulOneTimeMaxSize);
+			CurObject->m_pMainDlg->PrintLog(AcquisitionLogMessageFormatter::BuildEngineExitLog(summary).c_str());
 			ErrExit = summary.terminalStatus != WaveAcquisition::TerminalStatus::Success;
 			if (summary.terminalStatus == WaveAcquisition::TerminalStatus::Stopped)
 			{
