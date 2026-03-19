@@ -32,6 +32,7 @@ namespace
     constexpr ULONG kFrameSizeHigh = 4096u;
     constexpr ULONG kOneWaveSize = kFrameSizeLow + kFrameSizeHigh;
     constexpr wchar_t kStartupEp4LogPrefix[] = L"[PR04][STARTUP_EP4]";
+    constexpr wchar_t kTimeoutRecoveryLogPrefix[] = L"[PR04][TIMEOUT_RECOVERY]";
 
     std::array<BYTE, kEp4StatusBufferBytes> BuildStatusBuffer(const DdrStatusSnapshot& snapshot)
     {
@@ -75,6 +76,16 @@ namespace
         bool IsStopRequested() const override
         {
             return stopRequested;
+        }
+    };
+
+    struct FakePollWaiter : IPollWaiter
+    {
+        std::vector<DWORD> waits;
+
+        void Wait(DWORD milliseconds) override
+        {
+            waits.push_back(milliseconds);
         }
     };
 
@@ -446,6 +457,159 @@ void Test_TC_B_03_StartupEp4Observation_IsCappedToThreeLogs()
     TEST_ASSERT(CountLogsWithPrefix(observer, kStartupEp4LogPrefix) == 3u, "TC-B-03 startup EP4 logs should be capped to three");
 }
 
+void Test_TC_N_04_TimeoutRecoveryObservation_LogsTimeoutAndResumePlan()
+{
+    // Given: A recoverable timeout followed by a successful retry after the counters advance.
+    ScriptedUsbSession usb = {};
+    usb.snapshots = {
+        { 2u * kOneWaveSize, 0u, 0, 0 },
+        { 3u * kOneWaveSize, 0u, 0, 0 },
+        { 3u * kOneWaveSize, 3u * kOneWaveSize, 1, 1 }
+    };
+    usb.ep6Results = { kUsbErrTransferTimeout, kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    FakePollWaiter pollWaiter = {};
+    RunConfig config = MakeConfig(4u);
+    config.ep6TimeoutRetryLimit = 1;
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken, &pollWaiter);
+
+    // When: The engine retries after the first EP6 timeout.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The observer receives timeout and resume-plan diagnostics for the recovery path.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-N-04 terminal status should be success");
+    TEST_ASSERT(CountLogsWithPrefix(observer, kTimeoutRecoveryLogPrefix) == 2u, "TC-N-04 timeout recovery should log timeout and resume");
+    std::wstring timeoutLog;
+    std::wstring resumeLog;
+    for (const std::wstring& line : observer.logs)
+    {
+        if (line.find(kTimeoutRecoveryLogPrefix) != 0u)
+        {
+            continue;
+        }
+
+        if (line.find(L"phase=timeout") != std::wstring::npos)
+        {
+            timeoutLog = line;
+        }
+        if (line.find(L"phase=resume") != std::wstring::npos)
+        {
+            resumeLog = line;
+        }
+    }
+
+    TEST_ASSERT(timeoutLog.find(L"ordinal=1") != std::wstring::npos, "TC-N-04 timeout log should include ordinal");
+    TEST_ASSERT(timeoutLog.find(L"requestedReadSize=16384") != std::wstring::npos, "TC-N-04 timeout log should include requested read size");
+    TEST_ASSERT(resumeLog.find(L"ordinal=1") != std::wstring::npos, "TC-N-04 resume log should include ordinal");
+    TEST_ASSERT(resumeLog.find(L"nextPlannedReadSize=16384") != std::wstring::npos, "TC-N-04 resume log should include next planned read size");
+    TEST_ASSERT(resumeLog.find(L"retryBackoffMs=20") != std::wstring::npos, "TC-N-04 resume log should include retry backoff");
+    TEST_ASSERT(resumeLog.find(L"deltaWr=8192") != std::wstring::npos, "TC-N-04 resume log should include WAVE_WR delta");
+    TEST_ASSERT(resumeLog.find(L"deltaRd=0") != std::wstring::npos, "TC-N-04 resume log should include WAVE_RD delta");
+    size_t nonZeroWaitCount = 0u;
+    for (const DWORD waitMs : pollWaiter.waits)
+    {
+        if (waitMs > 0u)
+        {
+            ++nonZeroWaitCount;
+        }
+    }
+    TEST_ASSERT(nonZeroWaitCount == 1u, "TC-N-04 recovery backoff should be applied once");
+}
+
+void Test_TC_N_05_TimeoutRecoveryObservation_LogsSecondTerminalTimeout()
+{
+    // Given: Two consecutive timeouts occur and the retry budget is exhausted on the second one.
+    ScriptedUsbSession usb = {};
+    usb.snapshots = {
+        { 2u * kOneWaveSize, 0u, 0, 0 },
+        { 4u * kOneWaveSize, 0u, 0, 0 }
+    };
+    usb.ep6Results = { kUsbErrTransferTimeout, kUsbErrTransferTimeout };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    FakePollWaiter pollWaiter = {};
+    RunConfig config = MakeConfig(4u);
+    config.ep6TimeoutRetryLimit = 1;
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken, &pollWaiter);
+
+    // When: The second timeout ends the cycle.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The diagnostics retain both timeout ordinals and the terminal timeout request size.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Ep6Timeout, "TC-N-05 terminal status should be ep6_timeout");
+    TEST_ASSERT(CountLogsWithPrefix(observer, kTimeoutRecoveryLogPrefix) == 3u, "TC-N-05 timeout recovery should log timeout, resume, timeout");
+    size_t secondTimeoutCount = 0u;
+    for (const std::wstring& line : observer.logs)
+    {
+        if (line.find(kTimeoutRecoveryLogPrefix) == 0u &&
+            line.find(L"phase=timeout") != std::wstring::npos &&
+            line.find(L"ordinal=2") != std::wstring::npos &&
+            line.find(L"requestedReadSize=32768") != std::wstring::npos)
+        {
+            ++secondTimeoutCount;
+        }
+    }
+    TEST_ASSERT(secondTimeoutCount == 1u, "TC-N-05 second timeout log should be present once");
+    size_t nonZeroWaitCount = 0u;
+    for (const DWORD waitMs : pollWaiter.waits)
+    {
+        if (waitMs > 0u)
+        {
+            ++nonZeroWaitCount;
+        }
+    }
+    TEST_ASSERT(nonZeroWaitCount == 1u, "TC-N-05 recovery backoff should be applied once");
+}
+
+void Test_TC_B_04_TimeoutRecoveryObservation_IsSilentWithoutTimeout()
+{
+    // Given: The cycle completes without any EP6 timeout.
+    ScriptedUsbSession usb = {};
+    usb.snapshots = {
+        { 2u * kOneWaveSize, 0u, 0, 0 },
+        { 2u * kOneWaveSize, 2u * kOneWaveSize, 1, 1 }
+    };
+    usb.ep6Results = { kUsbSuccess };
+    FakeWavePairSink sink = {};
+    FakeObserver observer = {};
+    FakeStopToken stopToken = {};
+    const RunConfig config = MakeConfig(3u);
+    WaveAcquisitionEngine engine(&usb, &sink, &observer, &stopToken);
+
+    // When: The engine drains the cycle cleanly.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: No timeout recovery diagnostics are emitted.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Success, "TC-B-04 terminal status should be success");
+    TEST_ASSERT(CountLogsWithPrefix(observer, kTimeoutRecoveryLogPrefix) == 0u, "TC-B-04 timeout recovery log should stay silent");
+}
+
+void Test_TC_B_05_TimeoutRecoveryObservation_AllowsNullObserver()
+{
+    // Given: A timeout occurs while no observer is attached.
+    ScriptedUsbSession usb = {};
+    usb.snapshots = {
+        { 2u * kOneWaveSize, 0u, 0, 0 },
+        { 4u * kOneWaveSize, 0u, 0, 0 }
+    };
+    usb.ep6Results = { kUsbErrTransferTimeout, kUsbErrTransferTimeout };
+    FakeWavePairSink sink = {};
+    FakeStopToken stopToken = {};
+    RunConfig config = MakeConfig(4u);
+    config.ep6TimeoutRetryLimit = 1;
+    WaveAcquisitionEngine engine(&usb, &sink, nullptr, &stopToken);
+
+    // When: The cycle hits the terminal timeout without an observer.
+    const AcquisitionSummary summary = engine.RunCycle(config);
+
+    // Then: The timeout semantics are preserved without requiring a logging sink.
+    TEST_ASSERT(summary.terminalStatus == TerminalStatus::Ep6Timeout, "TC-B-05 terminal status should be ep6_timeout");
+    TEST_ASSERT(summary.errorCode == kUsbErrTransferTimeout, "TC-B-05 error code should stay as timeout");
+}
+
 int main()
 {
     std::printf("=== WaveAcquisitionEngine Unit Tests ===\n\n");
@@ -453,9 +617,13 @@ int main()
     RUN_TEST(Test_TC_N_01_PartialFinalPair_PublishesAtCycleEnd);
     RUN_TEST(Test_TC_N_02_NonFatalPublish_StillCompletesCycle);
     RUN_TEST(Test_TC_N_03_StartupEp4Observation_LogsSnapshotFields);
+    RUN_TEST(Test_TC_N_04_TimeoutRecoveryObservation_LogsTimeoutAndResumePlan);
+    RUN_TEST(Test_TC_N_05_TimeoutRecoveryObservation_LogsSecondTerminalTimeout);
     RUN_TEST(Test_TC_B_01_QueueFullTimeout_StopsReaderBeforeWriterCatchesUp);
     RUN_TEST(Test_TC_B_02_PublishSequence_KeepsCompletedPairsMonotonic);
     RUN_TEST(Test_TC_B_03_StartupEp4Observation_IsCappedToThreeLogs);
+    RUN_TEST(Test_TC_B_04_TimeoutRecoveryObservation_IsSilentWithoutTimeout);
+    RUN_TEST(Test_TC_B_05_TimeoutRecoveryObservation_AllowsNullObserver);
     RUN_TEST(Test_TC_I_01_LastNPlus1Probe_ObservesOnlyPublishedPairs);
 
     std::printf("\n=== Summary ===\n");

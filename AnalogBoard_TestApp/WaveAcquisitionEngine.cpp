@@ -6,12 +6,24 @@
 #include <thread>
 
 #include "AcquisitionCompletionLogic.h"
+#include "Ep6TimeoutRecoveryPolicy.h"
 #include "FpgaRegisterLogic.h"
 
 namespace WaveAcquisition
 {
     namespace
     {
+        struct TimeoutRecoveryObservation
+        {
+            bool pendingResumeLog = false;
+            bool shouldThrottleNextRead = false;
+            INT ordinal = 0;
+            ULONG requestedReadSizeBytes = 0u;
+            ULONGLONG unreadBytes = 0u;
+            ULONGLONG readableUpperBoundBytes = 0u;
+            DdrStatusSnapshot snapshot = {};
+        };
+
         bool IsStopRequested(IStopToken* stopToken)
         {
             return stopToken != nullptr && stopToken->IsStopRequested();
@@ -84,6 +96,89 @@ namespace WaveAcquisition
                 L" DDR_WR_END=" + std::to_wstring(snapshot.ddrWrEnd) +
                 L" DDR_RD_END=" + std::to_wstring(snapshot.ddrRdEnd) +
                 L" savedBytes=" + std::to_wstring(savedDdrBytes);
+            observer->OnLog(message);
+        }
+
+        void NotifyTimeoutRecoveryTimeout(
+            IAcquisitionObserver* observer,
+            INT ordinal,
+            ULONG requestedReadSizeBytes,
+            ULONGLONG unreadBytes,
+            ULONGLONG readableUpperBoundBytes,
+            const DdrStatusSnapshot& snapshot)
+        {
+            if (observer == nullptr)
+            {
+                return;
+            }
+
+            const ULONGLONG backlogBytes =
+                (snapshot.waveWrCnt >= snapshot.waveRdCnt) ? (snapshot.waveWrCnt - snapshot.waveRdCnt) : 0u;
+            const std::wstring message =
+                L"[PR04][TIMEOUT_RECOVERY] phase=timeout" +
+                std::wstring(L" ordinal=") + std::to_wstring(ordinal) +
+                L" requestedReadSize=" + std::to_wstring(requestedReadSizeBytes) +
+                L" unreadBytes=" + std::to_wstring(unreadBytes) +
+                L" readableUpperBoundBytes=" + std::to_wstring(readableUpperBoundBytes) +
+                L" backlogBytes=" + std::to_wstring(backlogBytes) +
+                L" WAVE_WR_CNT=" + std::to_wstring(snapshot.waveWrCnt) +
+                L" WAVE_RD_CNT=" + std::to_wstring(snapshot.waveRdCnt) +
+                L" DDR_WR_END=" + std::to_wstring(snapshot.ddrWrEnd) +
+                L" DDR_RD_END=" + std::to_wstring(snapshot.ddrRdEnd);
+            observer->OnLog(message);
+        }
+
+        void NotifyTimeoutRecoveryResume(
+            IAcquisitionObserver* observer,
+            const TimeoutRecoveryObservation& previousTimeout,
+            const DdrStatusSnapshot& currentSnapshot,
+            ULONGLONG currentUnreadBytes,
+            ULONGLONG currentReadableUpperBoundBytes,
+            ULONG nextPlannedReadSizeBytes,
+            bool drainingHintSeen,
+            DWORD retryBackoffMs)
+        {
+            if (observer == nullptr)
+            {
+                return;
+            }
+
+            const ULONGLONG previousBacklogBytes =
+                (previousTimeout.snapshot.waveWrCnt >= previousTimeout.snapshot.waveRdCnt)
+                ? (previousTimeout.snapshot.waveWrCnt - previousTimeout.snapshot.waveRdCnt)
+                : 0u;
+            const ULONGLONG currentBacklogBytes =
+                (currentSnapshot.waveWrCnt >= currentSnapshot.waveRdCnt)
+                ? (currentSnapshot.waveWrCnt - currentSnapshot.waveRdCnt)
+                : 0u;
+            const LONGLONG deltaWr =
+                static_cast<LONGLONG>(currentSnapshot.waveWrCnt) -
+                static_cast<LONGLONG>(previousTimeout.snapshot.waveWrCnt);
+            const LONGLONG deltaRd =
+                static_cast<LONGLONG>(currentSnapshot.waveRdCnt) -
+                static_cast<LONGLONG>(previousTimeout.snapshot.waveRdCnt);
+            const LONGLONG deltaBacklog =
+                static_cast<LONGLONG>(currentBacklogBytes) -
+                static_cast<LONGLONG>(previousBacklogBytes);
+            const std::wstring stage = drainingHintSeen ? L"draining" : L"active";
+            const std::wstring message =
+                L"[PR04][TIMEOUT_RECOVERY] phase=resume" +
+                std::wstring(L" ordinal=") + std::to_wstring(previousTimeout.ordinal) +
+                L" priorRequestedReadSize=" + std::to_wstring(previousTimeout.requestedReadSizeBytes) +
+                L" priorUnreadBytes=" + std::to_wstring(previousTimeout.unreadBytes) +
+                L" priorReadableUpperBoundBytes=" + std::to_wstring(previousTimeout.readableUpperBoundBytes) +
+                L" currentUnreadBytes=" + std::to_wstring(currentUnreadBytes) +
+                L" currentReadableUpperBoundBytes=" + std::to_wstring(currentReadableUpperBoundBytes) +
+                L" nextPlannedReadSize=" + std::to_wstring(nextPlannedReadSizeBytes) +
+                L" retryBackoffMs=" + std::to_wstring(retryBackoffMs) +
+                L" deltaWr=" + std::to_wstring(deltaWr) +
+                L" deltaRd=" + std::to_wstring(deltaRd) +
+                L" deltaBacklog=" + std::to_wstring(deltaBacklog) +
+                L" WAVE_WR_CNT=" + std::to_wstring(currentSnapshot.waveWrCnt) +
+                L" WAVE_RD_CNT=" + std::to_wstring(currentSnapshot.waveRdCnt) +
+                L" DDR_WR_END=" + std::to_wstring(currentSnapshot.ddrWrEnd) +
+                L" DDR_RD_END=" + std::to_wstring(currentSnapshot.ddrRdEnd) +
+                L" stage=" + stage;
             observer->OnLog(message);
         }
 
@@ -263,6 +358,34 @@ namespace WaveAcquisition
 
             return kUsbSuccess;
         }
+
+        std::pair<size_t, size_t> ResolveReadWindowBytes(
+            size_t unreadLogicalBytes,
+            ULONG maxReadChunkBytes,
+            bool drainingHintSeen)
+        {
+            size_t bytesToRead = (std::min)(static_cast<size_t>(maxReadChunkBytes), unreadLogicalBytes);
+            size_t logicalBytesFromRead = bytesToRead;
+            if (drainingHintSeen && bytesToRead == unreadLogicalBytes)
+            {
+                const size_t remainder = bytesToRead % kEp6ReadAlignmentBytes;
+                if (remainder != 0u)
+                {
+                    bytesToRead += kEp6ReadAlignmentBytes - remainder;
+                }
+            }
+            else
+            {
+                const size_t remainder = bytesToRead % kEp6ReadAlignmentBytes;
+                if (remainder != 0u)
+                {
+                    bytesToRead -= remainder;
+                    logicalBytesFromRead = bytesToRead;
+                }
+            }
+
+            return { bytesToRead, logicalBytesFromRead };
+        }
     }
 
     WaveAcquisitionEngine::WaveAcquisitionEngine(
@@ -429,8 +552,10 @@ namespace WaveAcquisition
         size_t savedDdrBytes = 0u;
         INT consecutiveTimeoutCount = 0;
         INT startupObservationLogCount = 0;
+        INT timeoutRecoveryOrdinal = 0;
         bool sawDdrWrEndClear = false;
         INT settlingPollCount = 0;
+        TimeoutRecoveryObservation timeoutRecovery = {};
         AcquisitionCompletionLogic::Ep4CompletionState completionState = {};
         std::vector<BYTE> ep4Buffer(kEp4StatusBufferBytes, 0u);
         std::vector<BYTE> transferBuffer;
@@ -518,24 +643,37 @@ namespace WaveAcquisition
                 continue;
             }
 
-            size_t bytesToRead = (std::min)(static_cast<size_t>(config.maxReadChunkBytes), unreadLogicalBytes);
-            size_t logicalBytesFromRead = bytesToRead;
-            if (completionDecision.drainingHintSeen && bytesToRead == unreadLogicalBytes)
+            const std::pair<size_t, size_t> readWindow = ResolveReadWindowBytes(
+                unreadLogicalBytes,
+                config.maxReadChunkBytes,
+                completionDecision.drainingHintSeen);
+            size_t bytesToRead = readWindow.first;
+            size_t logicalBytesFromRead = readWindow.second;
+            const bool shouldThrottleRetry = timeoutRecovery.shouldThrottleNextRead;
+            const DWORD retryBackoffMs =
+                Ep6TimeoutRecoveryPolicy::ResolveRetryBackoffMs(shouldThrottleRetry);
+            if (shouldThrottleRetry)
             {
-                const size_t remainder = bytesToRead % kEp6ReadAlignmentBytes;
-                if (remainder != 0u)
-                {
-                    bytesToRead += kEp6ReadAlignmentBytes - remainder;
-                }
+                bytesToRead = Ep6TimeoutRecoveryPolicy::ResolveRetryReadSizeBytes(
+                    bytesToRead,
+                    kEp6ReadAlignmentBytes,
+                    true);
+                logicalBytesFromRead = (std::min)(logicalBytesFromRead, bytesToRead);
+                timeoutRecovery.shouldThrottleNextRead = false;
             }
-            else
+
+            if (timeoutRecovery.pendingResumeLog)
             {
-                const size_t remainder = bytesToRead % kEp6ReadAlignmentBytes;
-                if (remainder != 0u)
-                {
-                    bytesToRead -= remainder;
-                    logicalBytesFromRead = bytesToRead;
-                }
+                NotifyTimeoutRecoveryResume(
+                    observer_,
+                    timeoutRecovery,
+                    snapshot,
+                    unreadLogicalBytes,
+                    completionDecision.readableUpperBoundBytes,
+                    static_cast<ULONG>(bytesToRead),
+                    completionDecision.drainingHintSeen,
+                    retryBackoffMs);
+                timeoutRecovery.pendingResumeLog = false;
             }
 
             if (bytesToRead == 0u)
@@ -551,6 +689,11 @@ namespace WaveAcquisition
                 return FinishAndReturn(settlingPollCount, sawDdrWrEndClear);
             }
 
+            if (retryBackoffMs > 0u)
+            {
+                WaitBeforeEp4Poll(pollWaiter_, retryBackoffMs);
+            }
+
             transferBuffer.resize(bytesToRead);
             const ULONGLONG ep6StartMs = ::GetTickCount64();
             const INT ep6Result = usbSession_->EP6_GetData(transferBuffer.data(), static_cast<ULONG>(bytesToRead));
@@ -562,6 +705,21 @@ namespace WaveAcquisition
 
             if (ep6Result == kUsbErrTransferTimeout)
             {
+                ++timeoutRecoveryOrdinal;
+                NotifyTimeoutRecoveryTimeout(
+                    observer_,
+                    timeoutRecoveryOrdinal,
+                    static_cast<ULONG>(bytesToRead),
+                    unreadLogicalBytes,
+                    completionDecision.readableUpperBoundBytes,
+                    snapshot);
+                timeoutRecovery.pendingResumeLog = true;
+                timeoutRecovery.ordinal = timeoutRecoveryOrdinal;
+                timeoutRecovery.requestedReadSizeBytes = static_cast<ULONG>(bytesToRead);
+                timeoutRecovery.unreadBytes = unreadLogicalBytes;
+                timeoutRecovery.readableUpperBoundBytes = completionDecision.readableUpperBoundBytes;
+                timeoutRecovery.snapshot = snapshot;
+                timeoutRecovery.shouldThrottleNextRead = true;
                 summary.metrics.RecordTimeoutTelemetry(
                     static_cast<ULONG>(bytesToRead),
                     unreadLogicalBytes,

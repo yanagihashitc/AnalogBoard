@@ -17,6 +17,7 @@
 #include <tchar.h>
 #include <new>
 #include "Ep6TransferRetryPolicy.h"
+#include "Ep6TransferTuningPolicy.h"
 #include "AnalogBoard_Dll.h"
 #include "..\CyLib\header\CyAPI.h"
 
@@ -238,6 +239,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 				else if ((pEpt->Attributes == 2) && (pEpt->Address == 0x86))
 				{
 					m_pInEndpt6 = pEpt;
+					Ep6TransferTuningPolicy::ApplyBulkInDefaults(&m_pInEndpt6->TimeOut);
 				}
 				else
 				{

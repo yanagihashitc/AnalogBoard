@@ -93,6 +93,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:Ep6TransferTuningPolicy_test.pdb Ep6TransferTuningPolicy_test.cpp /Fe:Ep6TransferTuningPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(Ep6TransferTuningPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:ReadRequestBurstPolicy_test.pdb ReadRequestBurstPolicy_test.cpp /Fe:ReadRequestBurstPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
@@ -227,6 +235,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(Ep6TransferRetryPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%Ep6TransferTuningPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(Ep6TransferTuningPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

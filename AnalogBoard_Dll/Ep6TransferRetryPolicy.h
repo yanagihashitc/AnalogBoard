@@ -2,10 +2,12 @@
 
 #include <windows.h>
 
+#include "Ep6TransferTuningPolicy.h"
+
 namespace Ep6TransferRetryPolicy
 {
-    constexpr int kEp6TimeoutRetryMaxRetries = 1;
-    constexpr DWORD kEp6TimeoutRetryBackoffMs = 1;
+    constexpr int kEp6TimeoutRetryMaxRetries = Ep6TransferTuningPolicy::kEp6TimeoutRetryMaxRetries;
+    constexpr DWORD kEp6TimeoutRetryBackoffMs = Ep6TransferTuningPolicy::kEp6TimeoutRetryBackoffMs;
 
     template <typename TransferFn, typename SleepFn>
     bool ExecuteWithRetry(
