@@ -76,7 +76,7 @@ The main working tree may still have local `CyAPI.lib` copies, but `git worktree
 
 ### References
 
-- `baseline/0.1.4-hw-recovery` worktree setup on 2026-03-12
+- `baseline/0.1.4-hw-recovery` worktree setup on 2026-03-12 (branch consolidated into `dev` on 2026-03-19)
 
 ---
 

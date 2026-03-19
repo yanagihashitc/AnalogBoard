@@ -1,6 +1,6 @@
 # Baseline Next
 
-対象 branch: `baseline/0.1.4-hw-recovery`
+対象 branch: `dev`
 
 ## Purpose
 

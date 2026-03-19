@@ -54,7 +54,7 @@
 
 ## Constraints
 
-- `baseline/0.1.4-hw-recovery` の PR-04 field gate とは切り分ける
+- `dev` の PR-04 field gate とは切り分ける
 - public API (`EP2_SendData`, `EP4_GetData`, `EP6_GetData`) は維持する
 - `Dialog1_Main` や acquisition semantics は new driver 対応だけを理由に広く触らない
 - full suite の既存 `WaveDataFileIO_test` failure は別件として扱う

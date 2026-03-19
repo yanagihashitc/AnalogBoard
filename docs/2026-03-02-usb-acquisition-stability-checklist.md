@@ -10,7 +10,7 @@ process log: [Process Log](./process_log/2026-03-02-usb-acquisition-stability-lo
 
 ## Current Execution Rule
 
-- **実装本線は `baseline/0.1.4-hw-recovery`**
+- **実装本線は `dev`**
 - **`lab/0.2.2-engine-semantics` は non-blocking な verification asset**
 - **Win11 new driver 対応は `feature/win11-driver-compat` worktree へ切り出した**
 - **日々の実行は [baseline_next.md](./baseline_next.md) / [lab_next.md](./lab_next.md) / [driver_next.md](./driver_next.md) を見る**

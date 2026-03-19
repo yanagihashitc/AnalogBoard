@@ -22,7 +22,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 
 - 実装の進捗と exit gate は [チェックリスト](./2026-03-02-usb-acquisition-stability-checklist.md) を見る
 - 判断の根拠、実機ログ、Red/Green/field validation の履歴は [process_log](./process_log/2026-03-02-usb-acquisition-stability-log.md) を見る
-- `baseline/0.1.4-hw-recovery` の次タスクは [baseline_next.md](./baseline_next.md) を見る
+- `dev` の次タスクは [baseline_next.md](./baseline_next.md) を見る
 - `lab/0.2.2-engine-semantics` の次タスクは [lab_next.md](./lab_next.md) を見る
 - `feature/win11-driver-compat` の次タスクは [driver_next.md](./driver_next.md) を見る
 - 設計詳細は [Architecture Notes](./2026-03-02-usb-acquisition-stability-architecture.md) を見る
@@ -31,7 +31,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 
 2026-03-18 時点の運用ルール:
 
-- **Phase 2 の実装本線は `baseline/0.1.4-hw-recovery`**
+- **Phase 2 の実装本線は `dev`**
 - **`lab/0.2.2-engine-semantics` は non-blocking な verification asset**
 - lab で有効性を確認した差分だけを baseline へ小さく戻す
 - `WaveAcquisitionEngine` / SimRunner / simulator の維持は重要だが、release-track Phase 2 着手の前提条件にはしない
@@ -42,7 +42,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 
 - 対象は **`Win11 + new Cypress/Infineon driver + matching SDK`**
 - 目的は `Get ep4 register data failed.` を先に消し、Win11 上で high-density acquisition / timeout を再評価できる状態へ戻すこと
-- この track は release-track (`baseline/0.1.4-hw-recovery`) の blocker ではなく、field gate と並走する investigation / compatibility work として扱う
+- この track は release-track (`dev`) の blocker ではなく、field gate と並走する investigation / compatibility work として扱う
 
 2026-03-19 時点の観測:
 
@@ -61,7 +61,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 
 ## 2026-03-12 Recovery Strategy
 
-- **release track**: `baseline/0.1.4-hw-recovery`
+- **release track**: `dev`
   - tag `0.1.4` から開始し、実機安定性を最優先にする
   - まず legacy acquisition loop の completion semantics だけを FPGA 仕様に合わせる
   - `DDR_WR_END` は draining 開始ヒント、`DDR_RD_END` を最終完了条件として扱う
@@ -76,7 +76,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 ### Recovery gates
 
 1. `0.1.4` を high-density 実機条件で 3-5 サイクル再取得し、failure signature を baseline と比較可能な形で再確認する
-2. `baseline/0.1.4-hw-recovery` 上で low-density semantic gate を通し、`ep6Timeouts=0` と `DDR_RD_END=1` 到達を 3-5 サイクルで確認する
+2. `dev` 上で low-density semantic gate を通し、`ep6Timeouts=0` と `DDR_RD_END=1` 到達を 3-5 サイクルで確認する
 3. high-density では timeout / disconnect / `DDR_RD_END=0` の failure を completion semantics と別問題として分類する
 4. SimRunner / UnitTest で `RD_WAIT` と stale status を再現できる状態にする
 5. release track が安定した後にだけ `WaveAcquisitionEngine` の段階再導入を検討する
@@ -87,10 +87,10 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 
 ### Branch convergence policy
 
-- 収束前は `baseline/0.1.4-hw-recovery` を code mainline とみなしてよい
-- `dev` は docs / plan / process log の正本を保持するが、host acquisition code の自動的な収束先とはみなさない
-- 一時 branch を閉じるときは、branch 自体を残すことより「必須 change が surviving development branch に移り切っていること」を優先する
-- 最終形は `main` と開発用 branch 1 本でよく、その branch 名は収束時点で確定する
+- `dev` を code mainline とし、`main` へは PR 経由でマージする
+- `dev` は docs / plan / process log と host acquisition code の両方を保持する
+- 一時 branch を閉じるときは、branch 自体を残すことより「必須 change が `dev` に移り切っていること」を優先する
+- 運用形は `main` + `dev` の 2 ブランチ体制で確定した (2026-03-19)
 
 ## 前提方針（FPGA Firmware A 非改変）
 
