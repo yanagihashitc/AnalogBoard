@@ -1,0 +1,334 @@
+# Build Troubleshooting
+
+## LNK1181: `AnalogBoard_Dll.lib` missing when rebuilding TestApp alone after a clean
+
+**Date**: 2026-03-17
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_TestApp:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1"` fails in a clean worktree
+- Link step reports `fatal error LNK1181: 入力ファイル '..\x64\Release\AnalogBoard_Dll.lib' を開けません`
+- Re-running `AnalogBoard_Dll:Rebuild` first makes the same TestApp rebuild succeed
+
+### Root Cause
+
+`AnalogBoard_TestApp.vcxproj` links against `..\x64\Release\AnalogBoard_Dll.lib`, but the `AnalogBoard_TestApp:Rebuild` target alone does not guarantee that the DLL project has already produced the import library in the current clean tree. After a clean, the TestApp link step runs before the expected `.lib` exists.
+
+### Failed Approaches
+
+1. Re-running the TestApp-only rebuild without rebuilding the DLL project first
+
+### Solution
+
+1. Rebuild the DLL project first:
+   - `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_Dll:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1"`
+2. Rebuild the TestApp project next:
+   - `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_TestApp:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1"`
+3. If both outputs are needed regularly, keep using the explicit DLL -> TestApp order in automation and ad-hoc verification
+
+### Related Files
+
+- `AnalogBoard_TestApp/AnalogBoard_TestApp.vcxproj`
+- `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
+- `scripts/run_with_vsdevcmd.bat`
+
+---
+
+## LNK1181: `CyAPI.lib` missing in a newly created worktree
+
+**Date**: 2026-03-12
+**Category**: build
+**Severity**: major
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_Dll:Rebuild /p:Configuration=Release /p:Platform=x64 /m:1"` fails in a new worktree
+- Link step reports `fatal error LNK1181: 入力ファイル 'CyAPI.lib' を開けません`
+- `AnalogBoard_Dll.vcxproj` expects `..\CyLib\x64\CyAPI.lib`
+
+### Root Cause
+
+`CyLib\x64` and `CyLib\x86` are ignored by `.gitignore` because of the repository-wide `x64/` rule.  
+The main working tree may still have local `CyAPI.lib` copies, but `git worktree add` does not bring ignored local files into the new worktree, so the linker cannot find `CyAPI.lib`.
+
+### Failed Approaches
+
+1. Re-running the same `msbuild` command without restoring `CyLib\x64\CyAPI.lib`
+
+### Solution
+
+1. Create `CyLib\x64` and `CyLib\x86` inside the new worktree if they do not exist
+2. Copy `CyAPI.lib` from an existing working tree or the original Cypress SDK drop:
+   - `copy ..\AnalogBoard\CyLib\x64\CyAPI.lib CyLib\x64\CyAPI.lib`
+   - `copy ..\AnalogBoard\CyLib\x86\CyAPI.lib CyLib\x86\CyAPI.lib`
+3. Re-run the DLL rebuild command
+4. Verify that `AnalogBoard_Dll.dll` is produced successfully
+
+### Related Files
+
+- `.gitignore`
+- `CyLib/x64/CyAPI.lib`
+- `CyLib/x86/CyAPI.lib`
+- `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
+- `scripts/run_with_vsdevcmd.bat`
+
+### References
+
+- `baseline/0.1.4-hw-recovery` worktree setup on 2026-03-12
+
+---
+
+## MSB3491 when parallel `run_simulation.bat` rebuilds lock `AnalogBoard_SimRunner.Build.CppClean.log`
+
+**Date**: 2026-03-12
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- Two simulation presets are launched in parallel with `cmd /d /c "scripts\run_with_vsdevcmd.bat scripts\run_simulation.bat ..."`
+- One invocation fails during `AnalogBoard_SimRunner:Rebuild`
+- MSBuild reports `error MSB3491` and says `AnalogBoard_SimRunner.Build.CppClean.log` is in use by another process
+
+### Root Cause
+
+`scripts\run_simulation.bat` rebuilds `AnalogBoard_SimRunner` before running a preset. When two preset commands run at the same time, both `Rebuild` steps try to clean and rewrite the same `AnalogBoard_SimRunner.Build.CppClean.log`, so one process loses the file lock race.
+
+### Failed Approaches
+
+1. Launching multiple `scripts\run_simulation.bat` commands in parallel against the same working tree
+
+### Solution
+
+1. Run simulation preset commands serially
+2. If multiple presets are needed, finish one `run_simulation.bat` invocation before starting the next
+3. Alternatively, rebuild `AnalogBoard_SimRunner` once and invoke the built executable directly for repeated preset runs
+
+### Related Files
+
+- `scripts/run_simulation.bat`
+- `AnalogBoard_SimRunner/AnalogBoard_SimRunner.vcxproj`
+- `AnalogBoard_TestApp.sln`
+
+---
+
+## MSB4057 when invoking `AnalogBoard_UnitTest:Rebuild` on the solution
+
+**Date**: 2026-03-06
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_UnitTest:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"` fails immediately
+- MSBuild reports `error MSB4057: ターゲット "AnalogBoard_UnitTest:Rebuild" はプロジェクト内に存在しません`
+
+### Root Cause
+
+`AnalogBoard_UnitTest` is not a project target inside `AnalogBoard_TestApp.sln`. The unit tests in this repository are built by `AnalogBoard_UnitTest/build_test.bat`, which compiles the standalone test executables directly with `cl`.
+
+### Failed Approaches
+
+1. Running `msbuild` with `/t:AnalogBoard_UnitTest:Rebuild` against the solution file
+
+### Solution
+
+Use one of the following verified commands depending on the goal:
+
+- Unit tests only:
+  `cmd /d /c "scripts\run_with_vsdevcmd.bat AnalogBoard_UnitTest\build_test.bat"`
+- Full Debug rebuild:
+  `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"`
+
+### Related Files
+
+- `AnalogBoard_UnitTest/build_test.bat`
+- `AnalogBoard_TestApp.sln`
+- `AGENTS.md`
+
+---
+
+## Parallel `cl` invocations hit C1041 on shared `vc140.pdb`
+
+**Date**: 2026-03-18
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- Standalone `cl`-based unit-test builds fail intermittently during `build_test.bat`
+- One compile fails with `fatal error C1041: プログラム データベース '...\\vc140.pdb' を開けません`
+- The message suggests `/FS` because multiple `CL.EXE` processes are writing the same PDB
+
+### Root Cause
+
+Standalone `cl` commands default to the same `vc140.pdb` output when no explicit `/Fd` is provided. Even when the commands are launched sequentially from `build_test.bat`, a later invocation can still collide with the shared PDB server state from the previous compile. `/FS` helps serialization, but the robust fix is to stop sharing the same default PDB at all.
+
+### Failed Approaches
+
+1. Running multiple standalone `cl` commands without distinct `/Fd`
+2. Adding `/FS` alone while still letting every compile target the same default `vc140.pdb`
+
+### Solution
+
+Use these verified mitigations:
+
+1. Add `/FS` to each standalone `cl` invocation
+2. Assign a unique `/Fd:<test>.pdb` to each compile command in `AnalogBoard_UnitTest\\build_test.bat`
+3. Keep the test compiles sequential
+4. Re-run `build_test.bat` and confirm the full suite passes
+
+### Related Files
+
+- `AnalogBoard_UnitTest/build_test.bat`
+- `AnalogBoard_UnitTest/UsbTransferHelpers_test.cpp`
+- `AnalogBoard_UnitTest/WaveAcquisitionEngine_test.cpp`
+
+---
+
+## MSB4184 when `msbuild` cannot access `C:\Users\...\Microsoft SDKs`
+
+**Date**: 2026-03-09
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"` fails immediately
+- MSBuild reports `error MSB4184` while evaluating `GetLatestSDKTargetPlatformVersion(Windows, 10.0)`
+- The inner message says `Access to the path 'C:\Users\chiccho\AppData\Local\Microsoft SDKs' is denied`
+
+### Root Cause
+
+The solution rebuild touches the Windows SDK discovery path under the user profile. In the sandboxed agent environment, that path is readable only when the command is run with elevated permissions, so the regular `msbuild` invocation fails before project evaluation finishes.
+
+### Failed Approaches
+
+1. Running the full solution rebuild inside the default sandbox
+
+### Solution
+
+Re-run the exact same `msbuild` command with escalated permissions enabled for the agent session. The rebuild then succeeds without any source changes.
+
+### Related Files
+
+- `scripts/run_with_vsdevcmd.bat`
+- `AnalogBoard_TestApp.sln`
+- `AnalogBoard_TestApp/AnalogBoard_TestApp.vcxproj`
+- `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
+
+---
+
+## LNK4098 in `Debug|x64` because `CyAPI.lib` pulls `LIBCMT`
+
+**Date**: 2026-03-11
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /t:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1"` succeeds but emits:
+  - `LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs`
+- Warning is reported from `AnalogBoard_Dll.vcxproj`
+
+### Root Cause
+
+`CyLib\x64\CyAPI.lib` contains the linker directive `/DEFAULTLIB:LIBCMT`.  
+`AnalogBoard_Dll` Debug build uses the dynamic debug CRT (`/MDd`), so the linker sees a static CRT request from `CyAPI.lib` and reports `LNK4098`.
+
+### Failed Approaches
+
+1. Treating the warning as originating from the DLL project itself without inspecting dependency directives
+
+### Solution
+
+1. Confirm the dependency directive with:
+   - `cmd /d /c "scripts\run_with_vsdevcmd.bat dumpbin /directives CyLib\x64\CyAPI.lib"`
+2. Mirror the existing Release workaround in `AnalogBoard_Dll.vcxproj`
+3. Add `LIBCMT` to `IgnoreSpecificDefaultLibraries` for `Debug|x64`
+4. Re-run the full `Debug|x64` rebuild and confirm it finishes with `0 warning / 0 error`
+
+### Related Files
+
+- `CyLib/x64/CyAPI.lib`
+- `AnalogBoard_Dll/AnalogBoard_Dll.vcxproj`
+- `AnalogBoard_TestApp.sln`
+
+---
+
+## C4996 / STL4017 when simulation code uses `<codecvt>` in VS2022
+
+**Date**: 2026-03-11
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- `msbuild AnalogBoard_TestApp.sln /t:AnalogBoard_SimRunner:Rebuild /p:Configuration=Debug /p:Platform=x64 /m:1` fails in `SimulationRunnerCore.cpp` / `SimulationScenario.cpp`
+- Compiler reports `error C4996` for `std::codecvt_utf8_utf16`
+- The nested warning text is `STL4017` about `<codecvt>` deprecation in C++17
+
+### Root Cause
+
+The VS2022 STL marks `<codecvt>` helpers such as `std::codecvt_utf8_utf16` as deprecated in C++17. In this repository, the standalone simulation project treats that deprecation as `C4996`, so using locale facets based on `<codecvt>` breaks the build.
+
+### Failed Approaches
+
+1. Using `std::wifstream` / `std::wofstream` with `std::locale(..., new std::codecvt_utf8_utf16<wchar_t>)`
+
+### Solution
+
+1. Remove `<codecvt>` usage from the simulation code
+2. Read JSON as UTF-8 bytes with `std::ifstream`
+3. Convert UTF-8 to UTF-16 with `MultiByteToWideChar`
+4. Convert UTF-16 to UTF-8 with `WideCharToMultiByte` when writing `runner.log` / `summary.json`
+5. Re-run the SimRunner rebuild and confirm it succeeds
+
+### Related Files
+
+- `AnalogBoard_SimRunner/SimulationScenario.cpp`
+- `AnalogBoard_SimRunner/SimulationRunnerCore.cpp`
+- `AnalogBoard_SimRunner/AnalogBoard_SimRunner.vcxproj`
+
+---
+
+## C2589/C4003 when `std::numeric_limits::min/max` collides with Windows macros
+
+**Date**: 2026-03-11
+**Category**: build
+**Severity**: minor
+
+### Symptoms
+
+- A standalone `cl` build of `SimulationScenario.cpp` fails after adding `std::numeric_limits<...>::min()` / `max()`
+- The compiler reports:
+  - `warning C4003: 関数に似たマクロ呼び出し 'max' の引数が不足しています`
+  - `error C2589: '(' : スコープ解決演算子 (::) の右側にあるトークンは使えません`
+
+### Root Cause
+
+`windows.h` defines `min` and `max` as macros unless `NOMINMAX` is set.  
+Those macros expand inside `std::numeric_limits<T>::min()` / `max()` and break parsing in MSVC.
+
+### Failed Approaches
+
+1. Calling `std::numeric_limits<T>::min()` / `max()` directly in a translation unit that already includes `windows.h`
+
+### Solution
+
+1. Keep using `std::numeric_limits`
+2. Call the functions with macro-safe syntax:
+   - `(std::numeric_limits<T>::min)()`
+   - `(std::numeric_limits<T>::max)()`
+3. Re-run the standalone `cl` build or project rebuild to confirm the errors disappear
+
+### Related Files
+
+- `AnalogBoard_SimRunner/SimulationScenario.cpp`
+- `AnalogBoard_UnitTest/SimulationScenario_test.cpp`
+
+### References
+
+- none
