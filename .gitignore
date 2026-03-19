@@ -57,12 +57,19 @@ ehthumbs.db
 .claude/
 .cursor/
 .codex/
+.vscode/
+.tmp.driveupload/
+.tmp.drivedownload/
 AGENTS.md
-docs/
 CLAUDE.md
 FPGA_FW/
 ref/
-data/
+data/*
+!data/sim_scenarios/
+!data/sim_scenarios/*.json
+memo.md
+branch_plan/*
+FX3/
 
 # Coverage artifacts
 coverage/
@@ -73,6 +80,3 @@ coverage/
 # unit test temporary outputs
 tmp_wave_data_io_*/
 AnalogBoard_UnitTest/tmp_wave_data_io_*/
-
-# temporary upload artifacts
-.tmp.driveupload/
