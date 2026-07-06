@@ -15,6 +15,12 @@
 [Rr]eleasePublic/
 x64/
 x86/
+# Cypress CyAPI static libs are required to build AnalogBoard_Dll and are not
+# reproducible from source — keep them tracked despite the x64//x86/ ignores.
+!CyLib/x64/
+!CyLib/x86/
+!CyLib/x64/CyAPI.lib
+!CyLib/x86/CyAPI.lib
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
@@ -57,6 +63,7 @@ ehthumbs.db
 .claude/
 .cursor/
 .codex/
+.sbxmounts
 .vscode/
 .tmp.driveupload/
 .tmp.drivedownload/
@@ -70,6 +77,9 @@ data/*
 memo.md
 branch_plan/*
 FX3/
+tasks/
+claudebox-codexbox-agmsg-setup.html
+data/
 
 # Coverage artifacts
 coverage/
