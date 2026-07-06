@@ -101,6 +101,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:UsbEndpointDiscoveryPolicy_test.pdb UsbEndpointDiscoveryPolicy_test.cpp /Fe:UsbEndpointDiscoveryPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(UsbEndpointDiscoveryPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
 call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:ReadRequestBurstPolicy_test.pdb ReadRequestBurstPolicy_test.cpp /Fe:ReadRequestBurstPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
@@ -243,6 +251,14 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(Ep6TransferTuningPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%UsbEndpointDiscoveryPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(UsbEndpointDiscoveryPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

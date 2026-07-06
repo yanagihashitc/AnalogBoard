@@ -16,8 +16,10 @@
 #include <winioctl.h>
 #include <tchar.h>
 #include <new>
+#include <cstdint>
 #include "Ep6TransferRetryPolicy.h"
 #include "Ep6TransferTuningPolicy.h"
+#include "UsbEndpointDiscoveryPolicy.h"
 #include "AnalogBoard_Dll.h"
 #include "..\CyLib\header\CyAPI.h"
 
@@ -121,9 +123,10 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 	INT iEptCount = 0;		//The EndPoint number
 	INT iDevIndex = 0;		//The device index 
 	INT iIntfcIndex = 0;	//The interface index 
-	INT iEndPointIndex = 0;	//The EndPoint index 
+	INT iEndPointIndex = 0;	//The EndPoint index
 	INT iDevNum = 0;		//The device num
 	CCyUSBEndPoint* pEpt = NULL;
+	bool endpointResolved = false;
 
 	if (!Hwd)
 	{
@@ -190,6 +193,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 		/* Returns the number of alternate interfaces exposed by the device */
 		iIntfcCount = m_pUSBDevice->AltIntfcCount() + 1;
+		UsbEndpointDiscoveryPolicy::AltEndpointSelectionState endpointSelection;
 
 		for (iIntfcIndex = 0; iIntfcIndex < iIntfcCount; iIntfcIndex++)
 		{
@@ -205,6 +209,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 			/* Returns the number of endpoints exposed by the currently selected interface (or Alternate Interface) plus 1 */
 			iEptCount = m_pUSBDevice->EndPointCount();
+			UsbEndpointDiscoveryPolicy::EndpointDiscoveryState endpointState;
 
 			/* Fill the EndPointsBox */
 			for (iEndPointIndex = 1; iEndPointIndex < iEptCount; iEndPointIndex++)
@@ -214,39 +219,65 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 				if (!pEpt)
 				{
-					if (iEndPointIndex + 1 == iEptCount)
-					{
-						return USB_ERR_INVALID_ENDPOINTER;
-					}
 					continue;
 				}
 
-				if (pEpt->Attributes == 3)//Interrupt type
-				{
-					/* Set the In/Out Endpoint. Must Correspond with Firm Set */
-					switch (pEpt->Address)
-					{
-					case 0x02:
-						m_pOutEndpt2 = pEpt;
-						break;
-					case 0x84:
-						m_pInEndpt4 = pEpt;
-						break;
-					default:
-						return USB_ERR_INVALID_ENDPOINTER;
-					}
-				}
-				else if ((pEpt->Attributes == 2) && (pEpt->Address == 0x86))
-				{
-					m_pInEndpt6 = pEpt;
-					Ep6TransferTuningPolicy::ApplyBulkInDefaults(&m_pInEndpt6->TimeOut);
-				}
-				else
-				{
-					//do nothing
-				}
+				endpointState.VisitEndpoint(
+					reinterpret_cast<std::uintptr_t>(pEpt),
+					static_cast<std::uint8_t>(pEpt->Address),
+					static_cast<std::uint8_t>(pEpt->Attributes));
+			}
+
+			if (endpointState.IsComplete())
+			{
+				endpointSelection.ConsiderAlt(iIntfcIndex, endpointState);
 			}
 		}
+
+		if (endpointSelection.HasSelection())
+		{
+			if (m_pUSBDevice->SetAltIntfc(endpointSelection.SelectedAltIndex()) != TRUE)
+			{
+				return USB_ERR_SETINTERFACE_FAILED;
+			}
+
+			UsbEndpointDiscoveryPolicy::EndpointDiscoveryState selectedEndpointState;
+			iEptCount = m_pUSBDevice->EndPointCount();
+			for (iEndPointIndex = 1; iEndPointIndex < iEptCount; iEndPointIndex++)
+			{
+				pEpt = m_pUSBDevice->EndPoints[iEndPointIndex];
+
+				if (!pEpt)
+				{
+					continue;
+				}
+
+				selectedEndpointState.VisitEndpoint(
+					reinterpret_cast<std::uintptr_t>(pEpt),
+					static_cast<std::uint8_t>(pEpt->Address),
+					static_cast<std::uint8_t>(pEpt->Attributes));
+			}
+
+			if (!selectedEndpointState.IsComplete())
+			{
+				return USB_ERR_INVALID_ENDPOINTER;
+			}
+
+			m_pOutEndpt2 = reinterpret_cast<CCyUSBEndPoint*>(selectedEndpointState.Ep2Token());
+			m_pInEndpt4 = reinterpret_cast<CCyUSBEndPoint*>(selectedEndpointState.Ep4Token());
+			m_pInEndpt6 = reinterpret_cast<CCyUSBEndPoint*>(selectedEndpointState.Ep6Token());
+			Ep6TransferTuningPolicy::ApplyBulkInDefaults(&m_pInEndpt6->TimeOut);
+			endpointResolved = true;
+			break;
+		}
+	}
+
+	if (!endpointResolved)
+	{
+		m_pOutEndpt2 = NULL;
+		m_pInEndpt4 = NULL;
+		m_pInEndpt6 = NULL;
+		return USB_ERR_INVALID_ENDPOINTER;
 	}
 
 	isConnected = TRUE;
