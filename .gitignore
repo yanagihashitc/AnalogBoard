@@ -63,6 +63,7 @@ ehthumbs.db
 .claude/
 .cursor/
 .codex/
+.sbxmounts
 .vscode/
 .tmp.driveupload/
 .tmp.drivedownload/
@@ -76,6 +77,8 @@ data/*
 memo.md
 branch_plan/*
 FX3/
+tasks/
+claudebox-codexbox-agmsg-setup.html
 
 # Coverage artifacts
 coverage/

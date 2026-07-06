@@ -1,0 +1,19 @@
+--- origin/dev:docs/archive/2026-03-12-host-fpga-acquisition-reference.md
++++ temp:docs/archive/2026-03-12-host-fpga-acquisition-reference.md
+@@ -15,11 +15,11 @@
+ ## 先に見るべき source of truth
+ 
+ - 仕様書: [`FPGA_FW/シスメックス株式会社様向け広帯域波形処理システム開発_FPGA設計仕様書_Rev1.0_241220.docx`](../FPGA_FW/シスメックス株式会社様向け広帯域波形処理システム開発_FPGA設計仕様書_Rev1.0_241220.docx)
+-- FPGA top wiring: [`FPGA_TOP.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/FPGA_TOP.vhd)
+-- measurement state machine: [`MEAS_CTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/MEAS_CTRL/MEAS_CTRL.vhd)
+-- DDR write control: [`DDR3_WCTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/DDR3_WCTRL/DDR3_WCTRL.vhd)
+-- DDR read control: [`DDR3_RCTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/DDR3_RCTRL/DDR3_RCTRL.vhd)
+-- register exposure: [`REG_CTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/REG_CTRL/REG_CTRL.vhd)
++- FPGA top wiring: [`FPGA_TOP.vhd`](../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/FPGA_TOP.vhd)
++- measurement state machine: [`MEAS_CTRL.vhd`](../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/MEAS_CTRL/MEAS_CTRL.vhd)
++- DDR write control: [`DDR3_WCTRL.vhd`](../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/DDR3_WCTRL/DDR3_WCTRL.vhd)
++- DDR read control: [`DDR3_RCTRL.vhd`](../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/DDR3_RCTRL/DDR3_RCTRL.vhd)
++- register exposure: [`REG_CTRL.vhd`](../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/REG_CTRL/REG_CTRL.vhd)
+ 
+ 仕様書では特に以下の節を先に読む。
+ 

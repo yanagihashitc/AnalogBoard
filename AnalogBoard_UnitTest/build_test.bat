@@ -13,7 +13,7 @@ if not exist "%RUN_WITH_VSDEVCMD%" (
 
 cd /d "%SCRIPT_DIR%"
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:FpgaRegisterLogic_test.pdb FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:FpgaRegisterLogic_test.pdb FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FpgaRegisterLogic_test^) ===
@@ -21,7 +21,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:WaveDataFileIO_test.pdb WaveDataFileIO_test.cpp /Fe:WaveDataFileIO_test.exe /link /DEBUG bcrypt.lib
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:WaveDataFileIO_test.pdb WaveDataFileIO_test.cpp /Fe:WaveDataFileIO_test.exe /link /DEBUG bcrypt.lib
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WaveDataFileIO_test^) ===
@@ -29,7 +29,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:SavePathValidation_test.pdb SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:SavePathValidation_test.pdb SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(SavePathValidation_test^) ===
@@ -37,7 +37,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionPerfMetrics_test.pdb AcquisitionPerfMetrics_test.cpp /Fe:AcquisitionPerfMetrics_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:AcquisitionPerfMetrics_test.pdb AcquisitionPerfMetrics_test.cpp /Fe:AcquisitionPerfMetrics_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionPerfMetrics_test^) ===
@@ -45,7 +45,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionCompletionLogic_test.pdb AcquisitionCompletionLogic_test.cpp /Fe:AcquisitionCompletionLogic_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:AcquisitionCompletionLogic_test.pdb AcquisitionCompletionLogic_test.cpp /Fe:AcquisitionCompletionLogic_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionCompletionLogic_test^) ===
@@ -53,7 +53,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:BlockingQueue_test.pdb BlockingQueue_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:BlockingQueue_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:BlockingQueue_test.pdb BlockingQueue_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:BlockingQueue_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(BlockingQueue_test^) ===
@@ -61,7 +61,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:WaveAcquisitionEngine_test.pdb WaveAcquisitionEngine_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:WaveAcquisitionEngine_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:WaveAcquisitionEngine_test.pdb WaveAcquisitionEngine_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:WaveAcquisitionEngine_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WaveAcquisitionEngine_test^) ===
@@ -69,7 +69,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionLogMessageFormatter_test.pdb AcquisitionLogMessageFormatter_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:AcquisitionLogMessageFormatter_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:AcquisitionLogMessageFormatter_test.pdb AcquisitionLogMessageFormatter_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:AcquisitionLogMessageFormatter_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionLogMessageFormatter_test^) ===
@@ -77,7 +77,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionRunMetadata_test.pdb AcquisitionRunMetadata_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:AcquisitionRunMetadata_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:AcquisitionRunMetadata_test.pdb AcquisitionRunMetadata_test.cpp ..\AnalogBoard_TestApp\WaveAcquisitionEngine.cpp /Fe:AcquisitionRunMetadata_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionRunMetadata_test^) ===
@@ -85,7 +85,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:Ep6TransferRetryPolicy_test.pdb Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:Ep6TransferRetryPolicy_test.pdb Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(Ep6TransferRetryPolicy_test^) ===
@@ -93,7 +93,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:Ep6TransferTuningPolicy_test.pdb Ep6TransferTuningPolicy_test.cpp /Fe:Ep6TransferTuningPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:Ep6TransferTuningPolicy_test.pdb Ep6TransferTuningPolicy_test.cpp /Fe:Ep6TransferTuningPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(Ep6TransferTuningPolicy_test^) ===
@@ -101,7 +101,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:UsbEndpointDiscoveryPolicy_test.pdb UsbEndpointDiscoveryPolicy_test.cpp /Fe:UsbEndpointDiscoveryPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:UsbEndpointDiscoveryPolicy_test.pdb UsbEndpointDiscoveryPolicy_test.cpp /Fe:UsbEndpointDiscoveryPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(UsbEndpointDiscoveryPolicy_test^) ===
@@ -109,7 +109,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:ReadRequestBurstPolicy_test.pdb ReadRequestBurstPolicy_test.cpp /Fe:ReadRequestBurstPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:ReadRequestBurstPolicy_test.pdb ReadRequestBurstPolicy_test.cpp /Fe:ReadRequestBurstPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(ReadRequestBurstPolicy_test^) ===
@@ -117,7 +117,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /DUNICODE /D_UNICODE /I".." /Fd:FileLogger_test.pdb FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /DUNICODE /D_UNICODE /I".." /Fd:FileLogger_test.pdb FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileLogger_test^) ===
@@ -125,7 +125,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:FileIoLoggingPolicy_test.pdb FileIoLoggingPolicy_test.cpp /Fe:FileIoLoggingPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:FileIoLoggingPolicy_test.pdb FileIoLoggingPolicy_test.cpp /Fe:FileIoLoggingPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileIoLoggingPolicy_test^) ===
@@ -133,7 +133,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:WavePairPublishPolicy_test.pdb WavePairPublishPolicy_test.cpp /Fe:WavePairPublishPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:WavePairPublishPolicy_test.pdb WavePairPublishPolicy_test.cpp /Fe:WavePairPublishPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WavePairPublishPolicy_test^) ===
@@ -141,7 +141,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:DialogMainBindingPolicy_test.pdb DialogMainBindingPolicy_test.cpp /Fe:DialogMainBindingPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:DialogMainBindingPolicy_test.pdb DialogMainBindingPolicy_test.cpp /Fe:DialogMainBindingPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(DialogMainBindingPolicy_test^) ===
@@ -149,7 +149,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /I".." /Fd:AcquisitionCycleRecoveryPolicy_test.pdb AcquisitionCycleRecoveryPolicy_test.cpp /Fe:AcquisitionCycleRecoveryPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /FS /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." /Fd:AcquisitionCycleRecoveryPolicy_test.pdb AcquisitionCycleRecoveryPolicy_test.cpp /Fe:AcquisitionCycleRecoveryPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionCycleRecoveryPolicy_test^) ===
