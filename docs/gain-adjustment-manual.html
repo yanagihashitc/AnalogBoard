@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnalogBoard ゲイン調整マニュアル</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3a;
+    --txt:#e6e9ef; --muted:#9aa3b2; --accent:#4cc4ff; --accent2:#7ce08a;
+    --warn:#ffb454; --bad:#ff6b6b; --chip:#222836;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+    line-height:1.7;font-size:15px}
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.5px}
+  h2{font-size:20px;margin:38px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:22px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);margin-top:0}
+  p{margin:10px 0}
+  code{background:var(--chip);padding:2px 6px;border-radius:4px;font-size:13px;
+    font-family:"Cascadia Code",Consolas,monospace}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:18px 20px;margin:16px 0}
+  .key{border-left:4px solid var(--accent)}
+  .good{border-left:4px solid var(--accent2)}
+  .warnbox{border-left:4px solid var(--warn);background:#211d16}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:center}
+  th{background:var(--panel2);color:var(--muted);font-weight:600}
+  td.l,th.l{text-align:left}
+  tr:nth-child(even) td{background:#14171e}
+  .chip{display:inline-block;background:var(--chip);border:1px solid var(--line);
+    border-radius:999px;padding:2px 10px;margin:2px;font-size:12px}
+  .free{background:#15303a;border-color:#2f7fa0;color:#bfe9ff}
+  .sw{background:#2a2233;border-color:#6a4f8a;color:#e0c8ff}
+  .fix{background:#23262e;color:var(--muted)}
+  ol li,ul li{margin:6px 0}
+  .step{counter-reset:none}
+  /* calculator */
+  .calc{background:linear-gradient(180deg,#191d27,#13161d);
+    border:1px solid #2c3340;border-radius:12px;padding:22px}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+  input,select{background:#0d0f14;color:var(--txt);border:1px solid var(--line);
+    border-radius:8px;padding:9px 12px;font-size:15px;width:160px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  button{background:var(--accent);color:#04212e;border:0;border-radius:8px;
+    padding:10px 20px;font-size:15px;font-weight:700;cursor:pointer}
+  button:hover{filter:brightness(1.1)}
+  .out{margin-top:18px;background:#0d0f14;border:1px solid var(--line);
+    border-radius:10px;padding:16px;display:none}
+  .out.show{display:block}
+  .out .big{font-size:22px;font-weight:700;color:var(--accent2)}
+  .out table{margin:12px 0 0}
+  .err{color:var(--bad);font-weight:600}
+  .ok{color:var(--accent2)}
+  .legend{font-size:12px;color:var(--muted);margin-top:8px}
+  .formula{font-family:Consolas,monospace;background:#0d0f14;border:1px solid var(--line);
+    border-radius:8px;padding:12px 14px;color:#cfe;overflow-x:auto}
+  .toc{font-size:14px}
+  .toc a{color:var(--accent);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  small{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>AnalogBoard ゲイン調整マニュアル</h1>
+  <p class="sub">Dialog1_Main の Gain1〜Gain5 を効率よく設定するための手順書 &nbsp;|&nbsp; <small>対象: AnalogBoard_TestApp</small></p>
+
+  <div class="card toc">
+    <strong>目次</strong>
+    <ul>
+      <li><a href="#concept">1. ゲインの仕組み（5段の掛け算）</a></li>
+      <li><a href="#why">2. なぜ調整しにくいのか / 攻略の鍵</a></li>
+      <li><a href="#workflow">3. 推奨手順（粗→微の2ステップ）</a></li>
+      <li><a href="#calc">4. 逆算計算機（目標倍率→設定値）</a></li>
+      <li><a href="#bands">5. 早見表（Low ch CH1〜8）</a></li>
+      <li><a href="#high">6. High ch（CH9〜13）について</a></li>
+      <li><a href="#notes">7. 入力ルール・注意事項</a></li>
+    </ul>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="concept">1. ゲインの仕組み（5段の掛け算）</h2>
+  <p>各チャンネルの Total Gain は、5段のアンプ設定の<strong>掛け算</strong>で決まります。</p>
+  <div class="formula">Total Gain ＝ Gain1 × Gain2 × Gain3 × Gain4 × Gain5</div>
+
+  <h3>Low ch（CH1〜8）の各段の役割</h3>
+  <table>
+    <tr><th>段</th><th>入力方式</th><th>取りうる値</th><th>倍率の働き</th><th>調整での役割</th></tr>
+    <tr><td>Gain1</td><td><span class="chip sw">2択</span></td><td>-0.2 / -0.4</td><td>×2 段</td><td>粗調整</td></tr>
+    <tr><td>Gain2</td><td><span class="chip sw">2択</span></td><td>-1.0 / -4.0</td><td>×4 段</td><td>粗調整</td></tr>
+    <tr><td><strong>Gain3</strong></td><td><span class="chip free">自由入力</span></td><td><strong>-0.5 〜 -1.0（連続）</strong></td><td>×0.5〜1.0</td><td><strong>微調整</strong></td></tr>
+    <tr><td>Gain4</td><td><span class="chip sw">2択</span></td><td>2.0 / 4.0</td><td>×2 段</td><td>粗調整</td></tr>
+    <tr><td>Gain5</td><td><span class="chip fix">固定</span></td><td>-1.35</td><td>固定</td><td>—</td></tr>
+  </table>
+  <p class="legend">※ 符号は途中段で負ですが、負の段が4つあるため Total Gain は正になります（画面には <code>%.2f倍</code> で表示）。</p>
+
+  <!-- 2 -->
+  <h2 id="why">2. なぜ調整しにくいのか / 攻略の鍵</h2>
+  <p>「5つの入力があり、1つは自由入力、残りは2択」という構成のため、闇雲に触ると組み合わせが多くて目標値に合わせにくくなります。しかし仕組みを分解すると、調整は実質<strong>2種類の操作</strong>に整理できます。</p>
+
+  <div class="card key">
+    <h3 style="margin-top:0">🔑 攻略の鍵</h3>
+    <ul>
+      <li><strong>2択スイッチ（Gain1 / Gain2 / Gain4）</strong> は、いずれも<strong>×2 単位</strong>でしか倍率を変えられません。つまり <code>0.27 → 0.54 → 1.08 → 2.16 → 4.32 → 8.64倍 …</code> という<strong>飛び飛びの「帯（オクターブ）」</strong>を選ぶ操作です。</li>
+      <li><strong>Gain3（自由入力）</strong> は連続値を取れる<strong>唯一の段</strong>。その可変幅は <code>0.5〜1.0倍</code>＝<strong>ちょうど1オクターブ分</strong>です。</li>
+    </ul>
+    <p style="margin-bottom:0">→ <strong>2択で「どの帯に乗るか」を選び、Gain3 で「帯の中を連続スライド」して目標に合わせる。</strong>各帯はちょうど隣と接するため、<strong>0.27倍〜8.64倍まで隙間なく連続</strong>に設定できます。</p>
+  </div>
+
+  <div class="card good">
+    <strong>つまりあなたの直感どおり、「自由入力（Gain3）で合わせ込む」が正解です。</strong>
+    2択は最初にだいたいの帯を決めるためだけに使い、最後の微調整は Gain3 一本に集約します。
+  </div>
+
+  <!-- 3 -->
+  <h2 id="workflow">3. 推奨手順（粗→微の2ステップ）</h2>
+  <ol class="step">
+    <li><strong>目標の Total Gain（倍）を決める。</strong> 設定可能範囲は <code>0.27倍 〜 8.64倍</code>。</li>
+    <li><strong>【粗調整】帯を選ぶ。</strong> 目標値以上で最も近い基準倍率（0.54 / 1.08 / 2.16 / 4.32 / 8.64）になるよう、下の<a href="#bands">早見表</a>から Gain1 / Gain2 / Gain4 の2択を設定する。</li>
+    <li><strong>【微調整】Gain3 を入れる。</strong> <code>Gain3 ＝ −(目標倍率 ÷ 基準倍率)</code> を計算して自由入力欄へ。値は必ず <code>-1.0 〜 -0.5</code> に収まります。</li>
+    <li><strong>確認。</strong> 画面の「○○倍」表示が目標どおりか確認し、ズレていれば Gain3 だけを微修正する（2択は触らない）。</li>
+  </ol>
+  <p class="legend">迷ったら下の計算機に目標倍率を入れれば、上の2〜3を自動で出します。</p>
+
+  <!-- 4 -->
+  <h2 id="calc">4. 逆算計算機（目標倍率 → 設定値）</h2>
+  <div class="calc">
+    <div class="row">
+      <div>
+        <label>目標 Total Gain（倍）</label>
+        <input id="target" type="number" step="0.01" min="0.27" max="8.64" placeholder="例: 1.50">
+      </div>
+      <div>
+        <label>チャンネル</label>
+        <select id="chtype">
+          <option value="low">Low ch（CH1〜8）</option>
+          <option value="high">High ch（CH9〜13）</option>
+        </select>
+      </div>
+      <div><button onclick="solve()">設定値を計算</button></div>
+    </div>
+    <div class="legend">Low ch: 0.27〜8.64倍 を連続設定可。High ch: 0.5 / 1.0 / 2.0 / 4.0倍 の4段階のみ（自由入力なし）。</div>
+    <div id="out" class="out"></div>
+  </div>
+
+  <!-- 5 -->
+  <h2 id="bands">5. 早見表（Low ch CH1〜8）</h2>
+  <p>「基準倍率」は Gain3 = -1.0（最大）のときの Total Gain。Gain3 を -1.0→-0.5 に動かすと、その帯の中で <strong>基準倍率 〜 基準倍率×0.5</strong> まで連続に下がります。</p>
+  <table>
+    <tr><th>基準倍率</th><th>Gain1</th><th>Gain2</th><th>Gain4</th><th>Gain5</th><th>Gain3で作れる範囲</th></tr>
+    <tr><td><strong>0.54倍</strong></td><td>-0.2</td><td>-1.0</td><td>2.0</td><td>-1.35</td><td>0.27 〜 0.54</td></tr>
+    <tr><td><strong>1.08倍</strong></td><td>-0.2</td><td>-1.0</td><td>4.0</td><td>-1.35</td><td>0.54 〜 1.08</td></tr>
+    <tr><td><strong>2.16倍</strong></td><td>-0.2</td><td>-4.0</td><td>2.0</td><td>-1.35</td><td>1.08 〜 2.16</td></tr>
+    <tr><td><strong>4.32倍</strong></td><td>-0.2</td><td>-4.0</td><td>4.0</td><td>-1.35</td><td>2.16 〜 4.32</td></tr>
+    <tr><td><strong>8.64倍</strong></td><td>-0.4</td><td>-4.0</td><td>4.0</td><td>-1.35</td><td>4.32 〜 8.64</td></tr>
+  </table>
+  <p class="legend">※ 1.08 / 2.16 / 4.32 倍は別の2択組み合わせ（Gain1=-0.4 側）でも作れますが、表は代表的な1組を記載。どれを使っても Total は同じです。</p>
+
+  <!-- 6 -->
+  <h2 id="high">6. High ch（CH9〜13）について</h2>
+  <div class="card warnbox">
+    <p style="margin-top:0">High ch は <strong>Gain3 / Gain4 / Gain5 が固定</strong>（自由入力なし）。可変なのは Gain1・Gain2 の2択だけなので、<strong>微調整はできず4段階のみ</strong>です。これはハード構成上の仕様です。</p>
+    <table>
+      <tr><th>Total Gain</th><th>Gain1</th><th>Gain2</th></tr>
+      <tr><td>0.5倍</td><td>-0.5</td><td>-1.0</td></tr>
+      <tr><td>1.0倍</td><td>-0.5</td><td>-2.0</td></tr>
+      <tr><td>2.0倍</td><td>-2.0</td><td>-1.0</td></tr>
+      <tr><td>4.0倍</td><td>-2.0</td><td>-2.0</td></tr>
+    </table>
+    <p style="margin-bottom:0"><small>※ CH13 のみ Gain3 = -1.0 のため Total の符号が反転しますが、倍率の大きさは上表と同じです。</small></p>
+  </div>
+
+  <!-- 7 -->
+  <h2 id="notes">7. 入力ルール・注意事項</h2>
+  <ul>
+    <li><strong>Gain3 の入力範囲は <code>-1.0 〜 -0.5</code></strong>。範囲外を入れると欄が<span class="err">赤くハイライト</span>され、内部では自動でクランプされます。</li>
+    <li>Gain3 はハードで <code>0.5 / 511 ≒ 0.00098</code> 刻みに量子化されるため、入力値どおりピッタリにならず微小な丸めが出ることがあります。最終確認は画面の「○○倍」表示で行ってください。</li>
+    <li>設定後は <strong>Gain トリガ書き込み（0x1 → GAIN_TRG）</strong>で初めてハードに反映されます。アプリの適用操作を忘れずに。</li>
+    <li><strong>微調整は Gain3 だけ</strong>を動かすのが鉄則。2択を変えると帯ごと2倍ずれるので、合わせ込み中は触らないこと。</li>
+  </ul>
+
+  <div class="card">
+    <strong>UI改善のヒント（開発者向け）</strong>
+    <p style="margin-bottom:0">この計算機のロジックをアプリ本体に組み込み、<strong>「目標 Total Gain を入力 → Gain1/2/4 の2択と Gain3 を自動設定」</strong>ボタンを付けると、ユーザーは倍率を1つ入れるだけで済みます。さらに Gain3 を<strong>スライダー化</strong>すれば「帯の中を連続で動かす」操作が直感的になります。</p>
+  </div>
+
+  <p style="margin-top:40px"><small>このマニュアルは <code>Dialog1_Main.cpp</code> / <code>FpgaRegisterLogic.h</code> の実装値（strGainMultp, CalcGain3RegValue）に基づいて作成。</small></p>
+
+</div>
+
+<script>
+// Low ch の基準倍率（Gain3=-1.0 のときの Total）と代表的な2択設定
+const BANDS = [
+  {base:0.54, g1:-0.2, g2:-1.0, g4:2.0},
+  {base:1.08, g1:-0.2, g2:-1.0, g4:4.0},
+  {base:2.16, g1:-0.2, g2:-4.0, g4:2.0},
+  {base:4.32, g1:-0.2, g2:-4.0, g4:4.0},
+  {base:8.64, g1:-0.4, g2:-4.0, g4:4.0},
+];
+const G5 = -1.35;
+const HIGH = [
+  {total:0.5, g1:-0.5, g2:-1.0},
+  {total:1.0, g1:-0.5, g2:-2.0},
+  {total:2.0, g1:-2.0, g2:-1.0},
+  {total:4.0, g1:-2.0, g2:-2.0},
+];
+
+function solve(){
+  const out = document.getElementById('out');
+  const t = parseFloat(document.getElementById('target').value);
+  const type = document.getElementById('chtype').value;
+  out.classList.add('show');
+
+  if(isNaN(t) || t<=0){
+    out.innerHTML = '<span class="err">目標倍率を正の数で入力してください。</span>';
+    return;
+  }
+
+  if(type==='high'){
+    // 最も近い4段階を提示
+    let best = HIGH[0];
+    for(const h of HIGH){ if(Math.abs(h.total-t) < Math.abs(best.total-t)) best=h; }
+    const exact = Math.abs(best.total-t) < 1e-9;
+    out.innerHTML =
+      `<div class="big">High ch 設定</div>`+
+      `<p>${exact?'<span class="ok">目標に一致する段があります。</span>':'<span class="err">High ch は連続調整できません。</span> 最も近い段を選びます（目標 '+t+'倍）。'}</p>`+
+      `<table><tr><th>Total Gain</th><th>Gain1</th><th>Gain2</th></tr>`+
+      `<tr><td><strong>${best.total.toFixed(1)}倍</strong></td><td>${best.g1}</td><td>${best.g2}</td></tr></table>`+
+      `<p class="legend">選べるのは 0.5 / 1.0 / 2.0 / 4.0倍 の4段階のみ。微調整が必要なら Low ch を使用してください。</p>`;
+    return;
+  }
+
+  // Low ch
+  if(t < 0.27 || t > 8.64){
+    out.innerHTML = `<span class="err">Low ch の設定可能範囲は 0.27倍 〜 8.64倍 です。</span>（入力: ${t}倍）`;
+    return;
+  }
+  // 目標以上で最も近い基準倍率を選ぶ → Gain3 が 0.5〜1.0 に収まる
+  let band = BANDS.find(b => b.base >= t - 1e-9) || BANDS[BANDS.length-1];
+  let g3mag = t / band.base;           // 0.5〜1.0
+  if(g3mag > 1) g3mag = 1;
+  if(g3mag < 0.5) g3mag = 0.5;
+  const g3 = -g3mag;                    // 入力は負
+  // 量子化（0.5/511刻み）を反映した実効値
+  const acc = 0.5/511;
+  const q = Math.round((g3mag-0.5)/acc)*acc + 0.5;
+  const actual = band.base * q;        // 量子化後の実際の Total
+
+  out.innerHTML =
+    `<div class="big">≒ ${actual.toFixed(2)}倍（目標 ${t}倍）</div>`+
+    `<table>`+
+    `<tr><th>Gain1</th><th>Gain2</th><th>Gain3（自由入力）</th><th>Gain4</th><th>Gain5</th></tr>`+
+    `<tr><td>${band.g1}</td><td>${band.g2}</td>`+
+    `<td><strong class="ok">${g3.toFixed(4)}</strong></td>`+
+    `<td>${band.g4}</td><td>${G5}</td></tr></table>`+
+    `<p class="legend">手順: ① Gain1/2/4 の2択を上表どおりに設定（基準 ${band.base.toFixed(2)}倍の帯）→ ② Gain3 に <strong>${g3.toFixed(4)}</strong> を入力。`+
+    `量子化により実効値は約 ${actual.toFixed(3)}倍。ズレは Gain3 のみで微修正してください。</p>`;
+}
+</script>
+</body>
+</html>

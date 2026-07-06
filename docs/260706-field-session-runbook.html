@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>まとめ実機セッション手順書（フェーズ0） — AnalogBoard</title>
+<style>
+:root {
+  /* Design tokens — お好みのブランドカラーに変更してください */
+  --color-bg: #ffffff;
+  --color-surface: #f5f8f7;
+  --color-surface-alt: #eaf0ee;
+  --color-border: #dfe7e5;
+  --color-border-strong: #c5d0cd;
+  --color-text: #111111;
+  --color-text-secondary: #626262;
+  --color-text-muted: #969696;
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-primary-light: #eff6ff;
+  --color-success: #16a34a;
+  --color-success-light: #dcfce7;
+  --color-warning: #e8910c;
+  --color-warning-light: #fef6e8;
+  --color-danger: #e03131;
+  --color-danger-light: #fdeaea;
+  --color-info: #0284c7;
+  --color-info-light: #e8f4fd;
+  --color-purple: #7048c6;
+  --color-purple-light: #f0ecf9;
+  --font-sans: 'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3', 'Hiragino Sans', 'メイリオ', Meiryo, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.07);
+  --content-width: 820px;
+  --toc-width: 220px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.doc-header {
+  border-bottom: 3px solid var(--color-primary);
+  padding: 3rem 2rem 2rem;
+  max-width: calc(var(--content-width) + var(--toc-width) + 4rem);
+  margin: 0 auto;
+}
+.doc-logo { margin-bottom: 1.25rem; }
+.doc-logo svg { display: block; }
+.doc-header h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+.doc-header .subtitle {
+  font-size: 1.125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1.25rem;
+}
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.doc-meta-item {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  padding: 0.25rem 0.625rem;
+}
+.doc-meta-item strong { color: var(--color-text); font-weight: 600; }
+
+.doc-layout {
+  display: grid;
+  grid-template-columns: var(--toc-width) 1fr;
+  gap: 2rem;
+  max-width: calc(var(--content-width) + var(--toc-width) + 4rem);
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* ── TOC Sidebar ── */
+.toc {
+  position: sticky;
+  top: 1.5rem;
+  align-self: start;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  font-size: 0.8125rem;
+  padding-right: 1rem;
+  border-right: 1px solid var(--color-border);
+}
+.toc-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+.toc ol {
+  list-style: none;
+  padding: 0;
+}
+.toc li { margin-bottom: 0.125rem; }
+.toc a {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+  transition: all 0.15s;
+}
+.toc a:hover { color: var(--color-primary); background: var(--color-primary-light); }
+.toc a.active { color: var(--color-primary); font-weight: 600; background: var(--color-primary-light); }
+.toc .toc-sub { padding-left: 1rem; }
+.toc .toc-sub a { font-size: 0.75rem; }
+
+/* ── Main Content ── */
+.doc-main { max-width: var(--content-width); }
+.doc-main section {
+  margin-bottom: 3rem;
+  scroll-margin-top: 1.5rem;
+}
+.doc-main h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--color-primary);
+  color: var(--color-text);
+}
+.doc-main h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+.doc-main p { margin-bottom: 1rem; }
+.doc-main ul, .doc-main ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+.doc-main li { margin-bottom: 0.375rem; }
+
+/* ── Summary Cards ── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+.card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+.card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.375rem;
+}
+.card-detail {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.card--accent-blue { border-left: 3px solid var(--color-info); }
+.card--accent-green { border-left: 3px solid var(--color-primary); }
+.card--accent-amber { border-left: 3px solid var(--color-warning); }
+.card--accent-red { border-left: 3px solid var(--color-danger); }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.1875rem 0.5rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.badge-must   { background: var(--color-danger-light); color: var(--color-danger); }
+.badge-should { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-could  { background: var(--color-info-light); color: var(--color-info); }
+.badge-wont   { background: var(--color-surface-alt); color: var(--color-text-muted); }
+
+.badge-confirmed  { background: var(--color-success-light); color: var(--color-success); }
+.badge-inferred   { background: var(--color-purple-light); color: var(--color-purple); }
+.badge-assumption { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-open       { background: var(--color-info-light); color: var(--color-info); }
+
+.badge-risk-high   { background: var(--color-danger-light); color: var(--color-danger); }
+.badge-risk-medium { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-risk-low    { background: var(--color-success-light); color: var(--color-success); }
+
+/* ── Tables ── */
+.spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 1rem 0 1.5rem;
+}
+.spec-table thead { background: var(--color-surface); }
+.spec-table th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 2px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.spec-table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+.spec-table tbody tr:hover { background: var(--color-surface); }
+.spec-table code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--color-surface-alt);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-xs);
+}
+
+/* ── Callouts ── */
+.callout {
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-surface);
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.9375rem;
+}
+.callout-title {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.375rem;
+}
+.callout-info    { border-left-color: var(--color-info);    background: var(--color-info-light); }
+.callout-info .callout-title { color: var(--color-info); }
+.callout-warning { border-left-color: var(--color-warning); background: var(--color-warning-light); }
+.callout-warning .callout-title { color: var(--color-warning); }
+.callout-danger  { border-left-color: var(--color-danger);  background: var(--color-danger-light); }
+.callout-danger .callout-title { color: var(--color-danger); }
+.callout-success { border-left-color: var(--color-success); background: var(--color-success-light); }
+.callout-success .callout-title { color: var(--color-success); }
+
+/* ── Diagrams ── */
+.diagram-container {
+  margin: 1.5rem 0;
+  text-align: center;
+  cursor: zoom-in;
+}
+.diagram-container .mermaid {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.diagram-container:hover .mermaid,
+.diagram-container:focus-visible .mermaid {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+.diagram-container:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+.diagram-container::after {
+  content: "Click to enlarge";
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.diagram-container:hover::after,
+.diagram-container:focus-visible::after { opacity: 1; }
+.diagram-container figcaption {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* ── Lightbox Modal (Pan & Zoom) ── */
+.diagram-modal {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.28s ease-out, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s;
+}
+.diagram-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.diagram-modal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.diagram-modal-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.diagram-modal-btn {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: var(--radius-xs);
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.diagram-modal-btn:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.diagram-modal-zoom-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 3rem;
+  text-align: center;
+}
+.diagram-modal-caption-bar {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.diagram-modal-viewport {
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  background: var(--color-surface);
+  position: relative;
+}
+.diagram-modal-viewport:active { cursor: grabbing; }
+.diagram-modal-content {
+  transform-origin: 0 0;
+  padding: 2rem;
+}
+.diagram-modal-content svg {
+  max-width: none;
+  max-height: none;
+}
+
+@media print { .diagram-modal { display: none !important; } }
+
+/* ── Glossary ── */
+.glossary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.glossary-item {
+  padding: 0.875rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.glossary-term {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin-bottom: 0.25rem;
+}
+.glossary-def {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Risk Cards ── */
+.risk-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.risk-card--high   { border-left: 3px solid var(--color-danger); }
+.risk-card--medium { border-left: 3px solid var(--color-warning); }
+.risk-card--low    { border-left: 3px solid var(--color-success); }
+.risk-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+}
+.risk-title { font-weight: 600; font-size: 0.9375rem; }
+.risk-body  { font-size: 0.875rem; color: var(--color-text-secondary); }
+
+/* ── Open Questions ── */
+.question-list {
+  list-style: none;
+  padding: 0;
+}
+.question-list li {
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-xs);
+  margin-bottom: 0.5rem;
+  font-size: 0.9375rem;
+  background: var(--color-info-light);
+}
+.question-list li::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--color-info);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-right: 0.625rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* ── Directory Tree ── */
+.tree-view {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.8;
+  white-space: pre;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+.tree-view .dir { color: var(--color-primary-dark); font-weight: 600; }
+.tree-view .file { color: var(--color-text-secondary); }
+.tree-view .comment { color: var(--color-text-muted); font-style: italic; }
+
+/* ── Pyramid Chart ── */
+.pyramid { margin: 1.5rem 0; }
+.pyramid-level {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 2fr;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.pyramid-bar {
+  border-radius: var(--radius-xs);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pyramid-bar .count {
+  font-size: 0.6875rem;
+  opacity: 0.8;
+  font-weight: 400;
+}
+.pyramid-detail {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+/* ── Code Blocks ── */
+pre {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  margin: 1rem 0;
+}
+
+/* ── Footer ── */
+.doc-footer {
+  border-top: 1px solid var(--color-border);
+  max-width: calc(var(--content-width) + var(--toc-width) + 4rem);
+  margin: 2rem auto 0;
+  padding: 1.5rem 2rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+.doc-footer p { margin-bottom: 0.25rem; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .doc-layout {
+    grid-template-columns: 1fr;
+    padding: 1.25rem;
+  }
+  .toc {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding-right: 0;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+  }
+  .doc-header { padding: 2rem 1.25rem 1.5rem; }
+  .doc-header h1 { font-size: 1.75rem; }
+  .card-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── Print ── */
+@media print {
+  body { font-size: 11pt; }
+  .toc, .doc-meta { display: none; }
+  .doc-layout { display: block; }
+  .doc-header { padding: 1rem 0; border-bottom: 2px solid #000; }
+  .doc-main section { page-break-inside: avoid; }
+  .card { border: 1px solid #999; }
+  .badge { border: 1px solid currentColor; }
+  a { color: inherit; text-decoration: none; }
+  .doc-footer { border-top: 1px solid #000; }
+}
+</style>
+</head>
+<body>
+
+<header class="doc-header">
+  <h1>まとめ実機セッション手順書</h1>
+  <p class="subtitle">AnalogBoard 再構築フェーズ0 — 実験1〜7を1セッションで流し切るための実施手順・判定基準・回収物チェックリスト</p>
+  <div class="doc-meta">
+    <span class="doc-meta-item"><strong>Type:</strong> 実機セッション手順書（runbook）</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.2</span>
+    <span class="doc-meta-item"><strong>Created:</strong> 2026-07-06</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-06（Win11×1台確定で直列フロー化。実験3を先行・実験2を条件付き＋スクリプト化（レジストリ手作業排除）。ドライバ入替・ロールバック詳細手順を新設）</span>
+    <span class="doc-meta-item"><strong>Audience:</strong> セッション実施者（オーナー／開発チーム）</span>
+    <span class="doc-meta-item"><strong>Source:</strong> 親プラン「まとめ実機セッション」節・baseline_next.md・driver_next.md・field-reference</span>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#summary">概要</a></li>
+      <li><a href="#principles">前提と原則</a></li>
+      <li><a href="#prep">事前準備（前日まで）</a></li>
+      <li><a href="#flow">セッション全体フロー</a></li>
+      <li><a href="#smoke">ステップ0：スモーク＆deploy検証</a></li>
+      <li><a href="#exp1">実験1：スイッチ区間A/B</a></li>
+      <li><a href="#driverswap">ドライバ入替・ロールバック手順</a></li>
+      <li><a href="#exp3">実験3：SDK1.3バイナリ（先行）</a></li>
+      <li><a href="#exp2">実験2：DFX A/B（条件付き）</a></li>
+      <li><a href="#exp4">実験4：r18高密度ラダー</a></li>
+      <li><a href="#exp5">実験5：再アームギャップ計測</a></li>
+      <li><a href="#exp6">実験6：録画キャプチャ</a></li>
+      <li><a href="#exp7">実験7：gcsa照合サンプル</a></li>
+      <li><a href="#sheet">判定シート</a></li>
+      <li><a href="#collect">回収物チェックリスト</a></li>
+      <li><a href="#risks">注意事項・未決事項</a></li>
+      <li><a href="#appendix">付録（トレーサビリティ）</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-main">
+
+    <!-- ===== SUMMARY ===== -->
+    <section id="summary">
+      <h2>概要</h2>
+      <p>
+        本書は親プラン（<code>docs/plans/260703-analogboard-rebuild-plan.html</code>「まとめ実機セッション」節）で定義された<strong>フェーズ0のまとめ実機セッション</strong>を、現地で迷わず流し切るための実施手順書である。実機アクセスは希少なため、<strong>事前にビルド済みバイナリ・本手順書・判定シートを全て用意し、1セッションで完了させる</strong>。セッションの成果（判定結果・録画コーパス・実サンプル）は、D4（移植ベースライン採用）・D17（物理ch順凍結）・ドライバ戦略（Plan A/B）・4GB戦略の判断入力になる。
+      </p>
+      <div class="card-grid">
+        <div class="card card--accent-blue">
+          <div class="card-label">実験数</div>
+          <div class="card-value">7</div>
+          <div class="card-detail">＋ステップ0スモーク（deploy検証）</div>
+        </div>
+        <div class="card card--accent-green">
+          <div class="card-label">使用PC</div>
+          <div class="card-value">Win11×1台</div>
+          <div class="card-detail">全実験直列。既存→新ドライバへ入替→（既定）ロールバック</div>
+        </div>
+        <div class="card card--accent-amber">
+          <div class="card-label">配布バイナリ</div>
+          <div class="card-value">2種</div>
+          <div class="card-detail">dev r18相当（Release x64）／win11-driver-compat</div>
+        </div>
+        <div class="card card--accent-red">
+          <div class="card-label">判断が凍結される決定</div>
+          <div class="card-value">D4 / D17</div>
+          <div class="card-detail">＋ドライバPlan A/B・4GB戦略フェーズ2要否</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PRINCIPLES ===== -->
+    <section id="principles">
+      <h2>前提と原則</h2>
+
+      <h3>全ラン共通条件</h3>
+      <ul>
+        <li><strong>ビルドは <code>Release | x64</code></strong>。Visual Studio デバッガ非接続、<strong>DebugView を起動しない</strong>（DLL 側 <code>OutputDebugStringA</code> が高コスト化し取得タイミングを変える——過去の計装退行の教訓）</li>
+        <li>ホットパスログを無効化した計測用改造ビルドは使わない（本セッションは配布した標準ビルドのみ）</li>
+        <li>A/B 比較は<strong>単変数</strong>で行う：同一マシン・同一USBポート・同一サンプル・同一取得パラメータのまま、比較対象（ケーブル／レジストリ値／バイナリ）だけを変える</li>
+        <li>ラン毎の証跡はビルド版別フォルダに保存：ログ＝<code>logs/&lt;ver&gt;/logs/*.log</code>、データ＝<code>data/&lt;ver&gt;/*_cfg.txt</code>・<code>*_fl_*.bin</code>／<code>*_fh_*.bin</code></li>
+        <li><strong>失敗ランのログ・データも絶対に消さない</strong>（障害トレースは録画コーパスの最重要資産）</li>
+        <li>ラン開始・終了ごとに判定シートへ即時記録（記憶に頼らない）</li>
+      </ul>
+
+      <h3>判定語彙</h3>
+      <div class="glossary">
+        <div class="glossary-item">
+          <div class="glossary-term">Type A</div>
+          <div class="glossary-def">取得中の <code>EP6 timeout</code>。サイクル終了時も <code>DDR_WR_END=0, DDR_RD_END=0</code>。<code>Wait fpga write completed. Timeout</code> や切断を伴うことがある。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">Type B</div>
+          <div class="glossary-def">ドレイン後の <code>EP6 timeout</code>。<code>DDR_WR_END=1, DDR_RD_END=0</code>。<code>Wait acquisition completed. Timeout</code>・EP4 fail・切断を伴う。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">Type C</div>
+          <div class="glossary-def">正常完了。<code>ep6Timeouts=0</code>・<code>DDR_WR_END=1, DDR_RD_END=1</code>。本セッションの多くの判定基準はこれ。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">良接続構成（直結）</div>
+          <div class="glossary-def">機械から出ている固定ケーブル（<strong>交換不可</strong>）から、先端に挿入されていた<strong>インライン on/off 切替スイッチ区間（メス—スイッチ—オス・着脱可能）を外した直結状態</strong>（D16）。本セッションで標準化する。外したスイッチ区間は <code>SW-SEG-01</code> とラベルして対照実験用に保管。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">DFX / Directed Power</div>
+          <div class="glossary-def">Win11 新ドライバ INF が有効化する WDF のアイドルサスペンド機構。新ドライバ通信不可の最有力仮説。レジストリ単変数 A/B で検証する（実験2）。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">deploy mismatch</div>
+          <div class="glossary-def">現地バイナリに想定の fix が入っていない状態。期待するログマーカーが出ない時は<strong>結果を解釈する前に</strong>これを疑う（ステップ0参照）。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PREP ===== -->
+    <section id="prep">
+      <h2>事前準備（セッション前日まで）</h2>
+      <p>当日に準備物の不足で実験を落とさないためのチェックリスト。<strong>1つでも未完なら該当実験をスキップ判断できるよう、依存関係を明記</strong>する。</p>
+
+      <h3>ビルド・配布物</h3>
+      <table class="spec-table">
+        <thead><tr><th></th><th>項目</th><th>内容</th><th>依存する実験</th></tr></thead>
+        <tbody>
+          <tr><td>☐</td><td><code>dev</code> r18相当 Release x64</td><td>DLL＋TestApp 一式。<code>scripts\run_with_vsdevcmd.bat msbuild ... /p:Configuration=Release /p:Platform=x64</code> でリビルドし、成果物をUSBメモリ等に格納。<strong>burst-cap／timeout-recovery／cfg-append fix が入った版であること</strong>（ステップ0で検証）</td><td>1・4・5・6・7</td></tr>
+          <tr><td>☐</td><td><code>feature/win11-driver-compat</code> の<strong>再作成（オーナー決定 2026-07-06）</strong></td><td><strong><code>dev</code> から切り直し、最初から origin へ push して進める</strong>（origin に旧ブランチが無いことは確認済み）。実装差分は <code>docs/driver_next.md</code> が正：<code>AnalogBoard_Dll</code> の endpoint discovery hardening（public API <code>EP2_SendData/EP4_GetData/EP6_GetData</code> 維持・<code>Dialog1_Main</code>／取得セマンティクス非接触）＋focused unit test。<strong>ヘッダの差し替えは不要</strong>——同梱 <code>CyLib/header</code> は SDK 1.3 世代一致を確認済み（2026-03-19 記録）。<code>Release|x64</code> リビルドまで前日完了が条件。間に合わなければ実験3のみ持ち越し（実験2は独立実施可）</td><td>3</td></tr>
+          <tr><td>☑</td><td><code>CyAPI.lib</code> の補完・確保</td><td><strong>2026-07-06 対応済み</strong>：<code>CyLib/x64</code>・<code>CyLib/x86</code> に配置（x64=AMD64／x86=i386・<code>/DEFAULTLIB:LIBCMT</code> を確認済み）、<code>.gitignore</code> に否定ルールを追加して追跡可能化。<strong>残タスク＝コミットして固定</strong>（これで新規 worktree の LNK1181 も解消）。予備の入手元：実機PCの <code>C:\Program Files (x86)\Cypress\EZ-USB FX3 SDK\1.3\library\cpp\lib</code></td><td>3</td></tr>
+        </tbody>
+      </table>
+
+      <h3>機材・環境</h3>
+      <table class="spec-table">
+        <thead><tr><th></th><th>項目</th><th>内容</th><th>依存する実験</th></tr></thead>
+        <tbody>
+          <tr><td>☐</td><td>接続構成の確認（機械ケーブルは交換不可）</td><td>機械から出ている固定ケーブルはそのまま使う。標準＝<strong>スイッチ区間を外した直結</strong>。ホスト側ポートを1つ決めて全実験で固定し、判定シートに記録</td><td>全部</td></tr>
+          <tr><td>☐</td><td>対照用インラインスイッチ区間</td><td>過去に外した「メス—スイッチ—オス」区間。<strong>現存確認済み（2026-07-06 オーナー確認）</strong>。真因確定の対照実験（再挿入）用に <code>SW-SEG-01</code> とラベルして持参</td><td>1</td></tr>
+          <tr><td>☐</td><td>主測定PC（Win11・既存ドライバ）</td><td>現行運用の既存ドライバ（cyusb3 <code>1.2.3.20</code> 系）構成のまま変更しない。ディスク残容量（高密度100サイクル分＋余裕）を確認</td><td>1・4・5・7</td></tr>
+          <tr><td>☐</td><td>新ドライバ入替の準備（Win11・1台確定）</td><td><strong>実験4/5/7 完了後にドライバ入替で直列実施</strong>（「ドライバ入替・ロールバック手順」節）。新ドライバ <code>FX3\Win11\x64</code>（1.3.0.4）＋旧ドライバ（1.2.3.20 系）のフォルダを実機ローカルに用意（<code>FX3/</code> は <strong>gitignore 対象のため実機ローカルにしか無い。事前に確保</strong>）。管理者権限の確認</td><td>2・3</td></tr>
+          <tr><td>☐</td><td>サンプル（低密度・中密度・高密度）</td><td>ラダー（実験4）と対照（実験1）で同一サンプルを使い回せる量を確保</td><td>1・4・5・7</td></tr>
+          <tr><td>☐</td><td>共有ストレージ</td><td><code>logs/</code>・<code>data/</code>・キャプチャの回収先（外付けSSD等）。実機PCにしか存在しないログを持ち帰るための必須品</td><td>6</td></tr>
+        </tbody>
+      </table>
+
+      <h3>ツール・ドキュメント</h3>
+      <table class="spec-table">
+        <thead><tr><th></th><th>項目</th><th>内容</th><th>依存する実験</th></tr></thead>
+        <tbody>
+          <tr><td>☐</td><td>USBレベルキャプチャツール</td><td>URB レベルの録画用（例：USBPcap＋Wireshark）。<span class="badge badge-assumption">Assumption</span> プランはツール未指定のため事前に選定・動作確認する。<strong>キャプチャ自体がタイミングへ影響しうるため、判定ランでは使わず専用の録画ランで使う</strong></td><td>6</td></tr>
+          
+          <tr><td>☐</td><td>実験2用スクリプト一式</td><td><code>scripts\field-session\</code>（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCへコピー（例：<code>C:\field-session\</code>）。実験2は条件付きだが<strong>スクリプトは必ず持参</strong>（現地でのレジストリ手作業を防ぐ）</td><td>2</td></tr>
+          <tr><td>☐</td><td>本手順書＋判定シート（印刷 or ローカルコピー）</td><td>ネットワーク非依存で参照できる形で持参</td><td>全部</td></tr>
+          <tr><td>☐</td><td>gcsa 実行環境（解析PC）</td><td>gcsa v0.4.1 が動く環境。実験7の照合はセッション中でなくても良いが、<strong>取得パラメータの記録はセッション中に必須</strong></td><td>7</td></tr>
+          <tr><td>☐</td><td>波形確認ノートブック（gcsa examples）</td><td>取得した .bin ペアの波形健全性 spot check 用。<code>../gcsa/examples/01_quickstart.ipynb</code>（<code>MeasurementLoader</code> に <code>_cfg.txt</code> を指定→fl/fh 読込・scatter/波形プロット）と <code>08_gmi_waveform_preview.ipynb</code>（GMI波形プレビュー）。過去の EP6 波形破損調査で「notebook 上の waveform 見た目」比較に使った実績あり（<code>docs/archive/usb-acquisition/0929_log_cut_test_instructions.md</code>）。解析PCでの動作を事前確認しておく</td><td>4・7</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== FLOW ===== -->
+    <section id="flow">
+      <h2>セッション全体フロー</h2>
+      <figure class="diagram-container">
+        <div class="mermaid">
+flowchart TB
+  PREP["事前準備完了の確認"] --> SMOKE0["ステップ0: スモーク＆deploy検証"]
+  SMOKE0 --> E1["実験1: スイッチ区間A/B — 真因の定量確定"]
+  E1 --> E4["実験4: r18高密度ラダー x1→x3→x100"]
+  E4 --> E5["実験5: 再アームギャップ計測 — 実験4と併走"]
+  E4 --> E7["実験7: gcsa照合サンプル取得"]
+  E5 --> DRV["ドライバ入替 旧→新 — 詳細手順節参照"]
+  E7 --> DRV
+  DRV --> E3["実験3: SDK1.3バイナリ検証 — レジストリ不要"]
+  E3 -- first gate 成功 --> RB["ロールバック＋復帰スモーク or 新ドライバ維持を記録"]
+  E3 -- first gate 失敗 --> E2["実験2: DFX A/B — 条件付き・スクリプト実施"]
+  E2 --> RB
+  RB --> WRAP["締め: 回収物チェックリスト実行・判定シート確定"]
+  REC["実験6: 録画キャプチャ — 全実験で並走"] -.-> WRAP
+        </div>
+        <figcaption>図1. セッション実行順。実機PCは Win11・1台（2026-07-06 確定）のため全体が直列：既存ドライバ系列（1→4→5→7）→ドライバ入替→実験3、実験2は実験3の first gate が失敗した場合のみ実施する。実験6（録画）は特定の時間枠ではなく全実験の証跡保全として常時走る。</figcaption>
+      </figure>
+
+      <h3>実験×構成マトリクス</h3>
+      <table class="spec-table">
+        <thead><tr><th>#</th><th>PC / OS</th><th>バイナリ</th><th>ドライバ</th><th>ケーブル</th><th>密度</th></tr></thead>
+        <tbody>
+          <tr><td><strong>0</strong> スモーク</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>低×1〜3</td></tr>
+          <tr><td><strong>1</strong> スイッチ区間A/B</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td><strong>直結 ⇔ SW区間挿入</strong></td><td>高</td></tr>
+          <tr><td><strong>2</strong> DFX A/B<br><span style="color:var(--color-text-muted);">条件付き（実験3失敗時のみ）</span></td><td>Win11・新ドライバ</td><td>win11-driver-compat（参考: dev r18相当）</td><td><strong>新 1.3.0.4（DFX有⇔無）</strong></td><td>直結</td><td>接続＋idle EP4</td></tr>
+          <tr><td><strong>3</strong> SDK1.3<br><span style="color:var(--color-text-muted);">実験2より先に実施</span></td><td>Win11・新ドライバ</td><td><strong>win11-driver-compat</strong></td><td>新 1.3.0.4</td><td>直結</td><td>smoke→低→高</td></tr>
+          <tr><td><strong>4</strong> r18ラダー</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>高×1→×3→低×100→高×100</td></tr>
+          <tr><td><strong>5</strong> 再アーム計測</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>実験4のsoakログから抽出</td></tr>
+          <tr><td><strong>6</strong> 録画</td><td>両構成</td><td>—</td><td>—</td><td>—</td><td>全ラン＋専用キャプチャラン</td></tr>
+          <tr><td><strong>7</strong> gcsa照合</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>既知パラメータ×1＋ch順特定ラン</td></tr>
+        </tbody>
+      </table>
+      <div class="callout callout-warning">
+        <div class="callout-title">実験順の理由</div>
+        <p>実験1（スイッチ区間）を最初に置くのは、<strong>直結（スイッチ区間なし）で高密度が安定することを確定させないと、以降の全実験の失敗が物理層起因かソフト起因か切り分けられなくなる</strong>ため。実験4のラダーは段階制（×1で確認→×3→×100）で、途中失敗時は先に進まず切り分けに切り替える（実験4の分岐参照）。新ドライバ系列は<strong>実験3（レジストリ不要）を先行</strong>させ、実験2（レジストリ変更）は実験3の first gate 失敗時のみの条件付きとする——レジストリ操作を極力避けるオーナー方針（2026-07-06）。</p>
+      </div>
+    </section>
+
+    <!-- ===== SMOKE ===== -->
+    <section id="smoke">
+      <h2>ステップ0：スモーク＆deploy検証</h2>
+      <p><strong>目的</strong>：配布バイナリが「想定の fix が全部入った版」であることをログマーカーで確認し、以降の実験結果を解釈可能にする。<strong>ここを飛ばすと、当日の全データが「どのビルドの挙動か不明」になり無効化しうる。</strong></p>
+      <h3>手順</h3>
+      <ol>
+        <li>主測定PC（Win11・既存ドライバ構成のまま）に dev r18相当ビルドを配置。<strong>スイッチ区間を外した直結</strong>で、決めたホストポートに接続</li>
+        <li>低密度サンプルで 1〜3 サイクル取得（Manual Get ON・既定パラメータ）</li>
+        <li>ログを開き、下記マーカーを全て確認</li>
+      </ol>
+      <h3>確認マーカー（deploy検証）</h3>
+      <ul>
+        <li><code>[PR04][ENGINE_CONTEXT]</code>・<code>[PR04][ENGINE_ENTER]</code>・<code>[PR04][ENGINE_EXIT]</code> が出る</li>
+        <li><code>[PR04][STARTUP_EP4]</code> と <code>[PR01][CYCLE]</code> が出る（両方無ければ build/deploy mismatch）</li>
+        <li><code>One time max size=31211520byte</code>（<code>124813312byte</code> のままなら 1-file burst cap fix 未反映）</li>
+        <li><code>saved wave count 0</code>／immediate exit が<strong>出ない</strong></li>
+        <li><code>DDR_RD_END=1</code>・<code>ep6Timeouts=0</code> で正常完了（Type C）</li>
+        <li>完了ペアのみ <code>*_fl_*.bin</code>／<code>*_fh_*.bin</code> として残り、<code>.tmp</code> 残置がない</li>
+        <li>失敗させた場合は <code>_cfg.txt</code> 末尾に <code>Run Status / Error Code / Published Pairs / Saved Wave Count</code> が追記される（cfg append fix）</li>
+      </ul>
+      <div class="callout callout-danger">
+        <div class="callout-title">NG時</div>
+        <p>マーカー欠落＝deploy mismatch。<strong>実験に進まず</strong>、配布物のビルド日時・ハッシュを確認して再配置する。<code>ENGINE_EXIT error=-21001</code> が出る場合は parent binding fix 未反映を疑う。</p>
+      </div>
+    </section>
+
+    <!-- ===== EXP1 ===== -->
+    <section id="exp1">
+      <h2>実験1：直結標準化＋スイッチ区間の対照</h2>
+      <div class="callout callout-info">
+        <div class="callout-title">A/B の変数は「ケーブル交換」ではない</div>
+        <p>機械から出ている固定ケーブルは<strong>交換できない</strong>。真因（親プラン「タイムアウト問題の真因」節）は、その先端に挿入されていた<strong>インライン on/off 切替スイッチ区間（メス—スイッチ—オス・着脱可能）</strong>であり、オーナーが一度外して改善を確認済み。よって本実験の管理変数は<strong>スイッチ区間の着脱のみ</strong>：A＝直結（標準）／B＝スイッチ区間を再挿入（対照）。</p>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>「インライン切替スイッチが主因」を定量確定し、直結標準化（D16）を根拠付ける</td>
+          <td>直結で高密度×N ランが Type C（<code>ep6Timeouts=0</code>）、対照（スイッチ区間挿入）でのみタイムアウト再現</td>
+        </tr></tbody>
+      </table>
+      <h3>手順</h3>
+      <ol>
+        <li><strong>直結（スイッチ区間なし）</strong>のまま高密度サンプルで <strong>×3 ラン</strong>。各ランの Type 判定を記録（実験4の高密度×3と共用可）</li>
+        <li><code>SW-SEG-01</code>（スイッチ区間）を機械ケーブル先端とホスト側の間に<strong>再挿入</strong>（スイッチは ON 位置）。<strong>ホストポート・マシン・サンプル・パラメータは不変</strong></li>
+        <li>高密度で <strong>×1〜2 ラン</strong>（対照）。Type A/B の再現とログ署名（<code>DDR_WR_END/RD_END</code>・切断有無）を記録</li>
+        <li>スイッチ区間を<strong>外して直結に戻し</strong>、高密度×1で Type C 復帰を確認（可逆性）</li>
+      </ol>
+      <h3>観測ポイント</h3>
+      <ul>
+        <li><code>ep6Timeouts</code> 値、Type A/B/C 分類、切断（<code>USB board is removed!</code>）の有無</li>
+        <li>可能ならリンク速度（SuperSpeed か USB2 フォールバックか）。現行アプリに表示は無いためデバイスマネージャ／PIDで確認（PID <code>0xFFF2</code>=SS／<code>0xFFF3</code>=USB2）</li>
+      </ul>
+      <h3>終了時アクション</h3>
+      <ul>
+        <li>直結を標準構成として確定し、使用ホストポートと合わせて記録（D16 の運用開始）</li>
+        <li>スイッチ区間 <code>SW-SEG-01</code> は「再現用資材」として保管（廃棄しない）</li>
+      </ul>
+    </section>
+
+    <!-- ===== DRIVER SWAP ===== -->
+    <section id="driverswap">
+      <h2>ドライバ入替・ロールバック手順（詳細）</h2>
+      <p>実機PCは <strong>Win11・1台</strong>のため、新ドライバ系列（実験3→条件付きで実験2）は<strong>実験4・5・7 が完了してから</strong>実施する。PC操作に不慣れな実施者を想定し、クリック単位で記す。<strong>レジストリは触らない</strong>（実験2が必要になった場合も配布スクリプトが自動処理する）。</p>
+      <h3>入替前チェック</h3>
+      <ul>
+        <li>☐ 実験4・5・7 の判定シート記入とログ回収が完了している</li>
+        <li>☐ AnalogBoard アプリを終了している</li>
+        <li>☐ 新旧ドライバのフォルダをローカルに用意している：新＝<code>FX3\Win11\x64</code>（1.3.0.4）／旧＝現行運用版（1.2.3.20 系）のフォルダ</li>
+      </ul>
+      <h3>入替（旧 → 新 1.3.0.4）</h3>
+      <ol>
+        <li>画面左下の<strong>スタートボタンを右クリック</strong>し、メニューから「<strong>デバイス マネージャー</strong>」をクリック</li>
+        <li>一覧の「<strong>ユニバーサル シリアル バス コントローラー</strong>」の左の「＞」をクリックして開き、<strong>Cypress／FX3 系の名前のデバイス</strong>を探す（見つからない場合：メニューの「表示」→「デバイス（接続別）」に切り替えて探す。機械の電源とUSB接続も確認）</li>
+        <li>そのデバイスを<strong>右クリック</strong>→「<strong>プロパティ</strong>」→「<strong>ドライバー</strong>」タブ。<strong>現在のバージョン（1.2.3.20 系のはず）をメモ</strong>してから「<strong>ドライバーの更新</strong>」をクリック</li>
+        <li>「<strong>コンピューターを参照してドライバーを検索</strong>」→「参照」で用意した <code>FX3\Win11\x64</code> フォルダを選択 →「次へ」</li>
+        <li>完了後、もう一度プロパティの「ドライバー」タブを開き、<strong>バージョンが 1.3.0.4 になっている</strong>ことを確認して判定シートに記録</li>
+        <li>デバイスが「！」マーク無しで表示されていることを確認（「！」が付いたら下の「困ったとき」へ）</li>
+      </ol>
+      <h3>ロールバック（新 → 旧）</h3>
+      <ol>
+        <li>同じ手順でプロパティの「ドライバー」タブを開く</li>
+        <li>「<strong>ドライバーを元に戻す</strong>」ボタンが押せる場合：クリックして案内に従う（理由は「以前のバージョンの方が安定していた」等でよい）</li>
+        <li>ボタンが灰色で押せない場合：「ドライバーの更新」→「コンピューターを参照」→「<strong>コンピューター上の利用可能なドライバーの一覧から選択</strong>」→ 一覧から <strong>1.2.3.20 系</strong>を選択 →「次へ」。一覧に無ければ「参照」で旧ドライバのフォルダを指定</li>
+        <li>バージョンが 1.2.3.20 系に戻ったことを確認</li>
+        <li><strong>復帰スモーク×1</strong>：AnalogBoard アプリを起動し、低密度1サイクルで Type C（<code>ep6Timeouts=0</code>・<code>DDR_RD_END=1</code>）を確認。結果を判定シート 3-4 に記録</li>
+      </ol>
+      <h3>困ったとき</h3>
+      <ul>
+        <li>デバイスに「！」が付いた／認識されない → USB コネクタを抜き差し。直らなければ PC を再起動</li>
+        <li>更新ウィザードで「最適なドライバーが既にインストールされています」と出る → 「コンピューター上の利用可能なドライバーの一覧から選択」の経路でバージョンを明示指定する</li>
+        <li>どのデバイスか自信がない → デバイスを右クリック→プロパティ→「詳細」タブ→「ハードウェア ID」に <code>VID_04B4</code> が含まれていれば対象</li>
+      </ul>
+    </section>
+
+    <!-- ===== EXP3 (新ドライバ系列・先行) ===== -->
+    <section id="exp3">
+      <h2>実験3：SDK1.3対応バイナリ検証（新ドライバ系列の最初に実施・レジストリ不要）</h2>
+      <div class="callout callout-success">
+        <div class="callout-title">実験2より先にやる（2026-07-06 オーナー方針）</div>
+        <p>本実験は<strong>レジストリ操作が一切不要</strong>。これが成功すれば実験2（DFX A/B＝レジストリ変更）は<strong>丸ごとスキップ</strong>できるため、新ドライバ系列では本実験を先に実施する。</p>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>新ドライバ＋一致SDK（1.3）のバイナリで通信可能かを検証し、ドライバ Plan A を確定させる</td>
+          <td>Win11 新ドライバで Type C を達成</td>
+        </tr></tbody>
+      </table>
+      <h3>手順（driver_next.md の first gate を踏襲）</h3>
+      <ol>
+        <li>「ドライバ入替・ロールバック手順」に従い新ドライバ <code>1.3.0.4</code> へ入替（DFX 等の設定は<strong>一切変更しない</strong>＝既定のまま）</li>
+        <li><strong>再作成した</strong> <code>feature/win11-driver-compat</code> の <code>x64/Release</code> 出力物を配置</li>
+        <li><code>USBBoard_Connect</code> の成功を確認（起動時自動接続のログ）</li>
+        <li><strong>first gate</strong>：アイドル EP4 読取を10回以上反復し、<code>Get ep4 register data failed.</code>／<code>USB board is removed! Disconnect usb.</code> が出ないことを確認</li>
+        <li>first gate 通過後、<strong>EP2 → EP4 → EP6 の順で smoke</strong>：Set（EP2一括書込）→ レジスタ読取 → 低密度1サイクル取得</li>
+        <li>低密度で Type C を確認後、高密度×1〜3 で timeout と EP4 failure を再評価</li>
+        <li><strong>first gate が失敗した場合のみ</strong>実験2（DFX A/B）へ進む。成功した場合は実験2をスキップし判定シートに「スキップ（実験3成功）」と記録</li>
+        <li>系列の締めは「ドライバ入替・ロールバック手順」の<strong>ロールバック＋復帰スモーク</strong>（実験2/3 が良好で新ドライバ維持を選ぶ場合はその判断を判定シート 3-4 に明記）</li>
+      </ol>
+      <h3>観測ポイント</h3>
+      <ul>
+        <li>endpoint discovery の変化有無（DLL に discovery hardening 導入済み）</li>
+        <li>高密度時の Type 分類と <code>ep6Timeouts</code>（直結前提での比較）</li>
+      </ul>
+      <h3>アイドルEP4試験のUI経路</h3>
+      <p><span class="badge badge-open">Open Question</span> driver_next.md は「FPGA Debug タブ → EP4 RX ボタン数回」を想定するが、ビルドによっては Dialog2 タブが非表示（タブ挿入コメントアウト）の可能性がある。<strong>事前準備でタブ有効ビルドか確認</strong>し、非表示の場合の代替は「接続→Set→アイドル放置→再Set」等の EP4 読取を通る操作系列を用いる。</p>
+      <h3>結果の解釈</h3>
+      <table class="spec-table">
+        <thead><tr><th>実験3（新バイナリ・DFX既定）</th><th>実験2（NoDfx・条件付き）</th><th>解釈と次アクション</th></tr></thead>
+        <tbody>
+          <tr><td><strong>成功</strong></td><td>実施不要（スキップ）</td><td>SDK 世代不一致が主因。Plan A（cyusb3.sys＋SDK1.3一致lib）で確定。<strong>レジストリ操作なしで決着</strong></td></tr>
+          <tr><td>失敗</td><td><strong>成功</strong></td><td>DFX が主因。NoDfx を運用要件化（FX3 FW が LPM 非対応なら恒久要件の可能性）。Plan A＋NoDfx で確定</td></tr>
+          <tr><td>失敗</td><td>失敗</td><td>（時間があれば dev r18相当＝旧SDKバイナリ＋NoDfx も1本試行）→ 全滅なら Plan B（WinUSB 再バインド・署名コスト）検討へ。当面の運用は旧ドライバ継続</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== EXP2 (条件付き) ===== -->
+    <section id="exp2">
+      <h2>実験2：Win11 DFX無効化 A/B（条件付き・スクリプトで実施）</h2>
+      <div class="callout callout-warning">
+        <div class="callout-title">実施条件（2026-07-06 オーナー方針：レジストリ操作は極力避ける）</div>
+        <p><strong>実験3の first gate（接続＋アイドルEP4）が失敗した場合のみ</strong>実施する。実験3が成功していたら本実験はスキップし、判定シートに「スキップ（実験3成功）」と記録する。実施する場合も<strong>regedit は開かない</strong>——配布スクリプト（<code>scripts\field-session\</code>）が対象デバイスの自動検出・設定・復元まで行う。</p>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>Win11 新ドライバでの通信不可の主因が DFX（アイドルサスペンド）かを単変数で切り分け</td>
+          <td>NoDfx（<code>WdfDirectedPowerTransitionEnable=0</code>）で <code>Get ep4 register data failed.</code> が消えるか</td>
+        </tr></tbody>
+      </table>
+      <div class="callout callout-danger">
+        <div class="callout-title">やってはいけないこと</div>
+        <ul>
+          <li><strong>INF（<code>cyusb3.inf</code>）を編集しない</strong>——署名 cat が無効化される</li>
+          <li>INF 同梱の <code>CyUsb3NoDfx</code> セクションでインストールしない——<code>DriverEnableDfx=0</code> と <code>WdfDirectedPowerTransitionEnable=0</code> の<strong>2変数が同時に変わり交絡する</strong></li>
+          <li><strong>regedit で手動編集しない</strong>——キー階層の打ち間違いリスク。必ず配布スクリプトを使う</li>
+        </ul>
+      </div>
+      <h3>事前準備（開発側・セッション前日まで）</h3>
+      <ul>
+        <li>☐ <code>scripts\field-session\</code> フォルダ一式（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCにコピーしておく（例：<code>C:\field-session\</code>）</li>
+      </ul>
+      <h3>手順（クリック単位）</h3>
+      <ol>
+        <li><strong>実施判断</strong>：実験3 first gate の失敗を判定シートで確認（失敗していなければここで終了・スキップ記録）</li>
+        <li><strong>管理者ターミナルを開く</strong>：画面左下の<strong>スタートボタンを右クリック</strong>→「<strong>ターミナル (管理者)</strong>」（または「Windows PowerShell (管理者)」）→ 確認ダイアログで「<strong>はい</strong>」</li>
+        <li>スクリプトのフォルダへ移動：<code>cd C:\field-session</code>（実際の配置先に読み替え）</li>
+        <li><strong>現状確認</strong>：<code>powershell -ExecutionPolicy Bypass -File .\dfx_status.ps1</code><br>→ 表示された値（通常「<code>not set (driver default = DFX ENABLED)</code>」）を判定シートに書き写す</li>
+        <li><strong>ベースライン（A条件・DFX有効のまま）</strong>：実験3と同じ first gate 試験（接続→アイドルEP4×10回）を実施し、失敗回数を記録——実験3の結果をそのまま流用してよい</li>
+        <li><strong>DFX 無効化（B条件）</strong>：<code>powershell -ExecutionPolicy Bypass -File .\dfx_off.ps1</code><br>→ 緑色の「Done.」が出たら <code>dfx_status.ps1</code> をもう一度実行し「<code>0 = DFX DISABLED</code>」を確認。黄色の「WARN: device restart failed」が出た場合は<strong>USBコネクタを一度抜き差し</strong>すれば同じ効果</li>
+        <li><strong>B条件の試験</strong>：手順5と同一の first gate 試験を同一回数実施し、失敗回数を比較（判定 2-2）。失敗が消えたら、NoDfx のまま実験3の残り（smoke→低密度→高密度）を続行</li>
+        <li><strong>復元（可逆性確認を兼ねる）</strong>：試験終了後 <code>powershell -ExecutionPolicy Bypass -File .\dfx_on.ps1</code> を実行し、<code>dfx_status.ps1</code> で「<code>not set</code>」に戻ったことを確認（判定 2-3）。※NoDfx を恒久運用にする判断をした場合は戻さず、その旨を判定シートに明記</li>
+        <li>全ステップの実行結果（スクリプト出力の要点）を判定シートのメモ欄に記録</li>
+      </ol>
+      <h3>スクリプトが失敗するとき</h3>
+      <ul>
+        <li>「NG: administrator rights required」→ 手順2の<strong>管理者</strong>ターミナルで開き直す（ウィンドウタイトルに「管理者」と出ているか確認）</li>
+        <li>「NG: FX3 board not found」→ USB 接続と機械の電源を確認して再実行</li>
+        <li>赤字で「スクリプトの実行が無効」系のエラー → コマンドを <code>powershell -ExecutionPolicy Bypass -File .\〜</code> の形で打っているか確認</li>
+      </ul>
+    </section>
+
+    <!-- ===== EXP4 ===== -->
+    <section id="exp4">
+      <h2>実験4：r18高密度フィールドテスト（段階ラダー）</h2>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>高密度 EP6 タイムアウトが直結（スイッチ区間除去）＋r18ホスト側改修で解決済みかを確認し、<strong>D4（移植ベースライン＝origin/dev）の採用条件を閉じる</strong></td>
+          <td>高密度×3、100サイクル soak で Type C 維持</td>
+        </tr></tbody>
+      </table>
+      <p>正本 runbook は <code>docs/baseline_next.md</code>。以下はその実行順の要約＋判定分岐。</p>
+      <h3>手順（段階制——各段でPassしてから次へ）</h3>
+      <ol>
+        <li><strong>高密度 ×1</strong>：最優先で以下を回収
+          <ul>
+            <li><code>[PR04][TIMEOUT_RECOVERY] phase=resume</code> の <code>retryBackoffMs=20</code></li>
+            <li><code>nextPlannedReadSize</code> が <code>31211520</code> より小さい（clamp 反映）</li>
+            <li><code>deltaWr / deltaRd / deltaBacklog</code>（r17 より悪化していないこと）</li>
+            <li><code>[PR01][CYCLE] status/error/publishedPairs</code></li>
+          </ul>
+        </li>
+        <li><strong>分岐</strong>：
+          <ul>
+            <li>first timeout 自体が消えた → そのまま<strong>高密度 ×3</strong></li>
+            <li>first timeout は残るが <code>TIMEOUT_RECOVERY</code> が改善 → 高密度 ×1 をもう1本比較</li>
+            <li><code>retryBackoffMs=20</code>／clamped <code>nextPlannedReadSize</code> が出ない → <strong>deploy mismatch を先に疑う</strong>（ステップ0へ戻る）</li>
+          </ul>
+        </li>
+        <li><strong>高密度 ×3</strong>：全ラン Type C を確認。タイムアウト継続なら100サイクルへ進まず、リトライパスと波形品質の切り分けへ切替</li>
+        <li><strong>低密度 ×100 サイクル soak</strong> → <strong>高密度 ×100 サイクル soak</strong>：停止・破損・missing pair ゼロを確認（実験5の計測データ源を兼ねる）</li>
+        <li><strong>preview / consumer 併用セッション ×1</strong>：<code>.tmp</code> 非公開・pair index 単調増加・不完全ペア非可視を確認</li>
+        <li><strong>spot check</strong>：成功ランの .bin ペア健全性（ノートブックで波形確認）、失敗ランがあれば <code>_cfg.txt</code> の result metadata と publish 境界の照合</li>
+      </ol>
+      <h3>参考値（過去バージョンの実測）</h3>
+      <table class="spec-table">
+        <thead><tr><th>版</th><th>実測</th><th>含意</th></tr></thead>
+        <tbody>
+          <tr><td>r16</td><td><code>deltaWr=1047822336 / deltaRd=65536 / deltaBacklog=1047756800</code>、<code>nextPlannedReadSize=31211520</code>、<code>retryBackoffMs=0</code></td><td>first timeout 後の host retry/read-size 制御が主犯候補</td></tr>
+          <tr><td>r17</td><td><code>ep6MaxMs=34172</code>（DLL timeout 30s 延長は反映）、resume 直後 <code>deltaBacklog=2975612928</code>、<code>retryBackoffMs=0</code></td><td>ブロッカーはエンジン側 recovery path</td></tr>
+          <tr><td>r18（今回検証）</td><td>first-timeout-only <code>backoff=20ms</code>＋retry read clamp 64KiB を導入</td><td><code>retryBackoffMs=20</code> と縮小した <code>nextPlannedReadSize</code> の出現が改修反映の証拠</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== EXP5 ===== -->
+    <section id="exp5">
+      <h2>実験5：auto-mode 再アームギャップ計測</h2>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>4GB 再アーム窓の実測値を取得し、4GB戦略フェーズ2（FWリングバッファ化）の要否判断（D2）と新アプリの NFR（p99 &lt; 1s）の現実性を評価する</td>
+          <td><code>[PR01][CYCLE]</code> から <strong>p99 再アーム窓（ms）</strong>と <strong>maxBacklogBytes</strong> を算出できること</td>
+        </tr></tbody>
+      </table>
+      <h3>手順</h3>
+      <ol>
+        <li>実験4の <strong>100サイクル soak のログをそのまま一次データにする</strong>（専用ランは不要。soak が流れている間に本実験の抽出定義を確認しておく）</li>
+        <li>auto-mode（Manual Get OFF → Set → 外部開始待機）での連続サイクルを最低1系列含める。<span class="badge badge-open">Open Question</span> 機械側スイッチによる外部開始をセッションで操作できるかは現地確認——不可なら Manual 連続サイクルで代替し、その旨を記録</li>
+        <li>各サイクルについてログのタイムスタンプから「停止（ドレイン完了 <code>DDR_RD_END=1</code>）→ 次アーム（INIT → 取得再開）」の窓を抽出</li>
+        <li>サイクル毎の <code>backlogBytes</code> 最大値（<code>[PR04][TIMEOUT_RECOVERY]</code>／<code>[PR04][STARTUP_EP4]</code> の <code>WAVE_WR_CNT/WAVE_RD_CNT</code> 差分）を併記</li>
+        <li>低密度・高密度それぞれで p50 / p99 / max を算出（解析は持ち帰り後で可。ログの完全回収が現地の必須タスク）</li>
+      </ol>
+      <h3>観測ポイント</h3>
+      <ul>
+        <li><code>[PR01][CYCLE] status/error/publishedPairs</code>（サイクル境界の一次マーカー）</li>
+        <li><code>[PR04][STARTUP_EP4] poll/WAVE_WR_CNT/WAVE_RD_CNT/DDR_WR_END/DDR_RD_END/savedBytes</code></li>
+        <li>ディスク書込停滞（writer 遅延）でバックログが膨れたサイクルの有無——p99 を歪める要因として個別記録</li>
+      </ul>
+    </section>
+
+    <!-- ===== EXP6 ===== -->
+    <section id="exp6">
+      <h2>実験6：録画キャプチャ（全実験で並走）</h2>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>エミュレータ（Tier 1/2/3）・回帰コーパスの初期充填。<strong>特に失敗トレース</strong>（タイムアウト・切断・ショートリード）の保全</td>
+          <td>各 config・各ドライバ構成（Win11 旧/新）で EP2/4/6 の証跡を取得し、障害トレースも保全されている</td>
+        </tr></tbody>
+      </table>
+      <div class="callout callout-info">
+        <div class="callout-title">フェーズ0での「録画」の実体</div>
+        <p>新通信層の Recorder はまだ存在しないため、フェーズ0の録画は<strong>①アプリログ＋②保存データ（.bin/_cfg）＋③USBレベルキャプチャ</strong>の3点セットで代替する。<span class="badge badge-assumption">Assumption</span> ③のツール（USBPcap 等）はプラン未指定・事前選定。①②は全ランで自動的に取れるので、<strong>「消さない・全部持ち帰る」が本実験の実質タスク</strong>。</p>
+      </div>
+      <h3>手順</h3>
+      <ol>
+        <li>全実験を通じ、ラン毎に「ビルド版・OS・ケーブル・密度・パラメータ・結果 Type」を判定シートに記録（コーパスのメタデータになる）</li>
+        <li>アプリログ（<code>logs/&lt;ver&gt;/logs/*.log</code>）と保存データ（<code>*_cfg.txt</code>・<code>.bin</code> ペア）を<strong>失敗ラン含め全て保全</strong></li>
+        <li><strong>専用キャプチャラン</strong>：判定に使わない追加ランとして、低密度×1・高密度×1・（可能なら）スイッチ区間を挿入した障害再現×1 を USB レベルキャプチャ付きで取得——EP2 コマンド列・EP4 レジスタ推移・EP6 バルク・転送間タイムスタンプの実トレースを得る</li>
+        <li>キャプチャファイルはラン ID（判定シートの番号）と紐付けて保存</li>
+      </ol>
+      <h3>コーパスに揃えるべき内訳（プラン「録画コーパスに含めるもの」より）</h3>
+      <ul>
+        <li>EP6 生バイト列（=保存 .bin ペア＋キャプチャ）</li>
+        <li>EP4 レジスタ推移（=ログの <code>STARTUP_EP4</code>/EP4読取行＋キャプチャ）</li>
+        <li>EP2 コマンド列（=Set 時のログ＋キャプチャ）</li>
+        <li>転送間タイムスタンプ（=キャプチャ。ログは秒精度のため補助）</li>
+        <li>config タグ（=<code>_cfg.txt</code>＋判定シートのメタデータ）</li>
+        <li>障害イベントの実トレース（=Type A/B ランのログ一式）</li>
+      </ul>
+    </section>
+
+    <!-- ===== EXP7 ===== -->
+    <section id="exp7">
+      <h2>実験7：実 .bin/_cfg サンプル取得と gcsa 照合</h2>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>gcsa 互換契約の実行時確認。<strong>D17（物理ch順＝gcsa想定順）を実サンプルで照合・凍結</strong>し、cfg 必須行・特徴量算出方針を確定する</td>
+          <td>実サンプルが gcsa v1 パーサを通り、物理ch順・<code>Select(0/1)</code>・A/H/W 算出方針が確定</td>
+        </tr></tbody>
+      </table>
+      <h3>手順（現地）</h3>
+      <ol>
+        <li><strong>基準サンプル取得</strong>：CH1-13 全有効・既知の gain/offset・記録したトリガ設定で1データセット取得（<code>*_fl_*.bin</code>＋<code>*_fh_*.bin</code>＋<code>_cfg.txt</code>）。使用パラメータは判定シートに全て記録</li>
+        <li><strong>ch順特定ラン</strong>：物理ch→波形chの対応を一意化するため、<strong>1チャンネルだけ条件を変えたランを2〜3本</strong>追加取得（例：特定 FL ch のゲインのみ大きく変える／特定 ch のみ有効化）。どの ch を変えたかを必ず記録</li>
+        <li>サンプル温存が難しい場合に備え、基準サンプルは最優先で取得しておく（セッション後半の機材トラブルに対するヘッジ）</li>
+      </ol>
+      <h3>手順（照合——持ち帰り後で可）</h3>
+      <ol>
+        <li><code>_cfg.txt</code> が gcsa 必須3フィールドを持つか：<code>trigger_set.high_freq_num_per_sample</code>・<code>wave_get_set.waveformes_nums_per_file</code>（スペルミス "Waveformes" のまま）・<code>trigger_set.select</code>（≥1ch が 1）</li>
+        <li>.bin が契約通りか：ヘッダレス <code>&lt;u2</code>・channel-major・FL 8ch／FH 5ch・2400 サンプル・exact-multiple</li>
+        <li>gcsa v0.4.1 でロード → <code>extract_all</code> で 24 カラム（ch毎 A→H→W 順）が得られる</li>
+        <li>ch順特定ランを使い、変えた物理 ch が gcsa の想定 index（<code>FSC,SSC,FL1..FL6</code>／<code>fsGMI,ssGMI,flGMI,dGMI,bfGMI</code>）に現れるかを照合 → <strong>一致なら D17 凍結、不一致なら ch-mapping 表1枚で吸収</strong>（プラン想定の対応）</li>
+        <li>ROI/BG 既定（FSC/SSC/FL4-6=1100・FL1-3=125・長250・BG[0:50]）が実波形のパルス位置と整合するか目視確認</li>
+        <li>基準サンプル一式の SHA256 を記録し、ゴールデンサンプルとして凍結・保管</li>
+      </ol>
+    </section>
+
+    <!-- ===== SHEET ===== -->
+    <section id="sheet">
+      <h2>判定シート</h2>
+      <p>セッション当日はこの表を印刷（またはコピー）して1行ずつ埋める。<strong>「結果」欄は Pass / Fail / Skip（理由）のみ</strong>、詳細はメモ欄と証跡パスに残す。セッション後の健全性サマリ（UX-07 の紙版）を兼ねる。</p>
+      <table class="spec-table">
+        <thead><tr><th>#</th><th>判定項目</th><th>基準</th><th>結果</th><th>証跡（ログ/データパス）</th><th>メモ</th></tr></thead>
+        <tbody>
+          <tr><td>0-1</td><td>deploy 検証</td><td>マーカー全出現・Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>1-1</td><td>直結 高密度×3</td><td>全ラン Type C（<code>ep6Timeouts=0</code>）</td><td></td><td></td><td></td></tr>
+          <tr><td>1-2</td><td>対照（スイッチ区間挿入）</td><td>Type A/B 再現</td><td></td><td></td><td></td></tr>
+          <tr><td>1-3</td><td>直結復帰</td><td>Type C 復帰</td><td></td><td></td><td></td></tr>
+          <tr><td>3-0</td><td>ドライバ入替（旧→新）</td><td>バージョン 1.3.0.4 表示を確認</td><td></td><td></td><td></td></tr>
+          <tr><td>3-1</td><td>SDK1.3 first gate（DFX既定）</td><td><code>USBBoard_Connect</code>＋idle EP4×10 安定</td><td></td><td></td><td></td></tr>
+          <tr><td>3-2</td><td>SDK1.3 取得 smoke</td><td>低密度 Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>3-3</td><td>SDK1.3 高密度</td><td>Type C（直結）</td><td></td><td></td><td></td></tr>
+          <tr><td>2-1</td><td>【実験3失敗時のみ】dfx_off 適用</td><td><code>dfx_status</code> が <code>0 = DFX DISABLED</code></td><td></td><td></td><td></td></tr>
+          <tr><td>2-2</td><td>【〃】NoDfx で first gate 再試験</td><td>同試験で失敗が消える</td><td></td><td></td><td></td></tr>
+          <tr><td>2-3</td><td>【〃】dfx_on で復元</td><td><code>dfx_status</code> が <code>not set</code>（恒久 NoDfx 採用時はその旨記録）</td><td></td><td></td><td></td></tr>
+          <tr><td>3-4</td><td>ドライバ最終状態</td><td>ロールバック＋復帰スモーク or 新ドライバ維持を記録</td><td></td><td></td><td></td></tr>
+          <tr><td>4-1</td><td>r18 高密度×1</td><td><code>retryBackoffMs=20</code>・clamped read size</td><td></td><td></td><td></td></tr>
+          <tr><td>4-2</td><td>r18 高密度×3</td><td>全ラン Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>4-3</td><td>低密度×100 soak</td><td>停止・破損・missing pair ゼロ</td><td></td><td></td><td></td></tr>
+          <tr><td>4-4</td><td>高密度×100 soak</td><td>Type C 維持</td><td></td><td></td><td></td></tr>
+          <tr><td>4-5</td><td>preview/consumer 併用</td><td><code>.tmp</code> 非公開・pair 単調</td><td></td><td></td><td></td></tr>
+          <tr><td>5-1</td><td>再アーム窓データ</td><td>p99 算出に足るサイクル数のログ回収</td><td></td><td></td><td></td></tr>
+          <tr><td>6-1</td><td>ログ・データ全保全</td><td>失敗ラン含め回収済み</td><td></td><td></td><td></td></tr>
+          <tr><td>6-2</td><td>専用キャプチャラン</td><td>低・高・障害の3本</td><td></td><td></td><td></td></tr>
+          <tr><td>7-1</td><td>基準サンプル取得</td><td>全13ch・パラメータ記録済み</td><td></td><td></td><td></td></tr>
+          <tr><td>7-2</td><td>ch順特定ラン</td><td>2〜3本・変更ch記録済み</td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== COLLECT ===== -->
+    <section id="collect">
+      <h2>回収物チェックリスト（セッション終了時・退出前）</h2>
+      <div class="callout callout-danger">
+        <div class="callout-title">退出前に必ず実施</div>
+        <p>以下は<strong>実機PCにしか存在しない</strong>ものを含む。持ち帰り忘れはセッションのやり直しに直結する。</p>
+      </div>
+      <ul>
+        <li>☐ <code>logs/</code> 一式（全ビルド・全ラン・<strong>失敗ラン含む</strong>）→ 共有ストレージへコピー</li>
+        <li>☐ <code>data/</code> 一式（.bin ペア＋<code>_cfg.txt</code>。少なくとも代表ラン＋障害ラン＋実験7の全サンプル）</li>
+        <li>☐ USB レベルキャプチャファイル（ラン ID と紐付け済み）</li>
+        <li>☐ 判定シート（全行埋め・Skip は理由付き）</li>
+        <li>☐ 実験2のレジストリ変更の記録（最終状態：戻したか、NoDfx のままか）</li>
+        <li>☐ <code>feature/win11-driver-compat</code> worktree の push 確認（未 push commit ゼロ）</li>
+        <li>☐ <code>CyAPI.lib</code>（SDK 1.2/1.3）バイナリの保管とビルド対応の記録</li>
+        <li>☐ 接続構成の記録（使用ホストポート・直結標準化の確定・<code>SW-SEG-01</code> の保管場所）</li>
+        <li>☐ 各PCの最終ドライバ状態の記録（旧ドライバへロールバック済みか＋復帰スモーク結果、または新ドライバ維持の判断）</li>
+      </ul>
+    </section>
+
+    <!-- ===== RISKS ===== -->
+    <section id="risks">
+      <h2>注意事項・未決事項</h2>
+
+      <h3>落とし穴（負の知識）</h3>
+      <div class="risk-card risk-card--high">
+        <div class="risk-header"><span class="badge badge-risk-high">High</span><span class="risk-title">計装・観測がタイミングを変える</span></div>
+        <div class="risk-body">DebugView／デバッガ接続は <code>OutputDebugStringA</code> のコストを跳ね上げ、取得タイミングを変えて別の障害を「作り出す」。判定ランでは必ず外す。USBレベルキャプチャも判定ランでは使わず専用ランに分離する。</div>
+      </div>
+      <div class="risk-card risk-card--high">
+        <div class="risk-header"><span class="badge badge-risk-high">High</span><span class="risk-title">deploy mismatch のまま実験を進める</span></div>
+        <div class="risk-body">マーカー（<code>[PR04][TIMEOUT_RECOVERY]</code> 等）が出ない状態で得た結果は解釈不能になり全ランが無駄になる。ステップ0を必ず通し、疑わしければ即座にビルド配置へ戻る。</div>
+      </div>
+      <div class="risk-card risk-card--medium">
+        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">A/B の交絡</span></div>
+        <div class="risk-body">スイッチ区間の着脱時にホストポートも変える、DFX を INF の NoDfx セクションで入れる（2値同時変更）、実験間でサンプル密度が変わる——いずれも切り分け力を失う。1実験1変数を厳守し、変えたものを判定シートに書く。</div>
+      </div>
+      <div class="risk-card risk-card--medium">
+        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">RD_WAIT 固着</span></div>
+        <div class="risk-body">FPGA がドレイン中に RD_WAIT で固着した場合、ホスト側だけでは回復不能（FW に abort レジスタなし）。発生したら電源サイクルで復帰し、<strong>発生時のログを障害トレースとして必ず保全</strong>する（自動再接続の上限を示す一次証拠になる）。</div>
+      </div>
+
+      <h3>未決事項</h3>
+      <ul class="question-list">
+        <li>アイドル EP4 試験の UI 経路：配布ビルドで Dialog2（FPGA Debug タブ）が有効か。無効時の代替操作系列を事前に確定する</li>
+        <li>auto-mode の外部開始（機械側スイッチ）をセッション中に操作できるか。不可なら実験5は Manual 連続サイクルで代替</li>
+        <li>USB レベルキャプチャツールの選定と、Win10/Win11 両機での動作確認</li>
+      </ul>
+
+      <h3>前提（Assumption）</h3>
+      <div class="callout callout-danger">
+        <div class="callout-title">Assumptions</div>
+        <ul>
+          <li>所要時間は soak（×100×2本）が支配的。実機PCは Win11・1台確定のため全実験を直列で回す（新ドライバ系列は最後）。1日で収まらない場合は新ドライバ系列（実験3→条件付き2）を第2セッションに分割する前提</li>
+          <li>DFX レジストリキーの正確な階層は現地確認（本書のパスはテンプレート）</li>
+          <li>「録画」はフェーズ0時点ではログ＋データ＋USBキャプチャの3点セットで代替（新通信層 Recorder は未実装）</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== APPENDIX ===== -->
+    <section id="appendix">
+      <h2>付録（トレーサビリティ）</h2>
+      <p>本書は以下の正本から生成した。判定基準・実験定義の規範は親プランと各 runbook にある。</p>
+      <table class="spec-table">
+        <thead><tr><th>本書のセクション</th><th>正本</th><th>扱い</th></tr></thead>
+        <tbody>
+          <tr><td>実験1〜7 の定義・判定基準</td><td>親プラン「まとめ実機セッション」節（<code>docs/plans/260703-analogboard-rebuild-plan.html</code>）</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>実験4 の手順・参考値・分岐</td><td><code>docs/baseline_next.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>実験2・3 の手順・first gate</td><td>親プラン「ドライバ・通信層戦略」節＋<code>docs/driver_next.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>Type A/B/C・スモーク項目</td><td><code>docs/2026-03-02-usb-acquisition-stability-field-reference.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>ラン共通条件（デバッガ・DebugView 禁止等）</td><td><code>docs/archive/usb-acquisition/0929_log_cut_test_instructions.md</code>＋<code>docs/troubleshooting/usb.md</code></td><td><span class="badge badge-inferred">Summarized</span></td></tr>
+          <tr><td>実験7 の照合項目（cfg 必須行・.bin 契約・ch順）</td><td>親プラン「gcsa 互換契約」節・「リスクと未決事項」節</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>セッション実行順・マトリクス・専用キャプチャラン・ch順特定ラン</td><td>本書で新規に構成（実施性のための提案）</td><td><span class="badge badge-inferred">Inferred</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+
+<footer class="doc-footer">
+  <p>Generated from <strong>docs/plans/260703-analogboard-rebuild-plan.html「まとめ実機セッション」節ほか</strong> on 2026-07-06.</p>
+  <p>本書は実施用の手順書であり、実験定義・判定基準の規範は親プランと各 runbook（baseline_next.md / driver_next.md）にある。図の描画に Mermaid（CDN）を使用。</p>
+</footer>
+<!-- Lightbox modal for diagrams (Pan & Zoom) -->
+<div class="diagram-modal" id="diagramModal" role="dialog" aria-modal="true" aria-label="Enlarged diagram" tabindex="-1">
+  <div class="diagram-modal-toolbar">
+    <div class="diagram-modal-toolbar-group">
+      <button class="diagram-modal-btn" id="zoomOut" aria-label="Zoom out">&minus;</button>
+      <span class="diagram-modal-zoom-label" id="zoomLabel">100%</span>
+      <button class="diagram-modal-btn" id="zoomIn" aria-label="Zoom in">+</button>
+      <button class="diagram-modal-btn" id="zoomReset" aria-label="Reset zoom" style="font-size:0.6875rem;width:auto;padding:0 0.5rem;">Reset</button>
+    </div>
+    <span class="diagram-modal-caption-bar" id="modalCaption"></span>
+    <button class="diagram-modal-btn" id="modalClose" aria-label="Close">&times;</button>
+  </div>
+  <div class="diagram-modal-viewport" id="modalViewport">
+    <div class="diagram-modal-content" id="modalContent"></div>
+  </div>
+</div>
+
+<!-- ============================
+     SCRIPTS
+     Mermaid CDN for diagram rendering.
+     Remove if using inline SVG only.
+     ============================ -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', fontFamily: 'inherit' });
+
+  // Diagram Pan & Zoom viewer
+  (function() {
+    var modal = document.getElementById('diagramModal');
+    var viewport = document.getElementById('modalViewport');
+    var content = document.getElementById('modalContent');
+    var caption = document.getElementById('modalCaption');
+    var zoomLabel = document.getElementById('zoomLabel');
+    var btnClose = document.getElementById('modalClose');
+    var btnIn = document.getElementById('zoomIn');
+    var btnOut = document.getElementById('zoomOut');
+    var btnReset = document.getElementById('zoomReset');
+
+    var scale = 1, panX = 0, panY = 0, fitScale = 1;
+    var dragging = false, startX = 0, startY = 0, startPanX = 0, startPanY = 0;
+    var lastFocusedDiagram = null;
+    var MIN_SCALE = 0.1, MAX_SCALE = 5, STEP = 0.25;
+    var WHEEL_ZOOM_SENSITIVITY = 0.005;
+    var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+
+    function applyTransform() {
+      content.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
+      zoomLabel.textContent = Math.round(scale * 100) + '%';
+    }
+
+    function fitToView() {
+      scale = 1; panX = 0; panY = 0;
+      content.style.transform = 'none';
+      requestAnimationFrame(function() {
+        var svg = content.querySelector('svg');
+        if (!svg) { applyTransform(); return; }
+
+        var vw = viewport.clientWidth;
+        var vh = viewport.clientHeight;
+        var rect = svg.getBoundingClientRect();
+        var svgW = rect.width;
+        var svgH = rect.height;
+
+        if (!svgW || !svgH) { applyTransform(); return; }
+
+        var PAD = 48;
+        fitScale = Math.min((vw - PAD * 2) / svgW, (vh - PAD * 2) / svgH);
+        fitScale = Math.min(fitScale, 2);
+        fitScale = Math.max(fitScale, MIN_SCALE);
+        scale = fitScale;
+
+        panX = (vw - svgW * scale) / 2;
+        panY = (vh - svgH * scale) / 2;
+        applyTransform();
+      });
+    }
+
+    function clampScale(value) {
+      return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+    }
+
+    function zoomTo(nextScale, cx, cy) {
+      var prev = scale;
+      scale = clampScale(nextScale);
+      if (cx !== undefined && cy !== undefined && prev !== scale) {
+        var ratio = scale / prev;
+        panX = cx - ratio * (cx - panX);
+        panY = cy - ratio * (cy - panY);
+      }
+      applyTransform();
+    }
+
+    function zoomBy(delta, cx, cy) {
+      zoomTo(scale + delta, cx, cy);
+    }
+
+    function normalizeWheel(e) {
+      var unit = 1;
+      if (e.deltaMode === 1) unit = 16;
+      else if (e.deltaMode === 2) unit = viewport.clientHeight;
+      return { dx: e.deltaX * unit, dy: e.deltaY * unit };
+    }
+
+    function isLikelyTrackpadPinch(e, wheel) {
+      return isMac && e.ctrlKey && !e.metaKey && e.deltaMode === 0 &&
+        Math.abs(wheel.delta) < 80 && Math.abs(wheel.dx) < 8;
+    }
+
+    function shouldZoomOnWheel(e, wheel) {
+      if (isMac ? e.metaKey : e.ctrlKey) return true;
+      return isLikelyTrackpadPinch(e, wheel);
+    }
+
+    function zoomByWheel(wheel, cx, cy) {
+      var factor = Math.exp(-wheel.delta * WHEEL_ZOOM_SENSITIVITY);
+      zoomTo(scale * factor, cx, cy);
+    }
+
+    function panByWheel(e, wheel) {
+      var dx = wheel.dx;
+      var dy = wheel.dy;
+      if (e.shiftKey && Math.abs(dx) < Math.abs(dy)) {
+        dx = dy;
+        dy = 0;
+      }
+      panX -= dx;
+      panY -= dy;
+      applyTransform();
+    }
+
+    function focusElement(el) {
+      if (!el || typeof el.focus !== 'function') return;
+      try { el.focus({ preventScroll: true }); }
+      catch (err) { el.focus(); }
+    }
+
+    function getDiagramLabel(figure) {
+      var figcap = figure.querySelector('figcaption');
+      var label = figcap && figcap.textContent ? figcap.textContent.trim() : '';
+      return label ? 'Open enlarged diagram: ' + label : 'Open enlarged diagram';
+    }
+
+    function isInteractiveTarget(target) {
+      return target && target.closest && target.closest('a, button, input, textarea, select, summary');
+    }
+
+    function openModal(figure) {
+      var svg = figure.querySelector('svg');
+      var mermaidDiv = figure.querySelector('.mermaid');
+      var figcap = figure.querySelector('figcaption');
+
+      content.innerHTML = '';
+      if (svg) {
+        var clone = svg.cloneNode(true);
+        clone.removeAttribute('style');
+        content.appendChild(clone);
+      } else if (mermaidDiv) {
+        content.innerHTML = mermaidDiv.innerHTML;
+      }
+
+      caption.textContent = figcap ? figcap.textContent : '';
+      lastFocusedDiagram = figure;
+      modal.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+      focusElement(modal);
+      fitToView();
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      document.body.style.overflow = '';
+      focusElement(lastFocusedDiagram);
+    }
+
+    // Open from diagram click or keyboard activation
+    document.querySelectorAll('.diagram-container').forEach(function(fig) {
+      if (!fig.hasAttribute('tabindex')) fig.setAttribute('tabindex', '0');
+      if (!fig.hasAttribute('role')) fig.setAttribute('role', 'button');
+      if (!fig.hasAttribute('aria-haspopup')) fig.setAttribute('aria-haspopup', 'dialog');
+      if (!fig.hasAttribute('aria-controls')) fig.setAttribute('aria-controls', 'diagramModal');
+      if (!fig.hasAttribute('aria-label')) fig.setAttribute('aria-label', getDiagramLabel(fig));
+
+      fig.addEventListener('click', function(e) {
+        if (isInteractiveTarget(e.target)) return;
+        openModal(fig);
+      });
+      fig.addEventListener('keydown', function(e) {
+        if (isInteractiveTarget(e.target)) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openModal(fig);
+        }
+      });
+    });
+
+    // Toolbar buttons
+    btnClose.addEventListener('click', closeModal);
+    btnIn.addEventListener('click', function() { zoomBy(STEP); });
+    btnOut.addEventListener('click', function() { zoomBy(-STEP); });
+    btnReset.addEventListener('click', fitToView);
+
+    // Wheel: Cmd/Ctrl + wheel zooms. Plain wheel pans the enlarged diagram.
+    // Trackpad pinch is supported when the browser exposes it as a wheel gesture.
+    viewport.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      var wheel = normalizeWheel(e);
+      wheel.delta = wheel.dy || wheel.dx;
+
+      var rect = viewport.getBoundingClientRect();
+      var cx = e.clientX - rect.left;
+      var cy = e.clientY - rect.top;
+
+      if (shouldZoomOnWheel(e, wheel)) {
+        zoomByWheel(wheel, cx, cy);
+      } else {
+        panByWheel(e, wheel);
+      }
+    }, { passive: false });
+
+    // Safari/WebKit trackpad pinch support.
+    if ('ongesturestart' in window) {
+      var gestureStartScale = 1;
+      viewport.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+        gestureStartScale = scale;
+      });
+      viewport.addEventListener('gesturechange', function(e) {
+        e.preventDefault();
+        var rect = viewport.getBoundingClientRect();
+        var cx = e.clientX ? e.clientX - rect.left : rect.width / 2;
+        var cy = e.clientY ? e.clientY - rect.top : rect.height / 2;
+        zoomTo(gestureStartScale * e.scale, cx, cy);
+      });
+    }
+
+    // Mouse drag to pan
+    viewport.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startPanX = panX; startPanY = panY;
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      panX = startPanX + (e.clientX - startX);
+      panY = startPanY + (e.clientY - startY);
+      applyTransform();
+    });
+    window.addEventListener('mouseup', function() { dragging = false; });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+      if (!modal.classList.contains('is-open')) return;
+      if (e.key === 'Escape') closeModal();
+      else if (e.key === '+' || e.key === '=') zoomBy(STEP);
+      else if (e.key === '-') zoomBy(-STEP);
+      else if (e.key === '0') fitToView();
+    });
+  })();
+
+  // TOC: highlight active section on scroll
+  (function() {
+    var links = document.querySelectorAll('.toc a[href^="#"]');
+    var sections = Array.from(links).map(function(a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+    if (!sections.length) return;
+    function onScroll() {
+      var current = sections[0];
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].getBoundingClientRect().top <= 80) current = sections[i];
+      }
+      links.forEach(function(a) {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + current.id);
+      });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+</script>
+</body>
+</html>
