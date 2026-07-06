@@ -1,0 +1,12 @@
+--- origin/dev:docs/process_log/INDEX.md
++++ temp:docs/process_log/INDEX.md
+@@ -7,6 +7,9 @@
+ 
+ | Date | Feature | Log |
+ |---|---|---|
++| 2026-03-22 | application specification polish | [log](2026-03-22-application-specification-polish-log.md) |
++| 2026-03-21 | application specification rescore | [log](2026-03-21-application-specification-rescore-log.md) |
++| 2026-03-21 | application specification restructure | [log](2026-03-21-application-specification-restructure-log.md) |
+ | 2026-03-19 | Engine context hex format | [log](2026-03-19-engine-context-hex-format-log.md) |
+ | 2026-03-02 | USB acquisition stability | [log](2026-03-02-usb-acquisition-stability-log.md) |
+ | 2026-03-02 | USB acquisition stability (Part 2) | [log](2026-03-02-usb-acquisition-stability-log-02.md) |
