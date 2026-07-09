@@ -4,19 +4,19 @@
 
 ## 対象プラン
 
-- [USB データ取得・書き込み安定性改善プラン](../2026-03-02-usb-acquisition-stability.md)
-- [チェックリスト](../2026-03-02-usb-acquisition-stability-checklist.md)
-- [baseline_next.md](../baseline_next.md)
-- [lab_next.md](../lab_next.md)
+- [USB データ取得・書き込み安定性改善プラン](../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
+- [チェックリスト](../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-checklist.md)
+- [baseline_next.md](../operations/usb-acquisition-stability/baseline_next.md)
+- [lab_next.md](../operations/usb-acquisition-stability/lab_next.md)
 
 ## 2026-03-18 読み方メモ
 
 今後の判断で迷わないため、この process log の役割を固定する。
 
 - この log は **「なぜその順番にしたか」「どの field result で gate を閉じたか」** を追うための正本
-- 現在の完了/未完了は [チェックリスト](../2026-03-02-usb-acquisition-stability-checklist.md) を見る
-- 実装方針と branch の責務は [プラン](../2026-03-02-usb-acquisition-stability.md) を見る
-- branch ごとの次タスクは [baseline_next.md](../baseline_next.md) と [lab_next.md](../lab_next.md) を見る
+- 現在の完了/未完了は [チェックリスト](../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-checklist.md) を見る
+- 実装方針と branch の責務は [プラン](../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md) を見る
+- branch ごとの次タスクは [baseline_next.md](../operations/usb-acquisition-stability/baseline_next.md) と [lab_next.md](../operations/usb-acquisition-stability/lab_next.md) を見る
 
 2026-03-18 時点の運用結論:
 

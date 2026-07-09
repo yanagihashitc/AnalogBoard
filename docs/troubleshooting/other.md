@@ -72,5 +72,5 @@ The repository `.gitignore` contains a broad `docs/` ignore rule. Previously tra
 
 - `.gitignore`
 - `docs/test-perspectives/INDEX.md`
-- `docs/2026-03-09-test-perspective-catalog-checklist.md`
-- `docs/2026-03-09-test-perspective-catalog-log.md`
+- `docs/archive/code-quality/2026-03-09-test-perspective-catalog-checklist.md`
+- `docs/archive/code-quality/2026-03-09-test-perspective-catalog-log.md`

@@ -588,12 +588,12 @@ pre {
 
 <header class="doc-header">
   <h1>まとめ実機セッション手順書</h1>
-  <p class="subtitle">AnalogBoard 再構築フェーズ0 — 実験1〜7を1セッションで流し切るための実施手順・判定基準・回収物チェックリスト</p>
+  <p class="subtitle">AnalogBoard 再構築フェーズ0 — 実験1〜7（5bは条件付き分岐）を1セッションで流し切るための実施手順・判定基準・回収物チェックリスト</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実機セッション手順書（runbook）</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.2</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.3</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-06</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-06（Win11×1台確定で直列フロー化。実験3を先行・実験2を条件付き＋スクリプト化（レジストリ手作業排除）。ドライバ入替・ロールバック詳細手順を新設）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-08（ステップ0を r7 / r18 直結 A/B に変更し、採用候補を決めてから実験1以降へ進む運用へ更新）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> セッション実施者（オーナー／開発チーム）</span>
     <span class="doc-meta-item"><strong>Source:</strong> 親プラン「まとめ実機セッション」節・baseline_next.md・driver_next.md・field-reference</span>
   </div>
@@ -608,18 +608,18 @@ pre {
       <li><a href="#principles">前提と原則</a></li>
       <li><a href="#prep">事前準備（前日まで）</a></li>
       <li><a href="#flow">セッション全体フロー</a></li>
-      <li><a href="#smoke">ステップ0：スモーク＆deploy検証</a></li>
+      <li><a href="#smoke">ステップ0：r7 / r18 直結A/B</a></li>
       <li><a href="#exp1">実験1：スイッチ区間A/B</a></li>
+      <li><a href="#exp2">実験2：選定候補 高密度ラダー</a></li>
+      <li><a href="#exp3">実験3：再アームギャップ計測</a></li>
+      <li><a href="#exp4">実験4：gcsa照合サンプル</a></li>
       <li><a href="#driverswap">ドライバ入替・ロールバック手順</a></li>
-      <li><a href="#exp3">実験3：SDK1.3バイナリ（先行）</a></li>
-      <li><a href="#exp2">実験2：DFX A/B（条件付き）</a></li>
-      <li><a href="#exp4">実験4：r18高密度ラダー</a></li>
-      <li><a href="#exp5">実験5：再アームギャップ計測</a></li>
+      <li><a href="#exp5">実験5：SDK1.3バイナリ</a></li>
+      <li><a href="#exp5b">実験5b：DFX A/B（条件付き）</a></li>
       <li><a href="#exp6">実験6：録画キャプチャ</a></li>
-      <li><a href="#exp7">実験7：gcsa照合サンプル</a></li>
+      <li><a href="#exp7">実験7：回収物チェック</a></li>
       <li><a href="#sheet">判定シート</a></li>
-      <li><a href="#collect">回収物チェックリスト</a></li>
-      <li><a href="#risks">注意事項・未決事項</a></li>
+      <li><a href="#risks">注意事項</a></li>
       <li><a href="#appendix">付録（トレーサビリティ）</a></li>
     </ol>
   </nav>
@@ -630,7 +630,7 @@ pre {
     <section id="summary">
       <h2>概要</h2>
       <p>
-        本書は親プラン（<code>docs/plans/260703-analogboard-rebuild-plan.html</code>「まとめ実機セッション」節）で定義された<strong>フェーズ0のまとめ実機セッション</strong>を、現地で迷わず流し切るための実施手順書である。実機アクセスは希少なため、<strong>事前にビルド済みバイナリ・本手順書・判定シートを全て用意し、1セッションで完了させる</strong>。セッションの成果（判定結果・録画コーパス・実サンプル）は、D4（移植ベースライン採用）・D17（物理ch順凍結）・ドライバ戦略（Plan A/B）・4GB戦略の判断入力になる。
+        本書は親プラン（<code>docs/plans/260710-analogboard-rebuild-plan.html</code>「まとめ実機セッション」節）で定義された<strong>フェーズ0のまとめ実機セッション</strong>を、現地で迷わず流し切るための実施手順書である。実機アクセスは希少なため、<strong>事前にビルド済みバイナリ・本手順書・判定シートを全て用意し、1セッションで完了させる</strong>。セッションの成果（判定結果・録画コーパス・実サンプル）は、D4（移植ベースライン採用）・D17（物理ch順凍結）・ドライバ戦略（Plan A/B）・4GB戦略の判断入力になる。
       </p>
       <div class="card-grid">
         <div class="card card--accent-blue">
@@ -645,8 +645,8 @@ pre {
         </div>
         <div class="card card--accent-amber">
           <div class="card-label">配布バイナリ</div>
-          <div class="card-value">2種</div>
-          <div class="card-detail">dev r18相当（Release x64）／win11-driver-compat</div>
+          <div class="card-value">3種</div>
+          <div class="card-detail">r7 baseline／r18相当 baseline／win11-driver-compat</div>
         </div>
         <div class="card card--accent-red">
           <div class="card-label">判断が凍結される決定</div>
@@ -690,7 +690,15 @@ pre {
         </div>
         <div class="glossary-item">
           <div class="glossary-term">DFX / Directed Power</div>
-          <div class="glossary-def">Win11 新ドライバ INF が有効化する WDF のアイドルサスペンド機構。新ドライバ通信不可の最有力仮説。レジストリ単変数 A/B で検証する（実験2）。</div>
+          <div class="glossary-def">Win11 新ドライバ INF が有効化する WDF のアイドルサスペンド機構。新ドライバ通信不可の最有力仮説。レジストリ単変数 A/B で検証する（実験5b）。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">r7 baseline</div>
+          <div class="glossary-def"><code>0.1.4r7</code> の保存済み Release x64 build。既存ログ上で比較的安定していた既知 baseline であり、ステップ0の直結 A/B で <code>r18相当</code> を採用してよいか判断する比較対象。本パッケージでは <code>bin_r7_sysmex_baseline/Sysmex_AnalogBoard_TestApp.exe</code> を使う。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">r18相当</div>
+          <div class="glossary-def"><code>0.1.4r17</code> 実機ログの次に入れた engine 側 timeout recovery 改修入りの検証 build。保存フォルダ名ではなく、<code>Ep6TimeoutRecoveryPolicy</code> の <code>retryBackoffMs=20</code> と retry read clamp 64KiB が入った状態を指す。本パッケージでは <code>bin_r18_sysmex_baseline/Sysmex_AnalogBoard_TestApp.exe</code> を使う。</div>
         </div>
         <div class="glossary-item">
           <div class="glossary-term">deploy mismatch</div>
@@ -708,9 +716,10 @@ pre {
       <table class="spec-table">
         <thead><tr><th></th><th>項目</th><th>内容</th><th>依存する実験</th></tr></thead>
         <tbody>
-          <tr><td>☐</td><td><code>dev</code> r18相当 Release x64</td><td>DLL＋TestApp 一式。<code>scripts\run_with_vsdevcmd.bat msbuild ... /p:Configuration=Release /p:Platform=x64</code> でリビルドし、成果物をUSBメモリ等に格納。<strong>burst-cap／timeout-recovery／cfg-append fix が入った版であること</strong>（ステップ0で検証）</td><td>1・4・5・6・7</td></tr>
-          <tr><td>☐</td><td><code>feature/win11-driver-compat</code> の<strong>再作成（オーナー決定 2026-07-06）</strong></td><td><strong><code>dev</code> から切り直し、最初から origin へ push して進める</strong>（origin に旧ブランチが無いことは確認済み）。実装差分は <code>docs/driver_next.md</code> が正：<code>AnalogBoard_Dll</code> の endpoint discovery hardening（public API <code>EP2_SendData/EP4_GetData/EP6_GetData</code> 維持・<code>Dialog1_Main</code>／取得セマンティクス非接触）＋focused unit test。<strong>ヘッダの差し替えは不要</strong>——同梱 <code>CyLib/header</code> は SDK 1.3 世代一致を確認済み（2026-03-19 記録）。<code>Release|x64</code> リビルドまで前日完了が条件。間に合わなければ実験3のみ持ち越し（実験2は独立実施可）</td><td>3</td></tr>
-          <tr><td>☑</td><td><code>CyAPI.lib</code> の補完・確保</td><td><strong>2026-07-06 対応済み</strong>：<code>CyLib/x64</code>・<code>CyLib/x86</code> に配置（x64=AMD64／x86=i386・<code>/DEFAULTLIB:LIBCMT</code> を確認済み）、<code>.gitignore</code> に否定ルールを追加して追跡可能化。<strong>残タスク＝コミットして固定</strong>（これで新規 worktree の LNK1181 も解消）。予備の入手元：実機PCの <code>C:\Program Files (x86)\Cypress\EZ-USB FX3 SDK\1.3\library\cpp\lib</code></td><td>3</td></tr>
+          <tr><td>☐</td><td><code>r7</code> baseline Release x64</td><td>本パッケージでは <code>bin_r7_sysmex_baseline/Sysmex_AnalogBoard_TestApp.exe</code> と <code>Sysmex_AnalogBoard_Dll.dll</code> を使う。ステップ0で <code>r18</code> 相当 build と同一条件で直結 A/B し、後続実験の採用候補を決めるための比較対象。<strong><code>FPGA Debug</code> タブ（Dialog2）有効版</strong>として再ビルド済み。</td><td>0・1・2・3・4・6</td></tr>
+          <tr><td>☐</td><td><code>r18</code> 相当 baseline Release x64</td><td>本パッケージでは <code>bin_r18_sysmex_baseline/Sysmex_AnalogBoard_TestApp.exe</code> と <code>Sysmex_AnalogBoard_Dll.dll</code> を使う。<code>r18</code> は保存フォルダ名ではなく、<strong>burst-cap／timeout-recovery／cfg-append fix、特に <code>retryBackoffMs=20</code> と retry read clamp 64KiB が入った版</strong>を指す。ステップ0で <code>r7</code> と比較してから採用可否を決める。<strong><code>FPGA Debug</code> タブ（Dialog2）有効版</strong>として再ビルド済み。</td><td>0・1・2・3・4・6</td></tr>
+          <tr><td>☐</td><td><code>feature/win11-driver-compat</code> の<strong>再作成（オーナー決定 2026-07-06）</strong></td><td><strong><code>dev</code> から切り直し、最初から origin へ push して進める</strong>（origin に旧ブランチが無いことは確認済み）。実装差分は <code>docs/operations/usb-acquisition-stability/driver_next.md</code> が正：<code>AnalogBoard_Dll</code> の endpoint discovery hardening（public API <code>EP2_SendData/EP4_GetData/EP6_GetData</code> 維持・<code>Dialog1_Main</code>／取得セマンティクス非接触）＋focused unit test。<strong>ヘッダの差し替えは不要</strong>——同梱 <code>CyLib/header</code> は SDK 1.3 世代一致を確認済み（2026-03-19 記録）。<code>Release|x64</code> リビルドまで前日完了が条件。間に合わなければ実験5のみ持ち越し（実験5bは実験5失敗時のみ実施）</td><td>5</td></tr>
+          <tr><td>☑</td><td><code>CyAPI.lib</code> の補完・確保</td><td><strong>2026-07-06 対応済み</strong>：<code>CyLib/x64</code>・<code>CyLib/x86</code> に配置（x64=AMD64／x86=i386・<code>/DEFAULTLIB:LIBCMT</code> を確認済み）、<code>.gitignore</code> に否定ルールを追加して追跡可能化。<strong>残タスク＝コミットして固定</strong>（これで新規 worktree の LNK1181 も解消）。予備の入手元：実機PCの <code>C:\Program Files (x86)\Cypress\EZ-USB FX3 SDK\1.3\library\cpp\lib</code></td><td>5</td></tr>
         </tbody>
       </table>
 
@@ -720,9 +729,9 @@ pre {
         <tbody>
           <tr><td>☐</td><td>接続構成の確認（機械ケーブルは交換不可）</td><td>機械から出ている固定ケーブルはそのまま使う。標準＝<strong>スイッチ区間を外した直結</strong>。ホスト側ポートを1つ決めて全実験で固定し、判定シートに記録</td><td>全部</td></tr>
           <tr><td>☐</td><td>対照用インラインスイッチ区間</td><td>過去に外した「メス—スイッチ—オス」区間。<strong>現存確認済み（2026-07-06 オーナー確認）</strong>。真因確定の対照実験（再挿入）用に <code>SW-SEG-01</code> とラベルして持参</td><td>1</td></tr>
-          <tr><td>☐</td><td>主測定PC（Win11・既存ドライバ）</td><td>現行運用の既存ドライバ（cyusb3 <code>1.2.3.20</code> 系）構成のまま変更しない。ディスク残容量（高密度100サイクル分＋余裕）を確認</td><td>1・4・5・7</td></tr>
-          <tr><td>☐</td><td>新ドライバ入替の準備（Win11・1台確定）</td><td><strong>実験4/5/7 完了後にドライバ入替で直列実施</strong>（「ドライバ入替・ロールバック手順」節）。新ドライバ <code>FX3\Win11\x64</code>（1.3.0.4）＋旧ドライバ（1.2.3.20 系）のフォルダを実機ローカルに用意（<code>FX3/</code> は <strong>gitignore 対象のため実機ローカルにしか無い。事前に確保</strong>）。管理者権限の確認</td><td>2・3</td></tr>
-          <tr><td>☐</td><td>サンプル（低密度・中密度・高密度）</td><td>ラダー（実験4）と対照（実験1）で同一サンプルを使い回せる量を確保</td><td>1・4・5・7</td></tr>
+          <tr><td>☐</td><td>主測定PC（Win11・既存ドライバ）</td><td>現行運用の既存ドライバ（cyusb3 <code>1.2.3.20</code> 系）構成のまま変更しない。ディスク残容量（高密度100サイクル分＋余裕）を確認</td><td>1・2・3・4</td></tr>
+          <tr><td>☐</td><td>新ドライバ入替の準備（Win11・1台確定）</td><td><strong>実験2・3・4 完了後にドライバ入替で直列実施</strong>（「ドライバ入替・ロールバック手順」節）。新ドライバ <code>FX3\Win11\x64</code>（1.3.0.4）＋旧ドライバ（1.2.3.20 系）のフォルダを実機ローカルに用意（<code>FX3/</code> は <strong>gitignore 対象のため実機ローカルにしか無い。事前に確保</strong>）。管理者権限の確認</td><td>5・5b</td></tr>
+          <tr><td>☐</td><td>サンプル（低密度・中密度・高密度）</td><td>ラダー（実験2）と対照（実験1）で同一サンプルを使い回せる量を確保</td><td>1・2・3・4</td></tr>
           <tr><td>☐</td><td>共有ストレージ</td><td><code>logs/</code>・<code>data/</code>・キャプチャの回収先（外付けSSD等）。実機PCにしか存在しないログを持ち帰るための必須品</td><td>6</td></tr>
         </tbody>
       </table>
@@ -731,12 +740,12 @@ pre {
       <table class="spec-table">
         <thead><tr><th></th><th>項目</th><th>内容</th><th>依存する実験</th></tr></thead>
         <tbody>
-          <tr><td>☐</td><td>USBレベルキャプチャツール</td><td>URB レベルの録画用（例：USBPcap＋Wireshark）。<span class="badge badge-assumption">Assumption</span> プランはツール未指定のため事前に選定・動作確認する。<strong>キャプチャ自体がタイミングへ影響しうるため、判定ランでは使わず専用の録画ランで使う</strong></td><td>6</td></tr>
+          <tr><td>☐</td><td>USBレベルキャプチャツール</td><td>URB レベルの録画用。標準は <strong>USBPcap＋Wireshark</strong> とする。<strong>キャプチャ自体がタイミングへ影響しうるため、判定ランでは使わず専用の短時間診断ランで使う</strong>。ハードウェア USB アナライザが使える場合は非侵襲の優先候補として併用可</td><td>6</td></tr>
           
-          <tr><td>☐</td><td>実験2用スクリプト一式</td><td><code>scripts\field-session\</code>（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCへコピー（例：<code>C:\field-session\</code>）。実験2は条件付きだが<strong>スクリプトは必ず持参</strong>（現地でのレジストリ手作業を防ぐ）</td><td>2</td></tr>
+          <tr><td>☐</td><td>実験5b用スクリプト一式</td><td><code>scripts\field-session\</code>（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCへコピー（例：<code>C:\field-session\</code>）。実験5bは条件付きだが<strong>スクリプトは必ず持参</strong>（現地でのレジストリ手作業を防ぐ）</td><td>5b</td></tr>
           <tr><td>☐</td><td>本手順書＋判定シート（印刷 or ローカルコピー）</td><td>ネットワーク非依存で参照できる形で持参</td><td>全部</td></tr>
-          <tr><td>☐</td><td>gcsa 実行環境（解析PC）</td><td>gcsa v0.4.1 が動く環境。実験7の照合はセッション中でなくても良いが、<strong>取得パラメータの記録はセッション中に必須</strong></td><td>7</td></tr>
-          <tr><td>☐</td><td>波形確認ノートブック（gcsa examples）</td><td>取得した .bin ペアの波形健全性 spot check 用。<code>../gcsa/examples/01_quickstart.ipynb</code>（<code>MeasurementLoader</code> に <code>_cfg.txt</code> を指定→fl/fh 読込・scatter/波形プロット）と <code>08_gmi_waveform_preview.ipynb</code>（GMI波形プレビュー）。過去の EP6 波形破損調査で「notebook 上の waveform 見た目」比較に使った実績あり（<code>docs/archive/usb-acquisition/0929_log_cut_test_instructions.md</code>）。解析PCでの動作を事前確認しておく</td><td>4・7</td></tr>
+          <tr><td>☐</td><td>gcsa 実行環境（解析PC）</td><td>gcsa v0.4.1 が動く環境。実験4の照合はセッション中でなくても良いが、<strong>取得パラメータの記録はセッション中に必須</strong></td><td>4</td></tr>
+          <tr><td>☐</td><td>波形確認ノートブック（gcsa examples）</td><td>取得した .bin ペアの波形健全性 spot check 用。<code>../gcsa/examples/01_quickstart.ipynb</code>（<code>MeasurementLoader</code> に <code>_cfg.txt</code> を指定→fl/fh 読込・scatter/波形プロット）と <code>08_gmi_waveform_preview.ipynb</code>（GMI波形プレビュー）。過去の EP6 波形破損調査で「notebook 上の waveform 見た目」比較に使った実績あり（<code>docs/archive/usb-acquisition/0929_log_cut_test_instructions.md</code>）。解析PCでの動作を事前確認しておく</td><td>2・4</td></tr>
         </tbody>
       </table>
     </section>
@@ -747,54 +756,56 @@ pre {
       <figure class="diagram-container">
         <div class="mermaid">
 flowchart TB
-  PREP["事前準備完了の確認"] --> SMOKE0["ステップ0: スモーク＆deploy検証"]
-  SMOKE0 --> E1["実験1: スイッチ区間A/B — 真因の定量確定"]
-  E1 --> E4["実験4: r18高密度ラダー x1→x3→x100"]
-  E4 --> E5["実験5: 再アームギャップ計測 — 実験4と併走"]
-  E4 --> E7["実験7: gcsa照合サンプル取得"]
-  E5 --> DRV["ドライバ入替 旧→新 — 詳細手順節参照"]
-  E7 --> DRV
-  DRV --> E3["実験3: SDK1.3バイナリ検証 — レジストリ不要"]
-  E3 -- first gate 成功 --> RB["ロールバック＋復帰スモーク or 新ドライバ維持を記録"]
-  E3 -- first gate 失敗 --> E2["実験2: DFX A/B — 条件付き・スクリプト実施"]
-  E2 --> RB
-  RB --> WRAP["締め: 回収物チェックリスト実行・判定シート確定"]
-  REC["実験6: 録画キャプチャ — 全実験で並走"] -.-> WRAP
+  PREP["事前準備完了の確認"] --> SMOKE0["ステップ0: r7 / r18 直結A/B — 採用候補決定"]
+  SMOKE0 --> E1["実験1: スイッチ区間A/B — 選定候補で真因の定量確定"]
+  E1 --> E2["実験2: 選定候補 高密度ラダー x1→x3→x100"]
+  E2 --> E3["実験3: 再アームギャップ計測 — 実験2と併走"]
+  E2 --> E4["実験4: gcsa照合サンプル取得"]
+  E3 --> DRV["ドライバ入替 旧→新 — 詳細手順節参照"]
+  E4 --> DRV
+  DRV --> E5["実験5: SDK1.3バイナリ検証 — レジストリ不要"]
+  E5 -- first gate 成功 --> RB["ロールバック＋復帰スモーク or 新ドライバ維持を記録"]
+  E5 -- first gate 失敗 --> E5B["実験5b: DFX A/B — 条件付き・スクリプト実施"]
+  E5B --> RB
+  RB --> E7["実験7: 回収物チェックリスト実行・判定シート確定"]
+  REC["実験6: 録画キャプチャ — ログ保全＋専用診断ラン"] -.-> E7
         </div>
-        <figcaption>図1. セッション実行順。実機PCは Win11・1台（2026-07-06 確定）のため全体が直列：既存ドライバ系列（1→4→5→7）→ドライバ入替→実験3、実験2は実験3の first gate が失敗した場合のみ実施する。実験6（録画）は特定の時間枠ではなく全実験の証跡保全として常時走る。</figcaption>
+        <figcaption>図1. セッション実行順。まず既存ドライバ・直結で r7 と r18 相当を同一条件 A/B し、後続実験の採用候補を決める。実機PCは Win11・1台（2026-07-06 確定）のため全体が直列：既存ドライバ系列（0→1→2→3→4）→ドライバ入替→実験5、実験5bは実験5の first gate が失敗した場合のみ実施する。実験6（録画）のうちアプリログ・保存データは全ランで保全し、USBPcap/Wireshark は判定ランと分けた短時間の専用診断ランで使う。</figcaption>
       </figure>
 
       <h3>実験×構成マトリクス</h3>
       <table class="spec-table">
         <thead><tr><th>#</th><th>PC / OS</th><th>バイナリ</th><th>ドライバ</th><th>ケーブル</th><th>密度</th></tr></thead>
         <tbody>
-          <tr><td><strong>0</strong> スモーク</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>低×1〜3</td></tr>
-          <tr><td><strong>1</strong> スイッチ区間A/B</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td><strong>直結 ⇔ SW区間挿入</strong></td><td>高</td></tr>
-          <tr><td><strong>2</strong> DFX A/B<br><span style="color:var(--color-text-muted);">条件付き（実験3失敗時のみ）</span></td><td>Win11・新ドライバ</td><td>win11-driver-compat（参考: dev r18相当）</td><td><strong>新 1.3.0.4（DFX有⇔無）</strong></td><td>直結</td><td>接続＋idle EP4</td></tr>
-          <tr><td><strong>3</strong> SDK1.3<br><span style="color:var(--color-text-muted);">実験2より先に実施</span></td><td>Win11・新ドライバ</td><td><strong>win11-driver-compat</strong></td><td>新 1.3.0.4</td><td>直結</td><td>smoke→低→高</td></tr>
-          <tr><td><strong>4</strong> r18ラダー</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>高×1→×3→低×100→高×100</td></tr>
-          <tr><td><strong>5</strong> 再アーム計測</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>実験4のsoakログから抽出</td></tr>
+          <tr><td><strong>0</strong> r7/r18直結A/B</td><td>Win11・既存ドライバ</td><td>r7 baseline ⇔ r18相当</td><td>既存</td><td>直結</td><td>低×1〜3＋高×1</td></tr>
+          <tr><td><strong>1</strong> スイッチ区間A/B</td><td>Win11・既存ドライバ</td><td>ステップ0の選定候補</td><td>既存</td><td><strong>直結 ⇔ SW区間挿入</strong></td><td>高</td></tr>
+          <tr><td><strong>2</strong> 選定候補ラダー</td><td>Win11・既存ドライバ</td><td>ステップ0の選定候補</td><td>既存</td><td>直結</td><td>高×1→×3→低×100→高×100</td></tr>
+          <tr><td><strong>3</strong> 再アーム計測</td><td>Win11・既存ドライバ</td><td>ステップ0の選定候補</td><td>既存</td><td>直結</td><td>実験2のsoakログから抽出</td></tr>
+          <tr><td><strong>4</strong> gcsa照合</td><td>Win11・既存ドライバ</td><td>ステップ0の選定候補</td><td>既存</td><td>直結</td><td>既知パラメータ×1＋ch順特定ラン</td></tr>
+          <tr><td><strong>5</strong> SDK1.3</td><td>Win11・新ドライバ</td><td><strong>win11-driver-compat</strong></td><td>新 1.3.0.4</td><td>直結</td><td>smoke→低→高</td></tr>
+          <tr><td><strong>5b</strong> DFX A/B<br><span style="color:var(--color-text-muted);">条件付き（実験5失敗時のみ）</span></td><td>Win11・新ドライバ</td><td>win11-driver-compat（参考: ステップ0の選定候補）</td><td><strong>新 1.3.0.4（DFX有⇔無）</strong></td><td>直結</td><td>接続＋idle EP4</td></tr>
           <tr><td><strong>6</strong> 録画</td><td>両構成</td><td>—</td><td>—</td><td>—</td><td>全ラン＋専用キャプチャラン</td></tr>
-          <tr><td><strong>7</strong> gcsa照合</td><td>Win11・既存ドライバ</td><td>dev r18相当</td><td>既存</td><td>直結</td><td>既知パラメータ×1＋ch順特定ラン</td></tr>
+          <tr><td><strong>7</strong> 回収確認</td><td>全構成</td><td>—</td><td>—</td><td>—</td><td>全ログ・全データ・判定シート</td></tr>
         </tbody>
       </table>
       <div class="callout callout-warning">
         <div class="callout-title">実験順の理由</div>
-        <p>実験1（スイッチ区間）を最初に置くのは、<strong>直結（スイッチ区間なし）で高密度が安定することを確定させないと、以降の全実験の失敗が物理層起因かソフト起因か切り分けられなくなる</strong>ため。実験4のラダーは段階制（×1で確認→×3→×100）で、途中失敗時は先に進まず切り分けに切り替える（実験4の分岐参照）。新ドライバ系列は<strong>実験3（レジストリ不要）を先行</strong>させ、実験2（レジストリ変更）は実験3の first gate 失敗時のみの条件付きとする——レジストリ操作を極力避けるオーナー方針（2026-07-06）。</p>
+        <p>ステップ0で r7 と r18 相当を先に直結 A/B するのは、r18 相当がまだ診断 build であり、既知 baseline の r7 より悪化していないことを確認してから後続実験へ進むため。実験1（スイッチ区間）では、<strong>直結（スイッチ区間なし）で高密度が安定することを確定させないと、以降の全実験の失敗が物理層起因かソフト起因か切り分けられなくなる</strong>。実験2のラダーは段階制（×1で確認→×3→×100）で、途中失敗時は先に進まず切り分けに切り替える（実験2の分岐参照）。新ドライバ系列は<strong>実験5（レジストリ不要）を先行</strong>させ、実験5b（レジストリ変更）は実験5の first gate 失敗時のみの条件付きとする——レジストリ操作を極力避けるオーナー方針（2026-07-06）。</p>
       </div>
     </section>
 
     <!-- ===== SMOKE ===== -->
     <section id="smoke">
-      <h2>ステップ0：スモーク＆deploy検証</h2>
-      <p><strong>目的</strong>：配布バイナリが「想定の fix が全部入った版」であることをログマーカーで確認し、以降の実験結果を解釈可能にする。<strong>ここを飛ばすと、当日の全データが「どのビルドの挙動か不明」になり無効化しうる。</strong></p>
+      <h2>ステップ0：r7 / r18 直結A/B＋deploy検証</h2>
+      <p><strong>目的</strong>：既存ドライバ・直結・同一条件で <code>r7 baseline</code> と <code>r18相当</code> を先に比較し、実験1〜4で使う採用候補を決める。配布バイナリの deploy mismatch もこの時点で検出する。<strong>ここを飛ばすと、後続データが「どのビルドの挙動か不明」になり無効化しうる。</strong></p>
       <h3>手順</h3>
       <ol>
-        <li>主測定PC（Win11・既存ドライバ構成のまま）に dev r18相当ビルドを配置。<strong>スイッチ区間を外した直結</strong>で、決めたホストポートに接続</li>
-        <li>低密度サンプルで 1〜3 サイクル取得（Manual Get ON・既定パラメータ）</li>
-        <li>ログを開き、下記マーカーを全て確認</li>
+        <li>主測定PC（Win11・既存ドライバ構成のまま）に <code>bin_r7_sysmex_baseline/</code> と <code>bin_r18_sysmex_baseline/</code> を配置。<strong>スイッチ区間を外した直結</strong>で、決めたホストポートに接続</li>
+        <li><code>run_r7_sysmex_baseline_app.bat</code> で r7 を起動し、低密度 1〜3 サイクル＋高密度 1 サイクルを取得（Manual Get ON・同一パラメータ）</li>
+        <li>アプリを閉じ、同じ PC / USB port / 直結 / サンプル / 設定のまま <code>run_r18_sysmex_baseline_app.bat</code> で r18 相当を起動し、同じ低密度 1〜3 サイクル＋高密度 1 サイクルを取得</li>
+        <li>r7 と r18 の Type 判定、ログ、生成データ、起動可否、<code>FPGA Debug</code> タブ表示可否を判定シートに記録し、下記の判定表で採用候補を決める</li>
       </ol>
-      <h3>確認マーカー（deploy検証）</h3>
+      <h3>r18 相当の確認マーカー（deploy検証）</h3>
       <ul>
         <li><code>[PR04][ENGINE_CONTEXT]</code>・<code>[PR04][ENGINE_ENTER]</code>・<code>[PR04][ENGINE_EXIT]</code> が出る</li>
         <li><code>[PR04][STARTUP_EP4]</code> と <code>[PR01][CYCLE]</code> が出る（両方無ければ build/deploy mismatch）</li>
@@ -803,10 +814,21 @@ flowchart TB
         <li><code>DDR_RD_END=1</code>・<code>ep6Timeouts=0</code> で正常完了（Type C）</li>
         <li>完了ペアのみ <code>*_fl_*.bin</code>／<code>*_fh_*.bin</code> として残り、<code>.tmp</code> 残置がない</li>
         <li>失敗させた場合は <code>_cfg.txt</code> 末尾に <code>Run Status / Error Code / Published Pairs / Saved Wave Count</code> が追記される（cfg append fix）</li>
+        <li>timeout recovery が発生した場合、<code>[PR04][TIMEOUT_RECOVERY] phase=resume</code> に <code>retryBackoffMs=20</code> と clamped <code>nextPlannedReadSize</code> が出る。timeout recovery が発生していない成功ランでは、このマーカーが無いこと自体は NG ではない</li>
       </ul>
+      <h3>採用候補の判定</h3>
+      <table class="spec-table">
+        <thead><tr><th>r7</th><th>r18相当</th><th>次アクション</th></tr></thead>
+        <tbody>
+          <tr><td>Pass</td><td>Fail</td><td><strong>採用候補は r7</strong>。r18 相当は診断 build 扱いに戻し、r18 固有の timeout recovery 改修は後続実装へ持ち込まない</td></tr>
+          <tr><td>Pass</td><td>Pass</td><td><strong>採用候補は r18 相当</strong>（ただし高密度 x1 が r7 より悪化していないこと）。実験1〜4は r18 相当で進める</td></tr>
+          <tr><td>Fail</td><td>Pass</td><td><strong>採用候補は r18 相当（暫定）</strong>。実験2の高密度 x3 を先に厳しめに確認する</td></tr>
+          <tr><td>Fail</td><td>Fail</td><td>採用候補を決めない。実験1以降へ進まず、物理層・PC・driver・サンプル・設定差分を先に確認する</td></tr>
+        </tbody>
+      </table>
       <div class="callout callout-danger">
         <div class="callout-title">NG時</div>
-        <p>マーカー欠落＝deploy mismatch。<strong>実験に進まず</strong>、配布物のビルド日時・ハッシュを確認して再配置する。<code>ENGINE_EXIT error=-21001</code> が出る場合は parent binding fix 未反映を疑う。</p>
+        <p>r18 で timeout recovery が発生しているのに <code>retryBackoffMs=20</code>／clamped <code>nextPlannedReadSize</code> が欠落する場合は deploy mismatch。<strong>実験に進まず</strong>、配布物のビルド日時・ハッシュを確認して再配置する。<code>ENGINE_EXIT error=-21001</code> が出る場合は parent binding fix 未反映を疑う。r7/r18 両方が落ちる場合は build 比較ではなく環境・物理層の切り分けに切り替える。</p>
       </div>
     </section>
 
@@ -826,7 +848,7 @@ flowchart TB
       </table>
       <h3>手順</h3>
       <ol>
-        <li><strong>直結（スイッチ区間なし）</strong>のまま高密度サンプルで <strong>×3 ラン</strong>。各ランの Type 判定を記録（実験4の高密度×3と共用可）</li>
+        <li>ステップ0で決めた採用候補（r7 または r18 相当）を使う。<strong>直結（スイッチ区間なし）</strong>のまま高密度サンプルで <strong>×3 ラン</strong>。各ランの Type 判定を記録（実験4の高密度×3と共用可）</li>
         <li><code>SW-SEG-01</code>（スイッチ区間）を機械ケーブル先端とホスト側の間に<strong>再挿入</strong>（スイッチは ON 位置）。<strong>ホストポート・マシン・サンプル・パラメータは不変</strong></li>
         <li>高密度で <strong>×1〜2 ラン</strong>（対照）。Type A/B の再現とログ署名（<code>DDR_WR_END/RD_END</code>・切断有無）を記録</li>
         <li>スイッチ区間を<strong>外して直結に戻し</strong>、高密度×1で Type C 復帰を確認（可逆性）</li>
@@ -843,160 +865,38 @@ flowchart TB
       </ul>
     </section>
 
-    <!-- ===== DRIVER SWAP ===== -->
-    <section id="driverswap">
-      <h2>ドライバ入替・ロールバック手順（詳細）</h2>
-      <p>実機PCは <strong>Win11・1台</strong>のため、新ドライバ系列（実験3→条件付きで実験2）は<strong>実験4・5・7 が完了してから</strong>実施する。PC操作に不慣れな実施者を想定し、クリック単位で記す。<strong>レジストリは触らない</strong>（実験2が必要になった場合も配布スクリプトが自動処理する）。</p>
-      <h3>入替前チェック</h3>
-      <ul>
-        <li>☐ 実験4・5・7 の判定シート記入とログ回収が完了している</li>
-        <li>☐ AnalogBoard アプリを終了している</li>
-        <li>☐ 新旧ドライバのフォルダをローカルに用意している：新＝<code>FX3\Win11\x64</code>（1.3.0.4）／旧＝現行運用版（1.2.3.20 系）のフォルダ</li>
-      </ul>
-      <h3>入替（旧 → 新 1.3.0.4）</h3>
-      <ol>
-        <li>画面左下の<strong>スタートボタンを右クリック</strong>し、メニューから「<strong>デバイス マネージャー</strong>」をクリック</li>
-        <li>一覧の「<strong>ユニバーサル シリアル バス コントローラー</strong>」の左の「＞」をクリックして開き、<strong>Cypress／FX3 系の名前のデバイス</strong>を探す（見つからない場合：メニューの「表示」→「デバイス（接続別）」に切り替えて探す。機械の電源とUSB接続も確認）</li>
-        <li>そのデバイスを<strong>右クリック</strong>→「<strong>プロパティ</strong>」→「<strong>ドライバー</strong>」タブ。<strong>現在のバージョン（1.2.3.20 系のはず）をメモ</strong>してから「<strong>ドライバーの更新</strong>」をクリック</li>
-        <li>「<strong>コンピューターを参照してドライバーを検索</strong>」→「参照」で用意した <code>FX3\Win11\x64</code> フォルダを選択 →「次へ」</li>
-        <li>完了後、もう一度プロパティの「ドライバー」タブを開き、<strong>バージョンが 1.3.0.4 になっている</strong>ことを確認して判定シートに記録</li>
-        <li>デバイスが「！」マーク無しで表示されていることを確認（「！」が付いたら下の「困ったとき」へ）</li>
-      </ol>
-      <h3>ロールバック（新 → 旧）</h3>
-      <ol>
-        <li>同じ手順でプロパティの「ドライバー」タブを開く</li>
-        <li>「<strong>ドライバーを元に戻す</strong>」ボタンが押せる場合：クリックして案内に従う（理由は「以前のバージョンの方が安定していた」等でよい）</li>
-        <li>ボタンが灰色で押せない場合：「ドライバーの更新」→「コンピューターを参照」→「<strong>コンピューター上の利用可能なドライバーの一覧から選択</strong>」→ 一覧から <strong>1.2.3.20 系</strong>を選択 →「次へ」。一覧に無ければ「参照」で旧ドライバのフォルダを指定</li>
-        <li>バージョンが 1.2.3.20 系に戻ったことを確認</li>
-        <li><strong>復帰スモーク×1</strong>：AnalogBoard アプリを起動し、低密度1サイクルで Type C（<code>ep6Timeouts=0</code>・<code>DDR_RD_END=1</code>）を確認。結果を判定シート 3-4 に記録</li>
-      </ol>
-      <h3>困ったとき</h3>
-      <ul>
-        <li>デバイスに「！」が付いた／認識されない → USB コネクタを抜き差し。直らなければ PC を再起動</li>
-        <li>更新ウィザードで「最適なドライバーが既にインストールされています」と出る → 「コンピューター上の利用可能なドライバーの一覧から選択」の経路でバージョンを明示指定する</li>
-        <li>どのデバイスか自信がない → デバイスを右クリック→プロパティ→「詳細」タブ→「ハードウェア ID」に <code>VID_04B4</code> が含まれていれば対象</li>
-      </ul>
-    </section>
-
-    <!-- ===== EXP3 (新ドライバ系列・先行) ===== -->
-    <section id="exp3">
-      <h2>実験3：SDK1.3対応バイナリ検証（新ドライバ系列の最初に実施・レジストリ不要）</h2>
-      <div class="callout callout-success">
-        <div class="callout-title">実験2より先にやる（2026-07-06 オーナー方針）</div>
-        <p>本実験は<strong>レジストリ操作が一切不要</strong>。これが成功すれば実験2（DFX A/B＝レジストリ変更）は<strong>丸ごとスキップ</strong>できるため、新ドライバ系列では本実験を先に実施する。</p>
-      </div>
-      <table class="spec-table">
-        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
-        <tbody><tr>
-          <td>新ドライバ＋一致SDK（1.3）のバイナリで通信可能かを検証し、ドライバ Plan A を確定させる</td>
-          <td>Win11 新ドライバで Type C を達成</td>
-        </tr></tbody>
-      </table>
-      <h3>手順（driver_next.md の first gate を踏襲）</h3>
-      <ol>
-        <li>「ドライバ入替・ロールバック手順」に従い新ドライバ <code>1.3.0.4</code> へ入替（DFX 等の設定は<strong>一切変更しない</strong>＝既定のまま）</li>
-        <li><strong>再作成した</strong> <code>feature/win11-driver-compat</code> の <code>x64/Release</code> 出力物を配置</li>
-        <li><code>USBBoard_Connect</code> の成功を確認（起動時自動接続のログ）</li>
-        <li><strong>first gate</strong>：アイドル EP4 読取を10回以上反復し、<code>Get ep4 register data failed.</code>／<code>USB board is removed! Disconnect usb.</code> が出ないことを確認</li>
-        <li>first gate 通過後、<strong>EP2 → EP4 → EP6 の順で smoke</strong>：Set（EP2一括書込）→ レジスタ読取 → 低密度1サイクル取得</li>
-        <li>低密度で Type C を確認後、高密度×1〜3 で timeout と EP4 failure を再評価</li>
-        <li><strong>first gate が失敗した場合のみ</strong>実験2（DFX A/B）へ進む。成功した場合は実験2をスキップし判定シートに「スキップ（実験3成功）」と記録</li>
-        <li>系列の締めは「ドライバ入替・ロールバック手順」の<strong>ロールバック＋復帰スモーク</strong>（実験2/3 が良好で新ドライバ維持を選ぶ場合はその判断を判定シート 3-4 に明記）</li>
-      </ol>
-      <h3>観測ポイント</h3>
-      <ul>
-        <li>endpoint discovery の変化有無（DLL に discovery hardening 導入済み）</li>
-        <li>高密度時の Type 分類と <code>ep6Timeouts</code>（直結前提での比較）</li>
-      </ul>
-      <h3>アイドルEP4試験のUI経路</h3>
-      <p><span class="badge badge-open">Open Question</span> driver_next.md は「FPGA Debug タブ → EP4 RX ボタン数回」を想定するが、ビルドによっては Dialog2 タブが非表示（タブ挿入コメントアウト）の可能性がある。<strong>事前準備でタブ有効ビルドか確認</strong>し、非表示の場合の代替は「接続→Set→アイドル放置→再Set」等の EP4 読取を通る操作系列を用いる。</p>
-      <h3>結果の解釈</h3>
-      <table class="spec-table">
-        <thead><tr><th>実験3（新バイナリ・DFX既定）</th><th>実験2（NoDfx・条件付き）</th><th>解釈と次アクション</th></tr></thead>
-        <tbody>
-          <tr><td><strong>成功</strong></td><td>実施不要（スキップ）</td><td>SDK 世代不一致が主因。Plan A（cyusb3.sys＋SDK1.3一致lib）で確定。<strong>レジストリ操作なしで決着</strong></td></tr>
-          <tr><td>失敗</td><td><strong>成功</strong></td><td>DFX が主因。NoDfx を運用要件化（FX3 FW が LPM 非対応なら恒久要件の可能性）。Plan A＋NoDfx で確定</td></tr>
-          <tr><td>失敗</td><td>失敗</td><td>（時間があれば dev r18相当＝旧SDKバイナリ＋NoDfx も1本試行）→ 全滅なら Plan B（WinUSB 再バインド・署名コスト）検討へ。当面の運用は旧ドライバ継続</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- ===== EXP2 (条件付き) ===== -->
+    <!-- ===== EXP2 ===== -->
     <section id="exp2">
-      <h2>実験2：Win11 DFX無効化 A/B（条件付き・スクリプトで実施）</h2>
-      <div class="callout callout-warning">
-        <div class="callout-title">実施条件（2026-07-06 オーナー方針：レジストリ操作は極力避ける）</div>
-        <p><strong>実験3の first gate（接続＋アイドルEP4）が失敗した場合のみ</strong>実施する。実験3が成功していたら本実験はスキップし、判定シートに「スキップ（実験3成功）」と記録する。実施する場合も<strong>regedit は開かない</strong>——配布スクリプト（<code>scripts\field-session\</code>）が対象デバイスの自動検出・設定・復元まで行う。</p>
-      </div>
+      <h2>実験2：選定候補 高密度フィールドテスト（段階ラダー）</h2>
       <table class="spec-table">
         <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
         <tbody><tr>
-          <td>Win11 新ドライバでの通信不可の主因が DFX（アイドルサスペンド）かを単変数で切り分け</td>
-          <td>NoDfx（<code>WdfDirectedPowerTransitionEnable=0</code>）で <code>Get ep4 register data failed.</code> が消えるか</td>
-        </tr></tbody>
-      </table>
-      <div class="callout callout-danger">
-        <div class="callout-title">やってはいけないこと</div>
-        <ul>
-          <li><strong>INF（<code>cyusb3.inf</code>）を編集しない</strong>——署名 cat が無効化される</li>
-          <li>INF 同梱の <code>CyUsb3NoDfx</code> セクションでインストールしない——<code>DriverEnableDfx=0</code> と <code>WdfDirectedPowerTransitionEnable=0</code> の<strong>2変数が同時に変わり交絡する</strong></li>
-          <li><strong>regedit で手動編集しない</strong>——キー階層の打ち間違いリスク。必ず配布スクリプトを使う</li>
-        </ul>
-      </div>
-      <h3>事前準備（開発側・セッション前日まで）</h3>
-      <ul>
-        <li>☐ <code>scripts\field-session\</code> フォルダ一式（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCにコピーしておく（例：<code>C:\field-session\</code>）</li>
-      </ul>
-      <h3>手順（クリック単位）</h3>
-      <ol>
-        <li><strong>実施判断</strong>：実験3 first gate の失敗を判定シートで確認（失敗していなければここで終了・スキップ記録）</li>
-        <li><strong>管理者ターミナルを開く</strong>：画面左下の<strong>スタートボタンを右クリック</strong>→「<strong>ターミナル (管理者)</strong>」（または「Windows PowerShell (管理者)」）→ 確認ダイアログで「<strong>はい</strong>」</li>
-        <li>スクリプトのフォルダへ移動：<code>cd C:\field-session</code>（実際の配置先に読み替え）</li>
-        <li><strong>現状確認</strong>：<code>powershell -ExecutionPolicy Bypass -File .\dfx_status.ps1</code><br>→ 表示された値（通常「<code>not set (driver default = DFX ENABLED)</code>」）を判定シートに書き写す</li>
-        <li><strong>ベースライン（A条件・DFX有効のまま）</strong>：実験3と同じ first gate 試験（接続→アイドルEP4×10回）を実施し、失敗回数を記録——実験3の結果をそのまま流用してよい</li>
-        <li><strong>DFX 無効化（B条件）</strong>：<code>powershell -ExecutionPolicy Bypass -File .\dfx_off.ps1</code><br>→ 緑色の「Done.」が出たら <code>dfx_status.ps1</code> をもう一度実行し「<code>0 = DFX DISABLED</code>」を確認。黄色の「WARN: device restart failed」が出た場合は<strong>USBコネクタを一度抜き差し</strong>すれば同じ効果</li>
-        <li><strong>B条件の試験</strong>：手順5と同一の first gate 試験を同一回数実施し、失敗回数を比較（判定 2-2）。失敗が消えたら、NoDfx のまま実験3の残り（smoke→低密度→高密度）を続行</li>
-        <li><strong>復元（可逆性確認を兼ねる）</strong>：試験終了後 <code>powershell -ExecutionPolicy Bypass -File .\dfx_on.ps1</code> を実行し、<code>dfx_status.ps1</code> で「<code>not set</code>」に戻ったことを確認（判定 2-3）。※NoDfx を恒久運用にする判断をした場合は戻さず、その旨を判定シートに明記</li>
-        <li>全ステップの実行結果（スクリプト出力の要点）を判定シートのメモ欄に記録</li>
-      </ol>
-      <h3>スクリプトが失敗するとき</h3>
-      <ul>
-        <li>「NG: administrator rights required」→ 手順2の<strong>管理者</strong>ターミナルで開き直す（ウィンドウタイトルに「管理者」と出ているか確認）</li>
-        <li>「NG: FX3 board not found」→ USB 接続と機械の電源を確認して再実行</li>
-        <li>赤字で「スクリプトの実行が無効」系のエラー → コマンドを <code>powershell -ExecutionPolicy Bypass -File .\〜</code> の形で打っているか確認</li>
-      </ul>
-    </section>
-
-    <!-- ===== EXP4 ===== -->
-    <section id="exp4">
-      <h2>実験4：r18高密度フィールドテスト（段階ラダー）</h2>
-      <table class="spec-table">
-        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
-        <tbody><tr>
-          <td>高密度 EP6 タイムアウトが直結（スイッチ区間除去）＋r18ホスト側改修で解決済みかを確認し、<strong>D4（移植ベースライン＝origin/dev）の採用条件を閉じる</strong></td>
+          <td>ステップ0で選定した候補（r7 または r18 相当）が、直結（スイッチ区間除去）で高密度 EP6 タイムアウトを起こさず運用できるか確認し、<strong>D4（移植ベースライン）の採用判断材料を閉じる</strong></td>
           <td>高密度×3、100サイクル soak で Type C 維持</td>
         </tr></tbody>
       </table>
-      <p>正本 runbook は <code>docs/baseline_next.md</code>。以下はその実行順の要約＋判定分岐。</p>
+      <p>以下はステップ0で決めた採用候補に対する実行順と判定分岐。採用候補が r18 相当の場合のみ、timeout recovery 発生時の r18 固有マーカーを deploy 証跡として確認する。</p>
       <h3>手順（段階制——各段でPassしてから次へ）</h3>
       <ol>
         <li><strong>高密度 ×1</strong>：最優先で以下を回収
           <ul>
-            <li><code>[PR04][TIMEOUT_RECOVERY] phase=resume</code> の <code>retryBackoffMs=20</code></li>
-            <li><code>nextPlannedReadSize</code> が <code>31211520</code> より小さい（clamp 反映）</li>
+            <li>Type 判定（<code>ep6Timeouts</code>、<code>DDR_WR_END</code>、<code>DDR_RD_END</code>）</li>
+            <li>採用候補が r18 相当で timeout recovery が発生した場合のみ、<code>[PR04][TIMEOUT_RECOVERY] phase=resume</code> の <code>retryBackoffMs=20</code></li>
+            <li>採用候補が r18 相当で timeout recovery が発生した場合のみ、<code>nextPlannedReadSize</code> が <code>31211520</code> より小さい（clamp 反映）</li>
             <li><code>deltaWr / deltaRd / deltaBacklog</code>（r17 より悪化していないこと）</li>
             <li><code>[PR01][CYCLE] status/error/publishedPairs</code></li>
           </ul>
         </li>
         <li><strong>分岐</strong>：
           <ul>
-            <li>first timeout 自体が消えた → そのまま<strong>高密度 ×3</strong></li>
-            <li>first timeout は残るが <code>TIMEOUT_RECOVERY</code> が改善 → 高密度 ×1 をもう1本比較</li>
-            <li><code>retryBackoffMs=20</code>／clamped <code>nextPlannedReadSize</code> が出ない → <strong>deploy mismatch を先に疑う</strong>（ステップ0へ戻る）</li>
+            <li>高密度 ×1 が Type C → そのまま<strong>高密度 ×3</strong></li>
+            <li>採用候補が r18 相当で first timeout は残るが <code>TIMEOUT_RECOVERY</code> が改善 → 高密度 ×1 をもう1本比較</li>
+            <li>採用候補が r18 相当で timeout recovery 発生時に <code>retryBackoffMs=20</code>／clamped <code>nextPlannedReadSize</code> が出ない → <strong>deploy mismatch を先に疑う</strong>（ステップ0へ戻る）</li>
+            <li>採用候補が r7 で高密度 ×1 が Type A/B → r18 相当の高密度 x1 と見比べ、候補選定をやり直す</li>
           </ul>
         </li>
         <li><strong>高密度 ×3</strong>：全ラン Type C を確認。タイムアウト継続なら100サイクルへ進まず、リトライパスと波形品質の切り分けへ切替</li>
-        <li><strong>低密度 ×100 サイクル soak</strong> → <strong>高密度 ×100 サイクル soak</strong>：停止・破損・missing pair ゼロを確認（実験5の計測データ源を兼ねる）</li>
+        <li><strong>低密度 ×100 サイクル soak</strong> → <strong>高密度 ×100 サイクル soak</strong>：停止・破損・missing pair ゼロを確認（実験3の計測データ源を兼ねる）</li>
         <li><strong>preview / consumer 併用セッション ×1</strong>：<code>.tmp</code> 非公開・pair index 単調増加・不完全ペア非可視を確認</li>
         <li><strong>spot check</strong>：成功ランの .bin ペア健全性（ノートブックで波形確認）、失敗ランがあれば <code>_cfg.txt</code> の result metadata と publish 境界の照合</li>
       </ol>
@@ -1011,9 +911,9 @@ flowchart TB
       </table>
     </section>
 
-    <!-- ===== EXP5 ===== -->
-    <section id="exp5">
-      <h2>実験5：auto-mode 再アームギャップ計測</h2>
+    <!-- ===== EXP3 ===== -->
+    <section id="exp3">
+      <h2>実験3：auto-mode 再アームギャップ計測</h2>
       <table class="spec-table">
         <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
         <tbody><tr>
@@ -1023,8 +923,8 @@ flowchart TB
       </table>
       <h3>手順</h3>
       <ol>
-        <li>実験4の <strong>100サイクル soak のログをそのまま一次データにする</strong>（専用ランは不要。soak が流れている間に本実験の抽出定義を確認しておく）</li>
-        <li>auto-mode（Manual Get OFF → Set → 外部開始待機）での連続サイクルを最低1系列含める。<span class="badge badge-open">Open Question</span> 機械側スイッチによる外部開始をセッションで操作できるかは現地確認——不可なら Manual 連続サイクルで代替し、その旨を記録</li>
+        <li>実験2の <strong>100サイクル soak のログをそのまま一次データにする</strong>（専用ランは不要。soak が流れている間に本実験の抽出定義を確認しておく）</li>
+        <li>auto-mode（Manual Get OFF → Set → 外部開始待機）での連続サイクルを最低1系列含める。測定開始は機械側スイッチ、または別アプリが 96 well auto sampler を動かした開始トリガで行う。AnalogBoard は sampler を制御しない</li>
         <li>各サイクルについてログのタイムスタンプから「停止（ドレイン完了 <code>DDR_RD_END=1</code>）→ 次アーム（INIT → 取得再開）」の窓を抽出</li>
         <li>サイクル毎の <code>backlogBytes</code> 最大値（<code>[PR04][TIMEOUT_RECOVERY]</code>／<code>[PR04][STARTUP_EP4]</code> の <code>WAVE_WR_CNT/WAVE_RD_CNT</code> 差分）を併記</li>
         <li>低密度・高密度それぞれで p50 / p99 / max を算出（解析は持ち帰り後で可。ログの完全回収が現地の必須タスク）</li>
@@ -1037,41 +937,9 @@ flowchart TB
       </ul>
     </section>
 
-    <!-- ===== EXP6 ===== -->
-    <section id="exp6">
-      <h2>実験6：録画キャプチャ（全実験で並走）</h2>
-      <table class="spec-table">
-        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
-        <tbody><tr>
-          <td>エミュレータ（Tier 1/2/3）・回帰コーパスの初期充填。<strong>特に失敗トレース</strong>（タイムアウト・切断・ショートリード）の保全</td>
-          <td>各 config・各ドライバ構成（Win11 旧/新）で EP2/4/6 の証跡を取得し、障害トレースも保全されている</td>
-        </tr></tbody>
-      </table>
-      <div class="callout callout-info">
-        <div class="callout-title">フェーズ0での「録画」の実体</div>
-        <p>新通信層の Recorder はまだ存在しないため、フェーズ0の録画は<strong>①アプリログ＋②保存データ（.bin/_cfg）＋③USBレベルキャプチャ</strong>の3点セットで代替する。<span class="badge badge-assumption">Assumption</span> ③のツール（USBPcap 等）はプラン未指定・事前選定。①②は全ランで自動的に取れるので、<strong>「消さない・全部持ち帰る」が本実験の実質タスク</strong>。</p>
-      </div>
-      <h3>手順</h3>
-      <ol>
-        <li>全実験を通じ、ラン毎に「ビルド版・OS・ケーブル・密度・パラメータ・結果 Type」を判定シートに記録（コーパスのメタデータになる）</li>
-        <li>アプリログ（<code>logs/&lt;ver&gt;/logs/*.log</code>）と保存データ（<code>*_cfg.txt</code>・<code>.bin</code> ペア）を<strong>失敗ラン含め全て保全</strong></li>
-        <li><strong>専用キャプチャラン</strong>：判定に使わない追加ランとして、低密度×1・高密度×1・（可能なら）スイッチ区間を挿入した障害再現×1 を USB レベルキャプチャ付きで取得——EP2 コマンド列・EP4 レジスタ推移・EP6 バルク・転送間タイムスタンプの実トレースを得る</li>
-        <li>キャプチャファイルはラン ID（判定シートの番号）と紐付けて保存</li>
-      </ol>
-      <h3>コーパスに揃えるべき内訳（プラン「録画コーパスに含めるもの」より）</h3>
-      <ul>
-        <li>EP6 生バイト列（=保存 .bin ペア＋キャプチャ）</li>
-        <li>EP4 レジスタ推移（=ログの <code>STARTUP_EP4</code>/EP4読取行＋キャプチャ）</li>
-        <li>EP2 コマンド列（=Set 時のログ＋キャプチャ）</li>
-        <li>転送間タイムスタンプ（=キャプチャ。ログは秒精度のため補助）</li>
-        <li>config タグ（=<code>_cfg.txt</code>＋判定シートのメタデータ）</li>
-        <li>障害イベントの実トレース（=Type A/B ランのログ一式）</li>
-      </ul>
-    </section>
-
-    <!-- ===== EXP7 ===== -->
-    <section id="exp7">
-      <h2>実験7：実 .bin/_cfg サンプル取得と gcsa 照合</h2>
+    <!-- ===== EXP4 ===== -->
+    <section id="exp4">
+      <h2>実験4：実 .bin/_cfg サンプル取得と gcsa 照合</h2>
       <table class="spec-table">
         <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
         <tbody><tr>
@@ -1096,6 +964,177 @@ flowchart TB
       </ol>
     </section>
 
+    <!-- ===== DRIVER SWAP ===== -->
+    <section id="driverswap">
+      <h2>ドライバ入替・ロールバック手順（詳細）</h2>
+      <p>実機PCは <strong>Win11・1台</strong>のため、新ドライバ系列（実験5→条件付きで実験5b）は<strong>実験2・3・4 が完了してから</strong>実施する。PC操作に不慣れな実施者を想定し、クリック単位で記す。<strong>レジストリは触らない</strong>（実験5bが必要になった場合も配布スクリプトが自動処理する）。</p>
+      <h3>入替前チェック</h3>
+      <ul>
+        <li>☐ 実験2・3・4 の判定シート記入とログ回収が完了している</li>
+        <li>☐ AnalogBoard アプリを終了している</li>
+        <li>☐ 新旧ドライバのフォルダをローカルに用意している：新＝<code>FX3\Win11\x64</code>（1.3.0.4）／旧＝現行運用版（1.2.3.20 系）のフォルダ</li>
+      </ul>
+      <h3>入替（旧 → 新 1.3.0.4）</h3>
+      <ol>
+        <li>画面左下の<strong>スタートボタンを右クリック</strong>し、メニューから「<strong>デバイス マネージャー</strong>」をクリック</li>
+        <li>一覧の「<strong>ユニバーサル シリアル バス コントローラー</strong>」の左の「＞」をクリックして開き、<strong>Cypress／FX3 系の名前のデバイス</strong>を探す（見つからない場合：メニューの「表示」→「デバイス（接続別）」に切り替えて探す。機械の電源とUSB接続も確認）</li>
+        <li>そのデバイスを<strong>右クリック</strong>→「<strong>プロパティ</strong>」→「<strong>ドライバー</strong>」タブ。<strong>現在のバージョン（1.2.3.20 系のはず）をメモ</strong>してから「<strong>ドライバーの更新</strong>」をクリック</li>
+        <li>「<strong>コンピューターを参照してドライバーを検索</strong>」→「参照」で用意した <code>FX3\Win11\x64</code> フォルダを選択 →「次へ」</li>
+        <li>完了後、もう一度プロパティの「ドライバー」タブを開き、<strong>バージョンが 1.3.0.4 になっている</strong>ことを確認して判定シートに記録</li>
+        <li>デバイスが「！」マーク無しで表示されていることを確認（「！」が付いたら下の「困ったとき」へ）</li>
+      </ol>
+      <h3>ロールバック（新 → 旧）</h3>
+      <ol>
+        <li>同じ手順でプロパティの「ドライバー」タブを開く</li>
+        <li>「<strong>ドライバーを元に戻す</strong>」ボタンが押せる場合：クリックして案内に従う（理由は「以前のバージョンの方が安定していた」等でよい）</li>
+        <li>ボタンが灰色で押せない場合：「ドライバーの更新」→「コンピューターを参照」→「<strong>コンピューター上の利用可能なドライバーの一覧から選択</strong>」→ 一覧から <strong>1.2.3.20 系</strong>を選択 →「次へ」。一覧に無ければ「参照」で旧ドライバのフォルダを指定</li>
+        <li>バージョンが 1.2.3.20 系に戻ったことを確認</li>
+        <li><strong>復帰スモーク×1</strong>：AnalogBoard アプリを起動し、低密度1サイクルで Type C（<code>ep6Timeouts=0</code>・<code>DDR_RD_END=1</code>）を確認。結果を判定シート 5-4 に記録</li>
+      </ol>
+      <h3>困ったとき</h3>
+      <ul>
+        <li>デバイスに「！」が付いた／認識されない → USB コネクタを抜き差し。直らなければ PC を再起動</li>
+        <li>更新ウィザードで「最適なドライバーが既にインストールされています」と出る → 「コンピューター上の利用可能なドライバーの一覧から選択」の経路でバージョンを明示指定する</li>
+        <li>どのデバイスか自信がない → デバイスを右クリック→プロパティ→「詳細」タブ→「ハードウェア ID」に <code>VID_04B4</code> が含まれていれば対象</li>
+      </ul>
+    </section>
+
+    <!-- ===== EXP5 (新ドライバ系列) ===== -->
+    <section id="exp5">
+      <h2>実験5：SDK1.3対応バイナリ検証（新ドライバ系列・レジストリ不要）</h2>
+      <div class="callout callout-success">
+        <div class="callout-title">実験5bより先にやる（2026-07-06 オーナー方針）</div>
+        <p>本実験は<strong>レジストリ操作が一切不要</strong>。これが成功すれば実験5b（DFX A/B＝レジストリ変更）は<strong>丸ごとスキップ</strong>できるため、新ドライバ系列では本実験を先に実施する。</p>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>新ドライバ＋一致SDK（1.3）のバイナリで通信可能かを検証し、ドライバ Plan A を確定させる</td>
+          <td>Win11 新ドライバで Type C を達成</td>
+        </tr></tbody>
+      </table>
+      <h3>手順（driver_next.md の first gate を踏襲）</h3>
+      <ol>
+        <li>「ドライバ入替・ロールバック手順」に従い新ドライバ <code>1.3.0.4</code> へ入替（DFX 等の設定は<strong>一切変更しない</strong>＝既定のまま）</li>
+        <li><strong>再作成した</strong> <code>feature/win11-driver-compat</code> の <code>x64/Release</code> 出力物を配置</li>
+        <li><code>USBBoard_Connect</code> の成功を確認（起動時自動接続のログ）</li>
+        <li><strong>first gate</strong>：アイドル EP4 読取を10回以上反復し、<code>Get ep4 register data failed.</code>／<code>USB board is removed! Disconnect usb.</code> が出ないことを確認</li>
+        <li>first gate 通過後、<strong>EP2 → EP4 → EP6 の順で smoke</strong>：Set（EP2一括書込）→ レジスタ読取 → 低密度1サイクル取得</li>
+        <li>低密度で Type C を確認後、高密度×1〜3 で timeout と EP4 failure を再評価</li>
+        <li><strong>first gate が失敗した場合のみ</strong>実験5b（DFX A/B）へ進む。成功した場合は実験5bをスキップし判定シートに「スキップ（実験5成功）」と記録</li>
+        <li>系列の締めは「ドライバ入替・ロールバック手順」の<strong>ロールバック＋復帰スモーク</strong>（実験5/5b が良好で新ドライバ維持を選ぶ場合はその判断を判定シート 5-4 に明記）</li>
+      </ol>
+      <h3>観測ポイント</h3>
+      <ul>
+        <li>endpoint discovery の変化有無（DLL に discovery hardening 導入済み）</li>
+        <li>高密度時の Type 分類と <code>ep6Timeouts</code>（直結前提での比較）</li>
+      </ul>
+      <h3>アイドルEP4試験のUI経路</h3>
+      <p><span class="badge badge-confirmed">Decision</span> first gate 用の一時検証ビルドでは Dialog2（<strong>FPGA Debug</strong> タブ）を有効化し、<strong>idle 状態で <code>EP4 RX</code> を10回以上押す</strong>ことを標準経路にする。これは判定前の接続・idle EP4 健全性確認だけに使う。<code>EP2 TX</code> と <code>EP6 RX</code> は別途指示がある診断時以外は触らない。</p>
+      <h3>結果の解釈</h3>
+      <table class="spec-table">
+        <thead><tr><th>実験5（新バイナリ・DFX既定）</th><th>実験5b（NoDfx・条件付き）</th><th>解釈と次アクション</th></tr></thead>
+        <tbody>
+          <tr><td><strong>成功</strong></td><td>実施不要（スキップ）</td><td>SDK 世代不一致が主因。Plan A（cyusb3.sys＋SDK1.3一致lib）で確定。<strong>レジストリ操作なしで決着</strong></td></tr>
+          <tr><td>失敗</td><td><strong>成功</strong></td><td>DFX が主因。NoDfx を運用要件化（FX3 FW が LPM 非対応なら恒久要件の可能性）。Plan A＋NoDfx で確定</td></tr>
+          <tr><td>失敗</td><td>失敗</td><td>（時間があればステップ0の選定候補＝旧SDKバイナリ＋NoDfx も1本試行）→ 全滅なら Plan B（WinUSB 再バインド・署名コスト）検討へ。当面の運用は旧ドライバ継続</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== EXP5B (条件付き) ===== -->
+    <section id="exp5b">
+      <h2>実験5b：Win11 DFX無効化 A/B（実験5失敗時のみ・スクリプトで実施）</h2>
+      <div class="callout callout-warning">
+        <div class="callout-title">実施条件（2026-07-06 オーナー方針：レジストリ操作は極力避ける）</div>
+        <p><strong>実験5の first gate（接続＋アイドルEP4）が失敗した場合のみ</strong>実施する。実験5が成功していたら本実験はスキップし、判定シートに「スキップ（実験5成功）」と記録する。実施する場合も<strong>regedit は開かない</strong>——配布スクリプト（<code>scripts\field-session\</code>）が対象デバイスの自動検出・設定・復元まで行う。</p>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>Win11 新ドライバでの通信不可の主因が DFX（アイドルサスペンド）かを単変数で切り分け</td>
+          <td>NoDfx（<code>WdfDirectedPowerTransitionEnable=0</code>）で <code>Get ep4 register data failed.</code> が消えるか</td>
+        </tr></tbody>
+      </table>
+      <div class="callout callout-danger">
+        <div class="callout-title">やってはいけないこと</div>
+        <ul>
+          <li><strong>INF（<code>cyusb3.inf</code>）を編集しない</strong>——署名 cat が無効化される</li>
+          <li>INF 同梱の <code>CyUsb3NoDfx</code> セクションでインストールしない——<code>DriverEnableDfx=0</code> と <code>WdfDirectedPowerTransitionEnable=0</code> の<strong>2変数が同時に変わり交絡する</strong></li>
+          <li><strong>regedit で手動編集しない</strong>——キー階層の打ち間違いリスク。必ず配布スクリプトを使う</li>
+        </ul>
+      </div>
+      <h3>事前準備（開発側・セッション前日まで）</h3>
+      <ul>
+        <li>☐ <code>scripts\field-session\</code> フォルダ一式（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCにコピーしておく（例：<code>C:\field-session\</code>）</li>
+      </ul>
+      <h3>手順（クリック単位）</h3>
+      <ol>
+        <li><strong>実施判断</strong>：実験5 first gate の失敗を判定シートで確認（失敗していなければここで終了・スキップ記録）</li>
+        <li><strong>管理者ターミナルを開く</strong>：画面左下の<strong>スタートボタンを右クリック</strong>→「<strong>ターミナル (管理者)</strong>」（または「Windows PowerShell (管理者)」）→ 確認ダイアログで「<strong>はい</strong>」</li>
+        <li>スクリプトのフォルダへ移動：<code>cd C:\field-session</code>（実際の配置先に読み替え）</li>
+        <li><strong>現状確認</strong>：<code>powershell -ExecutionPolicy Bypass -File .\dfx_status.ps1</code><br>→ 表示された値（通常「<code>not set (driver default = DFX ENABLED)</code>」）を判定シートに書き写す</li>
+        <li><strong>ベースライン（A条件・DFX有効のまま）</strong>：実験5と同じ first gate 試験（接続→アイドルEP4×10回）を実施し、失敗回数を記録——実験5の結果をそのまま流用してよい</li>
+        <li><strong>DFX 無効化（B条件）</strong>：<code>powershell -ExecutionPolicy Bypass -File .\dfx_off.ps1</code><br>→ 緑色の「Done.」が出たら <code>dfx_status.ps1</code> をもう一度実行し「<code>0 = DFX DISABLED</code>」を確認。黄色の「WARN: device restart failed」が出た場合は<strong>USBコネクタを一度抜き差し</strong>すれば同じ効果</li>
+        <li><strong>B条件の試験</strong>：手順5と同一の first gate 試験を同一回数実施し、失敗回数を比較（判定 5b-2）。失敗が消えたら、NoDfx のまま実験5の残り（smoke→低密度→高密度）を続行</li>
+        <li><strong>復元（可逆性確認を兼ねる）</strong>：試験終了後 <code>powershell -ExecutionPolicy Bypass -File .\dfx_on.ps1</code> を実行し、<code>dfx_status.ps1</code> で「<code>not set</code>」に戻ったことを確認（判定 5b-3）。※NoDfx を恒久運用にする判断をした場合は戻さず、その旨を判定シートに明記</li>
+        <li>全ステップの実行結果（スクリプト出力の要点）を判定シートのメモ欄に記録</li>
+      </ol>
+      <h3>スクリプトが失敗するとき</h3>
+      <ul>
+        <li>「NG: administrator rights required」→ 手順2の<strong>管理者</strong>ターミナルで開き直す（ウィンドウタイトルに「管理者」と出ているか確認）</li>
+        <li>「NG: FX3 board not found」→ USB 接続と機械の電源を確認して再実行</li>
+        <li>赤字で「スクリプトの実行が無効」系のエラー → コマンドを <code>powershell -ExecutionPolicy Bypass -File .\〜</code> の形で打っているか確認</li>
+      </ul>
+    </section>
+
+    <!-- ===== EXP6 ===== -->
+    <section id="exp6">
+      <h2>実験6：録画キャプチャ（ログ保全＋専用診断ラン）</h2>
+      <table class="spec-table">
+        <thead><tr><th>目的</th><th>判定基準（プラン確定）</th></tr></thead>
+        <tbody><tr>
+          <td>エミュレータ（Tier 1/2/3）・回帰コーパスの初期充填。<strong>特に失敗トレース</strong>（タイムアウト・切断・ショートリード）の保全</td>
+          <td>各 config・各ドライバ構成（Win11 旧/新）で EP2/4/6 の証跡を取得し、障害トレースも保全されている</td>
+        </tr></tbody>
+      </table>
+      <div class="callout callout-info">
+        <div class="callout-title">フェーズ0での「録画」の実体</div>
+        <p>新通信層の Recorder はまだ存在しないため、フェーズ0の録画は<strong>①アプリログ＋②保存データ（.bin/_cfg）＋③USBレベルキャプチャ</strong>の3点セットで代替する。③の標準ツールは <strong>USBPcap＋Wireshark</strong> とする。ただし USBPcap は Windows USB スタックにキャプチャ用 filter を入れるため、取得タイミングへ影響しうる。<strong>判定ランでは使わず、同条件を短く再現する専用診断ランで使う</strong>。①②は全ランで自動的に取れるので、<strong>「消さない・全部持ち帰る」が本実験の実質タスク</strong>。</p>
+      </div>
+      <h3>手順</h3>
+      <ol>
+        <li>全実験を通じ、ラン毎に「ビルド版・OS・ケーブル・密度・パラメータ・結果 Type」を判定シートに記録（コーパスのメタデータになる）</li>
+        <li>アプリログ（<code>logs/&lt;ver&gt;/logs/*.log</code>）と保存データ（<code>*_cfg.txt</code>・<code>.bin</code> ペア）を<strong>失敗ラン含め全て保全</strong></li>
+        <li><strong>専用キャプチャラン</strong>：判定に使わない追加ランとして、idle EP4×10、EP2 Set→EP4 read、低密度×1、失敗再現×1 を USB レベルキャプチャ付きで取得する。高密度×1は必要時のみ短時間で行い、×3／×100 soak では原則使わない</li>
+        <li>キャプチャファイルはラン ID（判定シートの番号）と紐付けて保存</li>
+      </ol>
+      <h3>USBPcap＋Wireshark の使い方</h3>
+      <ol>
+        <li><strong>事前準備</strong>：実機セッション前に Wireshark を USBPcap オプション付きでインストールし、必要なら再起動する。インストールや再起動は実機時間中に行わない</li>
+        <li><strong>保存先作成</strong>：例 <code>C:\AnalogBoardField\usbpcap\YYYYMMDD\</code> を作り、判定シートと同じラン ID で管理する</li>
+        <li><strong>対象 bus の確認</strong>：Wireshark を起動し、USBPcap の interface 一覧から Cypress/FX3 デバイス（VID <code>04B4</code> 系）がぶら下がる root hub を選ぶ。特定が難しい場合は準備時だけ抜き差しして増減する bus を確認し、判定ラン中には抜き差ししない</li>
+        <li><strong>判定ランを先に実施</strong>：first gate、ラダー、soak の Pass/Fail 判定は USBPcap を停止した状態で行い、ログと保存データを先に確保する</li>
+        <li><strong>診断 capture 開始</strong>：Wireshark で該当 <code>USBPcapX</code> interface の capture を開始し、すぐに 1 操作だけ実施する（例：idle EP4×10、EP2 Set→EP4 read、低密度 1 cycle、失敗再現 1 回）</li>
+        <li><strong>すぐ停止して保存</strong>：操作が終わったら capture を停止し、<code>usbpcap_E5_firstgate_idle_ep4x10_pass_YYYYMMDD_HHMM.pcapng</code> のように実験番号・操作・結果・日時が分かる名前で保存する</li>
+        <li><strong>メモを残す</strong>：判定シートに pcapng のパス、Wireshark/USBPcap の版、選んだ <code>USBPcapX</code>、対象操作、開始/終了時刻、EP2=<code>0x02</code>・EP4=<code>0x84</code>・EP6=<code>0x86</code> の観測有無を書く</li>
+        <li><strong>確認</strong>：Wireshark ではまず <code>usb</code> 表示フィルタで全体を見て、必要に応じて endpoint address や device address で絞る。Wireshark の USB field 名は版差があるため、現地では画面上の列名に合わせてフィルタを組む</li>
+      </ol>
+      <div class="callout callout-warning">
+        <div class="callout-title">USB capture の扱い</div>
+        <p>USBPcap は診断用の補助証跡であり、Pass/Fail の主証拠ではない。Pass/Fail はキャプチャなしの判定ランで決める。Microsoft USB ETW はドライバ stack・enumeration・port state の補助確認には使えるが、EP2/EP4/EP6 payload の代替にはしない。ハードウェア USB アナライザがある場合は非侵襲のため優先してよいが、機種・設定・接続位置を必ず記録する。</p>
+      </div>
+      <h3>コーパスに揃えるべき内訳（プラン「録画コーパスに含めるもの」より）</h3>
+      <ul>
+        <li>EP6 生バイト列（=保存 .bin ペア＋キャプチャ）</li>
+        <li>EP4 レジスタ推移（=ログの <code>STARTUP_EP4</code>/EP4読取行＋キャプチャ）</li>
+        <li>EP2 コマンド列（=Set 時のログ＋キャプチャ）</li>
+        <li>転送間タイムスタンプ（=キャプチャ。ログは秒精度のため補助）</li>
+        <li>config タグ（=<code>_cfg.txt</code>＋判定シートのメタデータ）</li>
+        <li>障害イベントの実トレース（=Type A/B ランのログ一式）</li>
+      </ul>
+    </section>
+
     <!-- ===== SHEET ===== -->
     <section id="sheet">
       <h2>判定シート</h2>
@@ -1103,45 +1142,65 @@ flowchart TB
       <table class="spec-table">
         <thead><tr><th>#</th><th>判定項目</th><th>基準</th><th>結果</th><th>証跡（ログ/データパス）</th><th>メモ</th></tr></thead>
         <tbody>
-          <tr><td>0-1</td><td>deploy 検証</td><td>マーカー全出現・Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>0-1</td><td>r7 起動・直結 low/high smoke</td><td>low×1〜3＋high×1 が Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>0-2</td><td>r18 起動・直結 low/high smoke</td><td>low×1〜3＋high×1 が Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>0-3</td><td>r18 deploy 検証</td><td>timeout recovery 発生時に <code>retryBackoffMs=20</code>・clamped read size</td><td></td><td></td><td></td></tr>
+          <tr><td>0-4</td><td>採用候補決定</td><td>r7 / r18 / 未定を記録</td><td></td><td></td><td></td></tr>
           <tr><td>1-1</td><td>直結 高密度×3</td><td>全ラン Type C（<code>ep6Timeouts=0</code>）</td><td></td><td></td><td></td></tr>
           <tr><td>1-2</td><td>対照（スイッチ区間挿入）</td><td>Type A/B 再現</td><td></td><td></td><td></td></tr>
           <tr><td>1-3</td><td>直結復帰</td><td>Type C 復帰</td><td></td><td></td><td></td></tr>
-          <tr><td>3-0</td><td>ドライバ入替（旧→新）</td><td>バージョン 1.3.0.4 表示を確認</td><td></td><td></td><td></td></tr>
-          <tr><td>3-1</td><td>SDK1.3 first gate（DFX既定）</td><td><code>USBBoard_Connect</code>＋idle EP4×10 安定</td><td></td><td></td><td></td></tr>
-          <tr><td>3-2</td><td>SDK1.3 取得 smoke</td><td>低密度 Type C</td><td></td><td></td><td></td></tr>
-          <tr><td>3-3</td><td>SDK1.3 高密度</td><td>Type C（直結）</td><td></td><td></td><td></td></tr>
-          <tr><td>2-1</td><td>【実験3失敗時のみ】dfx_off 適用</td><td><code>dfx_status</code> が <code>0 = DFX DISABLED</code></td><td></td><td></td><td></td></tr>
-          <tr><td>2-2</td><td>【〃】NoDfx で first gate 再試験</td><td>同試験で失敗が消える</td><td></td><td></td><td></td></tr>
-          <tr><td>2-3</td><td>【〃】dfx_on で復元</td><td><code>dfx_status</code> が <code>not set</code>（恒久 NoDfx 採用時はその旨記録）</td><td></td><td></td><td></td></tr>
-          <tr><td>3-4</td><td>ドライバ最終状態</td><td>ロールバック＋復帰スモーク or 新ドライバ維持を記録</td><td></td><td></td><td></td></tr>
-          <tr><td>4-1</td><td>r18 高密度×1</td><td><code>retryBackoffMs=20</code>・clamped read size</td><td></td><td></td><td></td></tr>
-          <tr><td>4-2</td><td>r18 高密度×3</td><td>全ラン Type C</td><td></td><td></td><td></td></tr>
-          <tr><td>4-3</td><td>低密度×100 soak</td><td>停止・破損・missing pair ゼロ</td><td></td><td></td><td></td></tr>
-          <tr><td>4-4</td><td>高密度×100 soak</td><td>Type C 維持</td><td></td><td></td><td></td></tr>
-          <tr><td>4-5</td><td>preview/consumer 併用</td><td><code>.tmp</code> 非公開・pair 単調</td><td></td><td></td><td></td></tr>
-          <tr><td>5-1</td><td>再アーム窓データ</td><td>p99 算出に足るサイクル数のログ回収</td><td></td><td></td><td></td></tr>
+          <tr><td>2-1</td><td>選定候補 高密度×1</td><td>Type C（r18の場合は timeout recovery 発生時のマーカーも確認）</td><td></td><td></td><td></td></tr>
+          <tr><td>2-2</td><td>選定候補 高密度×3</td><td>全ラン Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>2-3</td><td>低密度×100 soak</td><td>停止・破損・missing pair ゼロ</td><td></td><td></td><td></td></tr>
+          <tr><td>2-4</td><td>高密度×100 soak</td><td>Type C 維持</td><td></td><td></td><td></td></tr>
+          <tr><td>2-5</td><td>preview/consumer 併用</td><td><code>.tmp</code> 非公開・pair 単調</td><td></td><td></td><td></td></tr>
+          <tr><td>3-1</td><td>再アーム窓データ</td><td>p99 算出に足るサイクル数のログ回収</td><td></td><td></td><td></td></tr>
+          <tr><td>4-1</td><td>基準サンプル取得</td><td>全13ch・パラメータ記録済み</td><td></td><td></td><td></td></tr>
+          <tr><td>4-2</td><td>ch順特定ラン</td><td>2〜3本・変更ch記録済み</td><td></td><td></td><td></td></tr>
+          <tr><td>5-0</td><td>ドライバ入替（旧→新）</td><td>バージョン 1.3.0.4 表示を確認</td><td></td><td></td><td></td></tr>
+          <tr><td>5-1</td><td>SDK1.3 first gate（DFX既定）</td><td><code>USBBoard_Connect</code>＋idle EP4×10 安定</td><td></td><td></td><td></td></tr>
+          <tr><td>5-2</td><td>SDK1.3 取得 smoke</td><td>低密度 Type C</td><td></td><td></td><td></td></tr>
+          <tr><td>5-3</td><td>SDK1.3 高密度</td><td>Type C（直結）</td><td></td><td></td><td></td></tr>
+          <tr><td>5b-1</td><td>【実験5失敗時のみ】dfx_off 適用</td><td><code>dfx_status</code> が <code>0 = DFX DISABLED</code></td><td></td><td></td><td></td></tr>
+          <tr><td>5b-2</td><td>【〃】NoDfx で first gate 再試験</td><td>同試験で失敗が消える</td><td></td><td></td><td></td></tr>
+          <tr><td>5b-3</td><td>【〃】dfx_on で復元</td><td><code>dfx_status</code> が <code>not set</code>（恒久 NoDfx 採用時はその旨記録）</td><td></td><td></td><td></td></tr>
+          <tr><td>5-4</td><td>ドライバ最終状態</td><td>ロールバック＋復帰スモーク or 新ドライバ維持を記録</td><td></td><td></td><td></td></tr>
           <tr><td>6-1</td><td>ログ・データ全保全</td><td>失敗ラン含め回収済み</td><td></td><td></td><td></td></tr>
           <tr><td>6-2</td><td>専用キャプチャラン</td><td>低・高・障害の3本</td><td></td><td></td><td></td></tr>
-          <tr><td>7-1</td><td>基準サンプル取得</td><td>全13ch・パラメータ記録済み</td><td></td><td></td><td></td></tr>
-          <tr><td>7-2</td><td>ch順特定ラン</td><td>2〜3本・変更ch記録済み</td><td></td><td></td><td></td></tr>
+          <tr><td>7-1</td><td>退出前回収確認</td><td>全ログ・全データ・判定シート回収済み</td><td></td><td></td><td></td></tr>
         </tbody>
       </table>
     </section>
 
-    <!-- ===== COLLECT ===== -->
-    <section id="collect">
-      <h2>回収物チェックリスト（セッション終了時・退出前）</h2>
+    <!-- ===== EXP7 / COLLECT ===== -->
+    <section id="exp7">
+      <h2>実験7：回収物チェックリスト（セッション終了時・退出前）</h2>
       <div class="callout callout-danger">
         <div class="callout-title">退出前に必ず実施</div>
         <p>以下は<strong>実機PCにしか存在しない</strong>ものを含む。持ち帰り忘れはセッションのやり直しに直結する。</p>
       </div>
+      <h3>実験別の回収ファイル</h3>
+      <table class="spec-table">
+        <thead><tr><th>実験</th><th>必ず回収するファイル・記録</th><th>条件付きで回収するもの</th></tr></thead>
+        <tbody>
+          <tr><td>共通</td><td>判定シート、使用 USB port、ケーブル構成、driver version、ビルド版、ラン ID 対応表、<code>logs/&lt;ver&gt;/logs/*.log</code></td><td>失敗時の画面写真・原文 error message・発生時刻</td></tr>
+          <tr><td>ステップ0<br>r7 / r18 直結A/B</td><td>r7 と r18 相当それぞれの起動ログ、低密度×1〜3、高密度×1 のログ、生成された <code>_cfg.txt</code>、<code>*_fl_*.bin</code>、<code>*_fh_*.bin</code>、Type 判定、採用候補メモ</td><td>r18 相当で timeout recovery が発生した場合の <code>[PR04][TIMEOUT_RECOVERY]</code> を含むログ、deploy mismatch 疑い時の build hash / mtime 記録</td></tr>
+          <tr><td>実験1<br>直結標準化＋スイッチ区間A/B</td><td>直結条件の高密度×3ログ、生成された <code>_cfg.txt</code>、<code>*_fl_*.bin</code>、<code>*_fh_*.bin</code>、Type 判定、使用ポート・ケーブル構成記録</td><td>スイッチ区間を挿入した場合の同一条件ログ/データ、<code>SW-SEG-01</code> ラベル・保管場所の写真またはメモ</td></tr>
+          <tr><td>実験2<br>選定候補 高密度ラダー</td><td>高密度×1、×3、低密度×100、高密度×100 の全ログ、各ランの <code>_cfg.txt</code>＋bin ペア、<code>[PR01][CYCLE]</code> を含むログ。採用候補が r18 相当の場合は <code>[PR04][TIMEOUT_RECOVERY]</code> を含むログも回収</td><td>途中失敗時の最後の成功ラン・最初の失敗ランのデータ一式、notebook spot check のスクリーンショット</td></tr>
+          <tr><td>実験3<br>再アームギャップ計測</td><td>実験2の低密度/高密度×100 soak ログ一式、cycle start/end と再アーム窓を含むログ、算出対象ラン ID</td><td>持ち帰り後に作成した p50/p99/max 集計表、抽出スクリプトまたは notebook 出力</td></tr>
+          <tr><td>実験4<br>gcsa照合サンプル</td><td>基準サンプルの <code>_cfg.txt</code>＋bin ペア、ch順特定ランの <code>_cfg.txt</code>＋bin ペア、gain/offset/trigger/CH enable の記録、サンプル名・ラン ID 対応表</td><td>gcsa 読込結果、波形 preview、物理ch順の照合メモ、解析 notebook 出力</td></tr>
+          <tr><td>実験5<br>SDK1.3対応バイナリ</td><td>driver version 証跡、first gate ログ、低密度 smoke の <code>_cfg.txt</code>＋bin ペア、高密度を実施した場合のログ/データ、最終 driver 状態</td><td>first gate 失敗時の USBPcap 診断 capture、ロールバック後の復帰スモークログ</td></tr>
+          <tr><td>実験5b<br>DFX A/B（条件付き）</td><td><code>dfx_status.ps1</code> の変更前/変更後/復元後の出力、A条件/B条件の first gate ログ、判定シートの失敗回数</td><td>NoDfx のまま残す判断をした場合の最終 <code>dfx_status.ps1</code> 出力、管理者 PowerShell の transcript/screenshot</td></tr>
+          <tr><td>実験6<br>録画キャプチャ</td><td>専用診断ランの <code>.pcapng</code>、対応するアプリログ/データ、Wireshark/USBPcap version、選択した <code>USBPcapX</code>、capture 開始/終了時刻</td><td>hardware USB analyzer を使った場合の機種・設定・接続位置、Microsoft USB ETW を使った場合の ETL と目的メモ</td></tr>
+          <tr><td>実験7<br>回収確認</td><td>共有ストレージへコピーした <code>logs/</code>・<code>data/</code>・判定シート・driver 状態記録</td><td>不足が見つかった場合の現地追加コピー記録</td></tr>
+        </tbody>
+      </table>
       <ul>
         <li>☐ <code>logs/</code> 一式（全ビルド・全ラン・<strong>失敗ラン含む</strong>）→ 共有ストレージへコピー</li>
-        <li>☐ <code>data/</code> 一式（.bin ペア＋<code>_cfg.txt</code>。少なくとも代表ラン＋障害ラン＋実験7の全サンプル）</li>
+        <li>☐ <code>data/</code> 一式（.bin ペア＋<code>_cfg.txt</code>。少なくとも代表ラン＋障害ラン＋実験4の全サンプル）</li>
         <li>☐ USB レベルキャプチャファイル（ラン ID と紐付け済み）</li>
         <li>☐ 判定シート（全行埋め・Skip は理由付き）</li>
-        <li>☐ 実験2のレジストリ変更の記録（最終状態：戻したか、NoDfx のままか）</li>
+        <li>☐ 実験5bのレジストリ変更の記録（最終状態：戻したか、NoDfx のままか）</li>
         <li>☐ <code>feature/win11-driver-compat</code> worktree の push 確認（未 push commit ゼロ）</li>
         <li>☐ <code>CyAPI.lib</code>（SDK 1.2/1.3）バイナリの保管とビルド対応の記録</li>
         <li>☐ 接続構成の記録（使用ホストポート・直結標準化の確定・<code>SW-SEG-01</code> の保管場所）</li>
@@ -1151,7 +1210,7 @@ flowchart TB
 
     <!-- ===== RISKS ===== -->
     <section id="risks">
-      <h2>注意事項・未決事項</h2>
+      <h2>注意事項</h2>
 
       <h3>落とし穴（負の知識）</h3>
       <div class="risk-card risk-card--high">
@@ -1171,18 +1230,11 @@ flowchart TB
         <div class="risk-body">FPGA がドレイン中に RD_WAIT で固着した場合、ホスト側だけでは回復不能（FW に abort レジスタなし）。発生したら電源サイクルで復帰し、<strong>発生時のログを障害トレースとして必ず保全</strong>する（自動再接続の上限を示す一次証拠になる）。</div>
       </div>
 
-      <h3>未決事項</h3>
-      <ul class="question-list">
-        <li>アイドル EP4 試験の UI 経路：配布ビルドで Dialog2（FPGA Debug タブ）が有効か。無効時の代替操作系列を事前に確定する</li>
-        <li>auto-mode の外部開始（機械側スイッチ）をセッション中に操作できるか。不可なら実験5は Manual 連続サイクルで代替</li>
-        <li>USB レベルキャプチャツールの選定と、Win10/Win11 両機での動作確認</li>
-      </ul>
-
       <h3>前提（Assumption）</h3>
       <div class="callout callout-danger">
         <div class="callout-title">Assumptions</div>
         <ul>
-          <li>所要時間は soak（×100×2本）が支配的。実機PCは Win11・1台確定のため全実験を直列で回す（新ドライバ系列は最後）。1日で収まらない場合は新ドライバ系列（実験3→条件付き2）を第2セッションに分割する前提</li>
+          <li>所要時間は soak（×100×2本）が支配的。実機PCは Win11・1台確定のため全実験を直列で回す（新ドライバ系列は最後）。1日で収まらない場合は新ドライバ系列（実験5→条件付き5b）を第2セッションに分割する前提</li>
           <li>DFX レジストリキーの正確な階層は現地確認（本書のパスはテンプレート）</li>
           <li>「録画」はフェーズ0時点ではログ＋データ＋USBキャプチャの3点セットで代替（新通信層 Recorder は未実装）</li>
         </ul>
@@ -1196,12 +1248,12 @@ flowchart TB
       <table class="spec-table">
         <thead><tr><th>本書のセクション</th><th>正本</th><th>扱い</th></tr></thead>
         <tbody>
-          <tr><td>実験1〜7 の定義・判定基準</td><td>親プラン「まとめ実機セッション」節（<code>docs/plans/260703-analogboard-rebuild-plan.html</code>）</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
-          <tr><td>実験4 の手順・参考値・分岐</td><td><code>docs/baseline_next.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
-          <tr><td>実験2・3 の手順・first gate</td><td>親プラン「ドライバ・通信層戦略」節＋<code>docs/driver_next.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
-          <tr><td>Type A/B/C・スモーク項目</td><td><code>docs/2026-03-02-usb-acquisition-stability-field-reference.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>実験1〜7 の定義・判定基準</td><td>親プラン「まとめ実機セッション」節（<code>docs/plans/260710-analogboard-rebuild-plan.html</code>）</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>実験2 の手順・参考値・分岐</td><td><code>docs/operations/usb-acquisition-stability/baseline_next.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>実験5・5b の手順・first gate</td><td>親プラン「ドライバ・通信層戦略」節＋<code>docs/operations/usb-acquisition-stability/driver_next.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>Type A/B/C・スモーク項目</td><td><code>docs/operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-field-reference.md</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
           <tr><td>ラン共通条件（デバッガ・DebugView 禁止等）</td><td><code>docs/archive/usb-acquisition/0929_log_cut_test_instructions.md</code>＋<code>docs/troubleshooting/usb.md</code></td><td><span class="badge badge-inferred">Summarized</span></td></tr>
-          <tr><td>実験7 の照合項目（cfg 必須行・.bin 契約・ch順）</td><td>親プラン「gcsa 互換契約」節・「リスクと未決事項」節</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>実験4 の照合項目（cfg 必須行・.bin 契約・ch順）</td><td>親プラン「gcsa 互換契約」節・「リスクと未決事項」節</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
           <tr><td>セッション実行順・マトリクス・専用キャプチャラン・ch順特定ラン</td><td>本書で新規に構成（実施性のための提案）</td><td><span class="badge badge-inferred">Inferred</span></td></tr>
         </tbody>
       </table>
@@ -1211,7 +1263,7 @@ flowchart TB
 </div>
 
 <footer class="doc-footer">
-  <p>Generated from <strong>docs/plans/260703-analogboard-rebuild-plan.html「まとめ実機セッション」節ほか</strong> on 2026-07-06.</p>
+  <p>Generated from <strong>docs/plans/260710-analogboard-rebuild-plan.html「まとめ実機セッション」節ほか</strong> on 2026-07-06.</p>
   <p>本書は実施用の手順書であり、実験定義・判定基準の規範は親プランと各 runbook（baseline_next.md / driver_next.md）にある。図の描画に Mermaid（CDN）を使用。</p>
 </footer>
 <!-- Lightbox modal for diagrams (Pan & Zoom) -->

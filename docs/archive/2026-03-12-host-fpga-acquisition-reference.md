@@ -2,7 +2,7 @@
 
 作成日: 2026-03-12
 関連チェックリスト: [2026-03-12-host-fpga-acquisition-reference-checklist.md](./2026-03-12-host-fpga-acquisition-reference-checklist.md)
-関連プロセスログ: [2026-03-12-host-fpga-acquisition-reference-log.md](./process_log/2026-03-12-host-fpga-acquisition-reference-log.md)
+関連プロセスログ: [2026-03-12-host-fpga-acquisition-reference-log.md](./2026-03-12-host-fpga-acquisition-reference-log.md)
 
 ## 目的
 
@@ -14,12 +14,12 @@
 
 ## 先に見るべき source of truth
 
-- 仕様書: [`FPGA_FW/シスメックス株式会社様向け広帯域波形処理システム開発_FPGA設計仕様書_Rev1.0_241220.docx`](../FPGA_FW/シスメックス株式会社様向け広帯域波形処理システム開発_FPGA設計仕様書_Rev1.0_241220.docx)
-- FPGA top wiring: [`FPGA_TOP.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/FPGA_TOP.vhd)
-- measurement state machine: [`MEAS_CTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/MEAS_CTRL/MEAS_CTRL.vhd)
-- DDR write control: [`DDR3_WCTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/DDR3_WCTRL/DDR3_WCTRL.vhd)
-- DDR read control: [`DDR3_RCTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/DDR3_RCTRL/DDR3_RCTRL.vhd)
-- register exposure: [`REG_CTRL.vhd`](../FPGA_FW/ANA_20250129_restored/RTL/REG_CTRL/REG_CTRL.vhd)
+- 仕様書: [`FPGA_FW/シスメックス株式会社様向け広帯域波形処理システム開発_FPGA設計仕様書_Rev1.0_241220.docx`](../../FPGA_FW/シスメックス株式会社様向け広帯域波形処理システム開発_FPGA設計仕様書_Rev1.0_241220.docx)
+- FPGA top wiring: [`FPGA_TOP.vhd`](../../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/FPGA_TOP.vhd)
+- measurement state machine: [`MEAS_CTRL.vhd`](../../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/MEAS_CTRL/MEAS_CTRL.vhd)
+- DDR write control: [`DDR3_WCTRL.vhd`](../../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/DDR3_WCTRL/DDR3_WCTRL.vhd)
+- DDR read control: [`DDR3_RCTRL.vhd`](../../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/DDR3_RCTRL/DDR3_RCTRL.vhd)
+- register exposure: [`REG_CTRL.vhd`](../../FPGA_FW/SYSMEX_ANA_20250129_restored/RTL/REG_CTRL/REG_CTRL.vhd)
 
 仕様書では特に以下の節を先に読む。
 

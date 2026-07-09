@@ -80,6 +80,8 @@ FX3/
 tasks/
 claudebox-codexbox-agmsg-setup.html
 data/
+goal.md
+prompt.md
 
 # Coverage artifacts
 coverage/

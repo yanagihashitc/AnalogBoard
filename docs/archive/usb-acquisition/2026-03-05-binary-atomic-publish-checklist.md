@@ -1,6 +1,6 @@
 # binary原子的排出 タスクチェックリスト
 
-対象プラン: [AnalogBoard_improvement_plan.md](../plans/archive/AnalogBoard_improvement_plan.md)
+対象プラン: [AnalogBoard_improvement_plan.md](../plans/AnalogBoard_improvement_plan.md)
 プロセスログ: [Process Log](2026-03-05-binary-atomic-publish-log.md)
 作成日: 2026-03-05
 

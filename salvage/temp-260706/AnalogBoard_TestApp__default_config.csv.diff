@@ -1,8 +1,0 @@
---- origin/dev:AnalogBoard_TestApp/default_config.csv
-+++ temp:AnalogBoard_TestApp/default_config.csv
-@@ -35,4 +35,4 @@
- #Wave Get Set
- Manual Get Mode(ON:1/OFF:0):,1
- Waveformes Nums Per File:,10000
--Save Path:,E:\Projects\KD23026A-ANA\wavedata\test_07
-+Save Path:,E:\Projects\KD23026A-Sysmex_ANA\wavedata\test_07

@@ -1,9 +1,0 @@
---- origin/dev:docs/archive/log-isolation/2026-03-09-version-c-log-isolation-implementation-log.md
-+++ temp:docs/archive/log-isolation/2026-03-09-version-c-log-isolation-implementation-log.md
-@@ -28,5 +28,5 @@
- |---|---|---|---|---|---|---|
- | 2026-03-09 14:30 | Phase 1 / Initialize | Version C 実装用 checklist/log を作成 | initialized | このファイル | build と実機確認は未実施 | DLL perf log 抑止を実装する |
- | 2026-03-09 14:33 | Phase 1 / Implement Version C | `AnalogBoard_Dll.cpp` に DLL perf log 抑止スイッチを追加し、`OutputDebugStringA(...)` ブロックを条件付き化 | completed | `AnalogBoard_Dll/AnalogBoard_Dll.cpp` | DLL を含むため app 単体差し替えでは不十分、build と実機確認は未実施 | version 更新と差分確認を行う |
--| 2026-03-09 14:35 | Phase 1 / Update Version | `-version-update` スクリプトで TestApp version を `0.1.103` に更新 | completed | `AnalogBoard_TestApp/AnalogBoardTestApp.rc` | About 表示は skill 仕様により `0.1` を維持 | diff を確認して handoff する |
-+| 2026-03-09 14:35 | Phase 1 / Update Version | `sysmex-version-update` スクリプトで TestApp version を `0.1.103` に更新 | completed | `AnalogBoard_TestApp/AnalogBoardTestApp.rc` | About 表示は skill 仕様により `0.1` を維持 | diff を確認して handoff する |
- | 2026-03-09 14:37 | Phase 2 / Handoff | 差分確認と未実施事項の整理 | completed | checklist / process log / git diff | `x64 Release` build と実機取得はユーザー側で未実施 | build と Version C 実機確認を依頼する |

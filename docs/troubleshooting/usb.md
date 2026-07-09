@@ -34,5 +34,5 @@ The successful comparison build used a per-call EP6 local scratch buffer backed 
 
 - `AnalogBoard_Dll/UsbTransferHelpers.h`
 - `AnalogBoard_UnitTest/UsbTransferHelpers_test.cpp`
-- `docs/plans/2026-03-11-ep6-local-buffer-fix-design.md`
-- `docs/2026-03-02-usb-acquisition-stability-log.md`
+- `docs/archive/build-fixes/2026-03-11-ep6-local-buffer-fix-design.md`
+- `docs/process_log/2026-03-02-usb-acquisition-stability-log.md`

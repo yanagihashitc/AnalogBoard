@@ -4,7 +4,7 @@
 
 - [simulation-scenario-parser-hardening-design](./2026-03-11-simulation-scenario-parser-hardening-design.md)
 - [チェックリスト](./2026-03-11-simulation-scenario-parser-hardening-checklist.md)
-- [Process Log INDEX](INDEX.md)
+- [Process Log INDEX](../../process_log/INDEX.md)
 
 ## 記入ルール
 

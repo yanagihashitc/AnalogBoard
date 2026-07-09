@@ -1,8 +1,0 @@
---- origin/dev:docs/BUILD.md
-+++ temp:docs/BUILD.md
-@@ -1,4 +1,4 @@
--# AnalogBoard Build Guide (Windows / VS2022)
-+# Sysmex AnalogBoard Build Guide (Windows / VS2022)
- 
- ## 1. 前提環境
- 

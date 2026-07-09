@@ -2,7 +2,7 @@
 
 ## 対象プラン
 
-- [AnalogBoard_improvement_plan.md](../plans/archive/AnalogBoard_improvement_plan.md)
+- [AnalogBoard_improvement_plan.md](../plans/AnalogBoard_improvement_plan.md)
 - [チェックリスト](2026-03-05-binary-atomic-publish-checklist.md)
 
 ## 記入ルール
@@ -43,5 +43,4 @@
 | 2026-03-06 00:06 | Phase 14 verification prep | 実機確認用に EP6 timeout 注入シナリオの手順書を作成。操作手順、期待ログ、ファイル期待状態、合否判定、証跡項目を定義。 | 完了 | `docs/2026-03-05-ep6-timeout-field-verification.md` | 実機での実行結果は未取得 | 手順書に従って実機試験を実施し、結果を追記 |
 | 2026-03-06 01:02 | Phase 15 | Review指摘対応として `WaveDataFileIO.h` を更新。rollback backup path 生成の独立関数化、`*.bin.rollback.*` cleanup対応、rename試行回数(`attemptCount`)の可視化、`SaveWaveDataToFileImpl` pointer版の意図コメント追加を実施。あわせて `WaveDataFileIO_test.cpp` に cleanup/リトライ回数/nullptr+zero-size/backup-lock耐性のテストを追加。`SavePathValidation.h` に drive-root 判定コメントを追加。DLL側は EP6 診断カウンタを connect/disconnect でリセットするよう変更。 | 完了 | `msbuild AnalogBoard_TestApp.sln /t:Rebuild` 成功、`WaveDataFileIO_test.exe: 9420/9420 pass`、`SavePathValidation_test.exe: 23/23 pass`、`FpgaRegisterLogic_test.exe: 417/417 pass` | `build_test.bat` は環境依存で途中失敗するため個別実行で判定継続 | 実機で EP6 timeout 注入手順の実施結果を追記 |
 | 2026-03-06 01:19 | Phase 16 | `build_test.bat` の途中終了を調査。原因は `if (...)` ブロック内 `echo` 文の未エスケープ括弧で、バッチ構文が崩れていたこと。`^(`/`^)` へ修正し、`if errorlevel 1` へ統一。 | 完了 | `scripts\\run_with_vsdevcmd.bat AnalogBoard_UnitTest\\build_test.bat` 成功、3テスト完走 (`417/417`, `9420/9420`, `23/23`) | 末尾に `cl` banner が追加で出るが、終了コード/判定には影響なし | 必要なら banner抑制（`/nologo`）を別タスク化 |
-
 

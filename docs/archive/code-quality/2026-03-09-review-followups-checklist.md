@@ -1,6 +1,6 @@
 # レビュー指摘フォローアップ タスクチェックリスト
 
-対象プラン: [USB データ取得・書き込み安定性改善プラン](2026-03-02-usb-acquisition-stability.md)
+対象プラン: [USB データ取得・書き込み安定性改善プラン](../../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
 プロセスログ: [Process Log](2026-03-09-review-followups-log.md)
 作成日: 2026-03-09
 

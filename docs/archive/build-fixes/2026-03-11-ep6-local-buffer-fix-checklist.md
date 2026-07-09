@@ -1,6 +1,6 @@
 # EP6 Local Buffer Fix タスクチェックリスト
 
-対象プラン: [EP6 Local Buffer Fix Design](./plans/2026-03-11-ep6-local-buffer-fix-design.md)
+対象プラン: [EP6 Local Buffer Fix Design](./2026-03-11-ep6-local-buffer-fix-design.md)
 プロセスログ: [Process Log](./2026-03-11-ep6-local-buffer-fix-log.md)
 作成日: 2026-03-11
 

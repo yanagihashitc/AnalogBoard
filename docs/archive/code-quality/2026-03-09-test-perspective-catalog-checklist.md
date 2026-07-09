@@ -1,6 +1,6 @@
 # Test Perspective Catalog タスクチェックリスト
 
-対象プラン: [Test Perspectives Index](./test-perspectives/INDEX.md)
+対象プラン: [Test Perspectives Index](../../test-perspectives/INDEX.md)
 プロセスログ: [Process Log](./2026-03-09-test-perspective-catalog-log.md)
 作成日: 2026-03-09
 

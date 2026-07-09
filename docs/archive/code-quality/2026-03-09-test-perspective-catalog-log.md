@@ -2,7 +2,7 @@
 
 ## 対象プラン
 
-- [Test Perspectives Index](./test-perspectives/INDEX.md)
+- [Test Perspectives Index](../../test-perspectives/INDEX.md)
 - [チェックリスト](./2026-03-09-test-perspective-catalog-checklist.md)
 
 ## 記入ルール

@@ -1,0 +1,42 @@
+# AnalogBoard Docs Index
+
+このディレクトリは、再構築プラン実行中の正規仕様・運用手順・過去資料を分けて管理する。
+
+## Current Source of Truth
+
+- [AnalogBoard rebuild plan](plans/260710-analogboard-rebuild-plan.html)
+- [Downstream modification plan](plans/260703-downstream-modification-plan.html)
+- [Cross-repo execution roadmap](plans/260710-cross-repo-execution-roadmap.html) — AnalogBoard / gcsa / sys_app 4プランの推奨実行順・依存関係・同期点
+
+## Current Operations
+
+- [Field session runbook](260706-field-session-runbook.html)
+- [Baseline next](operations/usb-acquisition-stability/baseline_next.md)
+- [Driver next](operations/usb-acquisition-stability/driver_next.md)
+- [Lab next](operations/usb-acquisition-stability/lab_next.md)
+- [USB acquisition stability plan](operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
+- [USB acquisition stability checklist](operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-checklist.md)
+
+## Guides
+
+- [Build guide](BUILD.md)
+- [Simulation guide](guides/SIMULATION.md)
+- [Implementation tracking](guides/IMPLEMENTATION_TRACKING.md)
+- [Troubleshooting](troubleshooting/INDEX.md)
+- [Test perspectives](test-perspectives/INDEX.md)
+
+## Reference
+
+古い仕様書、移行手順、ドライバ資料、棚卸しメモは [reference/](reference/) にまとめる。
+
+- [Initial application specification](reference/application_specification_initial.md)
+- [Initial commit architecture](reference/initial-commit-architecture.md)
+- [CyUSB driver documentation](reference/CyUSB.md)
+- [Gain adjustment manual](reference/gain-adjustment-manual.html)
+- [Git migration notes](reference/git-migrate-analogboard-linux.md)
+- [Knowledge inventory](reference/knowledge_inventory.md)
+- [Project direction](reference/project_direction.md)
+
+## Archive
+
+完了済みチェックリスト、古い process log、過去プランは [archive/](archive/) に置く。進行中の判断根拠は [process_log/INDEX.md](process_log/INDEX.md) から辿る。

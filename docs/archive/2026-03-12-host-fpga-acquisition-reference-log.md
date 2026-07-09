@@ -2,9 +2,9 @@
 
 ## 対象プラン
 
-- [Host-FPGA Acquisition Reference](../2026-03-12-host-fpga-acquisition-reference.md)
-- [チェックリスト](../2026-03-12-host-fpga-acquisition-reference-checklist.md)
-- [Process Log INDEX](./INDEX.md)
+- [Host-FPGA Acquisition Reference](./2026-03-12-host-fpga-acquisition-reference.md)
+- [チェックリスト](./2026-03-12-host-fpga-acquisition-reference-checklist.md)
+- [Process Log INDEX](../process_log/INDEX.md)
 
 ## 記入ルール
 
