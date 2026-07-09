@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnalogBoard × sys_app 統合検討スタディ</title>
+<style>
+:root {
+  /* Design tokens — お好みのブランドカラーに変更してください */
+  --color-bg: #ffffff;
+  --color-surface: #f5f8f7;
+  --color-surface-alt: #eaf0ee;
+  --color-border: #dfe7e5;
+  --color-border-strong: #c5d0cd;
+  --color-text: #111111;
+  --color-text-secondary: #626262;
+  --color-text-muted: #969696;
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-primary-light: #eff6ff;
+  --color-success: #16a34a;
+  --color-success-light: #dcfce7;
+  --color-warning: #e8910c;
+  --color-warning-light: #fef6e8;
+  --color-danger: #e03131;
+  --color-danger-light: #fdeaea;
+  --color-info: #0284c7;
+  --color-info-light: #e8f4fd;
+  --color-purple: #7048c6;
+  --color-purple-light: #f0ecf9;
+  --font-sans: 'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3', 'Hiragino Sans', 'メイリオ', Meiryo, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', Menlo, Consolas, monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.07);
+  --content-width: 820px;
+  --toc-width: 220px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.doc-header {
+  border-bottom: 3px solid var(--color-primary);
+  padding: 3rem 2rem 2rem;
+  max-width: calc(var(--content-width) + var(--toc-width) + 4rem);
+  margin: 0 auto;
+}
+.doc-logo { margin-bottom: 1.25rem; }
+.doc-logo svg { display: block; }
+.doc-header h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+.doc-header .subtitle {
+  font-size: 1.125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1.25rem;
+}
+.doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.doc-meta-item {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  padding: 0.25rem 0.625rem;
+}
+.doc-meta-item strong { color: var(--color-text); font-weight: 600; }
+
+.doc-layout {
+  display: grid;
+  grid-template-columns: var(--toc-width) 1fr;
+  gap: 2rem;
+  max-width: calc(var(--content-width) + var(--toc-width) + 4rem);
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* ── TOC Sidebar ── */
+.toc {
+  position: sticky;
+  top: 1.5rem;
+  align-self: start;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  font-size: 0.8125rem;
+  padding-right: 1rem;
+  border-right: 1px solid var(--color-border);
+}
+.toc-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+.toc ol {
+  list-style: none;
+  padding: 0;
+}
+.toc li { margin-bottom: 0.125rem; }
+.toc a {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+  transition: all 0.15s;
+}
+.toc a:hover { color: var(--color-primary); background: var(--color-primary-light); }
+.toc a.active { color: var(--color-primary); font-weight: 600; background: var(--color-primary-light); }
+.toc .toc-sub { padding-left: 1rem; }
+.toc .toc-sub a { font-size: 0.75rem; }
+
+/* ── Main Content ── */
+.doc-main { max-width: var(--content-width); }
+.doc-main section {
+  margin-bottom: 3rem;
+  scroll-margin-top: 1.5rem;
+}
+.doc-main h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--color-primary);
+  color: var(--color-text);
+}
+.doc-main h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+.doc-main p { margin-bottom: 1rem; }
+.doc-main ul, .doc-main ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+.doc-main li { margin-bottom: 0.375rem; }
+
+/* ── Summary Cards ── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+.card-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+.card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.375rem;
+}
+.card-detail {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.card--accent-blue { border-left: 3px solid var(--color-info); }
+.card--accent-green { border-left: 3px solid var(--color-primary); }
+.card--accent-amber { border-left: 3px solid var(--color-warning); }
+.card--accent-red { border-left: 3px solid var(--color-danger); }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.1875rem 0.5rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.badge-must   { background: var(--color-danger-light); color: var(--color-danger); }
+.badge-should { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-could  { background: var(--color-info-light); color: var(--color-info); }
+.badge-wont   { background: var(--color-surface-alt); color: var(--color-text-muted); }
+
+.badge-confirmed  { background: var(--color-success-light); color: var(--color-success); }
+.badge-inferred   { background: var(--color-purple-light); color: var(--color-purple); }
+.badge-assumption { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-open       { background: var(--color-info-light); color: var(--color-info); }
+
+.badge-risk-high   { background: var(--color-danger-light); color: var(--color-danger); }
+.badge-risk-medium { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-risk-low    { background: var(--color-success-light); color: var(--color-success); }
+
+/* ── Tables ── */
+.spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 1rem 0 1.5rem;
+}
+.spec-table thead { background: var(--color-surface); }
+.spec-table th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 2px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.spec-table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+.spec-table tbody tr:hover { background: var(--color-surface); }
+.spec-table code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: var(--color-surface-alt);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-xs);
+}
+
+/* ── Callouts ── */
+.callout {
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-surface);
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.9375rem;
+}
+.callout-title {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.375rem;
+}
+.callout-info    { border-left-color: var(--color-info);    background: var(--color-info-light); }
+.callout-info .callout-title { color: var(--color-info); }
+.callout-warning { border-left-color: var(--color-warning); background: var(--color-warning-light); }
+.callout-warning .callout-title { color: var(--color-warning); }
+.callout-danger  { border-left-color: var(--color-danger);  background: var(--color-danger-light); }
+.callout-danger .callout-title { color: var(--color-danger); }
+.callout-success { border-left-color: var(--color-success); background: var(--color-success-light); }
+.callout-success .callout-title { color: var(--color-success); }
+
+/* ── Diagrams ── */
+.diagram-container {
+  margin: 1.5rem 0;
+  text-align: center;
+  cursor: zoom-in;
+}
+.diagram-container .mermaid {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.diagram-container:hover .mermaid,
+.diagram-container:focus-visible .mermaid {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+.diagram-container:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+.diagram-container::after {
+  content: "Click to enlarge";
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.diagram-container:hover::after,
+.diagram-container:focus-visible::after { opacity: 1; }
+.diagram-container figcaption {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* ── Lightbox Modal (Pan & Zoom) ── */
+.diagram-modal {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.28s ease-out, transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s;
+}
+.diagram-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.diagram-modal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.diagram-modal-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.diagram-modal-btn {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: var(--radius-xs);
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.diagram-modal-btn:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.diagram-modal-zoom-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 3rem;
+  text-align: center;
+}
+.diagram-modal-caption-bar {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.diagram-modal-viewport {
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  background: var(--color-surface);
+  position: relative;
+}
+.diagram-modal-viewport:active { cursor: grabbing; }
+.diagram-modal-content {
+  transform-origin: 0 0;
+  padding: 2rem;
+}
+.diagram-modal-content svg {
+  max-width: none;
+  max-height: none;
+}
+
+@media print { .diagram-modal { display: none !important; } }
+
+/* ── Glossary ── */
+.glossary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.glossary-item {
+  padding: 0.875rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.glossary-term {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin-bottom: 0.25rem;
+}
+.glossary-def {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* ── Risk Cards ── */
+.risk-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.risk-card--high   { border-left: 3px solid var(--color-danger); }
+.risk-card--medium { border-left: 3px solid var(--color-warning); }
+.risk-card--low    { border-left: 3px solid var(--color-success); }
+.risk-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+}
+.risk-title { font-weight: 600; font-size: 0.9375rem; }
+.risk-body  { font-size: 0.875rem; color: var(--color-text-secondary); }
+
+/* ── Open Questions ── */
+.question-list {
+  list-style: none;
+  padding: 0;
+}
+.question-list li {
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-xs);
+  margin-bottom: 0.5rem;
+  font-size: 0.9375rem;
+  background: var(--color-info-light);
+}
+.question-list li::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--color-info);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-right: 0.625rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* ── Directory Tree ── */
+.tree-view {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.8;
+  white-space: pre;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+.tree-view .dir { color: var(--color-primary-dark); font-weight: 600; }
+.tree-view .file { color: var(--color-text-secondary); }
+.tree-view .comment { color: var(--color-text-muted); font-style: italic; }
+
+/* ── Pyramid Chart ── */
+.pyramid { margin: 1.5rem 0; }
+.pyramid-level {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) 2fr;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.pyramid-bar {
+  border-radius: var(--radius-xs);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pyramid-bar .count {
+  font-size: 0.6875rem;
+  opacity: 0.8;
+  font-weight: 400;
+}
+.pyramid-detail {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+/* ── Code Blocks ── */
+pre {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  margin: 1rem 0;
+}
+
+/* ── Footer ── */
+.doc-footer {
+  border-top: 1px solid var(--color-border);
+  max-width: calc(var(--content-width) + var(--toc-width) + 4rem);
+  margin: 2rem auto 0;
+  padding: 1.5rem 2rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+.doc-footer p { margin-bottom: 0.25rem; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .doc-layout {
+    grid-template-columns: 1fr;
+    padding: 1.25rem;
+  }
+  .toc {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding-right: 0;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+  }
+  .doc-header { padding: 2rem 1.25rem 1.5rem; }
+  .doc-header h1 { font-size: 1.75rem; }
+  .card-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── Print ── */
+@media print {
+  body { font-size: 11pt; }
+  .toc, .doc-meta { display: none; }
+  .doc-layout { display: block; }
+  .doc-header { padding: 1rem 0; border-bottom: 2px solid #000; }
+  .doc-main section { page-break-inside: avoid; }
+  .card { border: 1px solid #999; }
+  .badge { border: 1px solid currentColor; }
+  a { color: inherit; text-decoration: none; }
+  .doc-footer { border-top: 1px solid #000; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="doc-header">
+  <h1>AnalogBoard × sys_app 統合検討スタディ</h1>
+  <p class="subtitle">「将来ひとつのアプリにまとめる」案の評価と、再構築設計に今から入れるべき変更の提案</p>
+  <div class="doc-meta">
+    <span class="doc-meta-item"><strong>Type:</strong> 調査レポート（意思決定材料・未採用）</span>
+    <span class="doc-meta-item"><strong>Version:</strong> 1.1</span>
+    <span class="doc-meta-item"><strong>Created:</strong> 2026-07-09</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（S1 の方向性をオーナー決定で「射影コピー → registration-only＋ストア完全直読」へ転換——「やらないこと」表の該当行に経緯を記載。07-09 追補：別アプリ維持の確認と Tauri デスクトップ化の実現性評価）</span>
+    <span class="doc-meta-item"><strong>Audience:</strong> オーナー／開発チーム</span>
+    <span class="doc-meta-item"><strong>Source:</strong> 再構築プラン Draft 1.12・下流改変プラン Draft 0.4・sys_app / gcsa ソース精査（9エージェント多視点調査）</span>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#summary">エグゼクティブサマリ</a></li>
+      <li><a href="#concepts">キーコンセプト</a></li>
+      <li><a href="#verdict">結論：統合の是非と到達形</a></li>
+      <li><a href="#facts">事実確認：sys_app / gcsa の実態</a></li>
+      <li><a href="#changes">今やるべき設計変更（6件）</a></li>
+      <li><a href="#rejected">やらないこと（却下・保留）</a></li>
+      <li><a href="#owner">オーナー判断事項</a></li>
+      <li><a href="#risks">リスク</a></li>
+      <li><a href="#tauri">追補：Tauri デスクトップ化</a></li>
+      <li><a href="#appendix">付録：調査プロセス</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-main">
+
+    <!-- ===== EXECUTIVE SUMMARY ===== -->
+    <section id="summary">
+      <h2>エグゼクティブサマリ</h2>
+      <p>
+        オーナーの問い——「将来的に AnalogBoard と sys_app をひとつのアプリにまとめる案はどうか。統合するなら今の設計を変えておく必要があるか」——に対し、
+        再構築プラン（Draft 1.12）・下流改変プラン（Draft 0.4）・sys_app（約29万行）・gcsa の実装を精査し、
+        <strong>製品/デプロイ・リアルタイム信頼性・契約ミニマリスト</strong>の3つの独立した設計視点で統合案を作成、
+        固定決定 D1〜D18 とコード実態への敵対的検証を通して統合した。
+      </p>
+      <p>
+        結論：<strong>コードベースの統合（単一プロセス・単一コードベース化）は非推奨</strong>。3視点すべてが独立に同じ結論に達した。
+        ただし「ユーザーにとってのひとつのアプリ」はコード統合なしで達成でき、その到達形は<strong>「一製品・複数プロセス」</strong>
+        ——同梱配布＋取得完了からの自動ハンドオフ（近期）、必要なら WPF シェルへの sys_app web UI 埋込（将来のアドオン）。
+        統合レイヤの実体はすでに設計済みの <strong>gcsa ネイティブ Zarr ストア＋正準 gate v1＋meta.json 契約そのもの</strong>であり、
+        これを完成させることが最良の「統合保険」になる。
+      </p>
+      <p>
+        今から入れるべき設計変更は6件（下記）。うち<strong>2件は時間制約付き</strong>：
+        ②finalization／パーティション可視性契約は meta.json（唯一「安定度：中」の契約項目）の凍結前に、
+        ③パーティションシャーディング方式はフェーズ0の D12 往復検証と同時に決める必要がある。
+        ②は統合と無関係に、<em>今日の正しさの穴</em>（取得中 import によるイベント数のサイレント切詰め）も塞ぐ。
+      </p>
+
+      <div class="card-grid">
+        <div class="card card--accent-blue">
+          <div class="card-label">結論</div>
+          <div class="card-value">コード統合は非推奨</div>
+          <div class="card-detail">3設計視点が独立に一致。「一製品・複数プロセス」が到達形。ストア契約＝統合レイヤ</div>
+        </div>
+        <div class="card card--accent-green">
+          <div class="card-label">今やる設計変更</div>
+          <div class="card-value">6件</div>
+          <div class="card-detail">うち契約凍結前必須2件（②可視性契約・③シャーディング）。コード変更はほぼゼロ、プラン/契約文言が主</div>
+        </div>
+        <div class="card card--accent-amber">
+          <div class="card-label">オーナー判断</div>
+          <div class="card-value">4件</div>
+          <div class="card-detail">「ひとつのアプリ」のゴール定義／デプロイトポロジ／自動ハンドオフ（UX-16）／P1 採否時期</div>
+        </div>
+        <div class="card card--accent-red">
+          <div class="card-label">検証規模</div>
+          <div class="card-value">9 エージェント</div>
+          <div class="card-detail">設計3案の主張22件を実コードで検証（反証1件のみ）。見落とし事実8件を回収し本書へ反映</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KEY CONCEPTS ===== -->
+    <section id="concepts">
+      <h2>キーコンセプト</h2>
+      <div class="glossary">
+        <div class="glossary-item">
+          <div class="glossary-term">一製品・複数プロセス</div>
+          <div class="glossary-def">ユーザーには1つの製品（同梱インストール・一貫した動線）に見せつつ、取得（WPF＋ネイティブコア）と解析（sys_app スタック）は別プロセス群に保つ形。取得の障害ドメインを解析から隔離したまま「ひとつのアプリ」体験を実現する。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">ストア契約＝統合レイヤ</div>
+          <div class="glossary-def">gcsa ネイティブ Zarr ストア＋meta.json＋正準 gate v1。両アプリが従う唯一のデータ語彙であり、将来アプリをどう包み直しても変わらない座標系。契約を完成させること自体が最大の統合保険。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">射影（projection / S1〜S8）</div>
+          <div class="glossary-def">sys_app が import 時にストアを自前の Parquet/JSON 面へ複製する方式（下流改変プラン。実行保留中）。sys_app の可視化・gating 層を無改修に保つために選ばれた——統合しても「seam の位置」が変わるだけで再計算禁止（D5）等の不変条件は残る。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">finalization マーカ</div>
+          <div class="glossary-def">データセットが「取得完了」かを外部リーダが判定できる meta.json 上の明示フラグ＋パーティションマニフェスト。gcsa の現行慣習（meta.json 最終書込＝暗黙のコミット）は再アーム append と両立しないため、明示マーカが正しい代替となる。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">C ABI 中立性</div>
+          <div class="glossary-def">ネイティブコアと UI の境界を「版付き POD 構造体のみ・フレームワーク型なし」に保つ規則。同一コアを WPF（現行）・常駐サービス・将来の web フロントのいずれからもホスト可能にする。</div>
+        </div>
+        <div class="glossary-item">
+          <div class="glossary-term">WebView2 埋込</div>
+          <div class="glossary-def">WPF ウィンドウ内に Edge ベースのブラウザペインを置き、localhost の sys_app web UI を表示する方式。sys_app 側の改修が原則不要な「見た目の統合」の最安経路。事前準備なしに後付け可能（＝今は作らない）。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== VERDICT ===== -->
+    <section id="verdict">
+      <h2>結論：統合の是非と到達形</h2>
+
+      <h3>統合オプションの比較</h3>
+      <table class="spec-table">
+        <thead>
+          <tr><th>案</th><th>内容</th><th>判定</th><th>根拠</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1. 二アプリ＋自動ハンドオフ</strong></td>
+            <td>取得完了（atomic finalize）→ sys_app へ自動登録（既存 <code>POST /api/v1/datasets/import_from_path</code>）→ 通知センターから「sys_app で開く」</td>
+            <td><span class="badge badge-confirmed">近期の推奨形</span></td>
+            <td>sys_app 改修は自動登録トリガのみ（UX-16 のオーナー確認後に S プロンプト化）。フェーズ4まではこの形で十分</td>
+          </tr>
+          <tr>
+            <td><strong>2. WPF シェル＋WebView2 埋込</strong></td>
+            <td>WPF が localhost の sys_app web UI をホストし「一画面・一製品」に見せる。案1の上に純追加</td>
+            <td><span class="badge badge-open">将来のアドオン</span></td>
+            <td>Next.js は same-origin の <code>/api</code> rewrite proxy を持ち CORS 不要で埋込可。sys_app のコード変更が原則不要。事前準備なしに後付けできるため今は作らない</td>
+          </tr>
+          <tr>
+            <td><strong>3. 取得コアをサービス化し web UI へ一本化</strong></td>
+            <td>取得制御・ライブ表示を含む全 UI を sys_app 側 web スタックに移す</td>
+            <td><span class="badge badge-must">却下</span></td>
+            <td>D1（WPF 確定）と衝突。sys_app は push 経路（WebSocket/SSE）ゼロのバッチ型でライブ表示を担えない。FR-11（機械スイッチ外部開始）が常駐ネイティブを要求</td>
+          </tr>
+          <tr>
+            <td><strong>4. 単一コードベース統合</strong></td>
+            <td>sys_app 機能の WPF 書き直し、または取得の web 化</td>
+            <td><span class="badge badge-must">却下</span></td>
+            <td>~29万行（TS/TSX 945ファイル＋Python 167ファイル）＋解析数値核は gcsa（Python+Rust）に在る。再実装コストに見合う便益なし</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <figure class="diagram-container">
+        <div class="mermaid">
+graph TB
+  subgraph PC["Windows 計測PC（将来は一製品として同梱可）"]
+    subgraph AB["AnalogBoard（WPF プロセス）"]
+      UI["WPF UI<br/>（将来: WebView2 ペイン追加可）"]
+      CORE["C++ ネイティブコア<br/>EP6 / Decoder / ZarrWriter"]
+    end
+    STORE[("gcsa ネイティブ Zarr ストア<br/>datasets/tube_N ＋ meta.json<br/>＝唯一のクロスアプリレジストリ")]
+    subgraph SYS["sys_app（任意共存・別プロセス群 / WSL2＋Docker）"]
+      WEB["Next.js web UI"]
+      API["FastAPI api<br/>（import は同期実行）"]
+      WORKER["Celery/Redis<br/>（DR/ML/export）"]
+    end
+  end
+  CORE -- "writer スレッド<br/>append ＋ finalize" --> STORE
+  CORE -. "C ABI: 集計フレームのみ<br/>（fan-out point・seq番号付与）" .-> UI
+  UI -. "取得完了 → 登録<br/>（手動 / 将来自動）" .-> API
+  API -- "projection import<br/>（再計算なし・finalized のみ対象）" --> STORE
+  WEB --> API
+  WORKER --> API
+        </div>
+        <figcaption>図1. 推奨到達形「一製品・複数プロセス」。取得の障害ドメイン（左）と解析（右）はストア契約だけで結合し、プロセス境界は将来どの包装（同梱・埋込）を選んでも変わらない。</figcaption>
+      </figure>
+
+      <h3>なぜコード統合が成立しないか（検証済みの3つの事実）</h3>
+      <ul>
+        <li><strong>実行環境の非対称</strong>：sys_app は Docker/Linux 専用（Windows 実行は WSL2＋Docker Desktop を README が必須指定）。ネイティブ Windows 実行経路は dev/production いずれの構成にも存在しない。</li>
+        <li><strong>取得側の常駐・隔離要件</strong>：計測は機械側スイッチから開始される（FR-11）ため取得コアは常駐ネイティブ必須。かつ 200MB/s ホットパスは過去3回「テスト緑のまま」現場退行しており（CRT アロケータ変更×2・エンジン抽出・ホットパス計装）、解析ワークロードと同一障害ドメインに置くことは信頼性上許されない。</li>
+        <li><strong>解析核の言語境界</strong>：バイナリ解析・特徴量・gate マスク・補償・UMAP/SVM は gcsa（Python＋Rust 拡張）に実装されており、C#/WPF への移植は数値核の再実装か新たな interop 境界を意味する——いま切ってある C ABI と同種の seam を別の場所にもう1本引くだけで、統合の便益がない。</li>
+      </ul>
+
+      <div class="callout callout-success">
+        <div class="callout-title">プランは既に「統合保険」を多く含む</div>
+        <p>単一データ基軸(gcsa ストア)・C ABI 隔離（コア別プロセス化の選択肢を明記済み）・D5/D14/G2（記録一回・再計算禁止・版管理）・正準 gate v1＋生ADC線形座標・UX-17（安定 dataset id）・UX-20/FR-13（sys_app の可視化コンポーネントを明示的な先行例として参照）——機能面の収斂は設計段階から起きており、将来の製品統合の概念コストは既に低い。</p>
+      </div>
+    </section>
+
+    <!-- ===== FACTS ===== -->
+    <section id="facts">
+      <h2>事実確認：sys_app / gcsa の実態</h2>
+      <p>統合判断を左右する実装事実。すべて敵対的検証パスで実コード（file:line）に対して確認済み。</p>
+
+      <h3>sys_app（約29万行の web アプリ）</h3>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>事実</th><th>統合への含意</th></tr></thead>
+        <tbody>
+          <tr><td>構成</td><td>FastAPI(Python ~35K行/167f) + Next.js/React(~255K行/945f) + Celery/Redis + SQLite。API は <code>/api/v1</code> で版付け（~61ルート）</td><td>書き直し統合は非現実。versioned API はハンドオフ自動化の良い足場</td></tr>
+          <tr><td>実行環境</td><td>Docker/Linux 専用。Windows は WSL2＋Docker Desktop（README 指定。ライセンス回避に Rancher 言及）</td><td>「一画面」にしても Linux コンテナスタックの同梱は消えない。サポート所有者が未定（→オーナー判断②）</td></tr>
+          <tr><td>ユーザモデル</td><td>ローカル単一ユーザ・認証なし・loopback バインド既定（外部公開は env 明示、コード内に「共有利用は別途 auth 判断」の注記）</td><td>計測PC同居に馴染む。多人数サーバ化は本検討のスコープ外</td></tr>
+          <tr><td>ライブ性</td><td>WebSocket/SSE ゼロ。準ライブは gain-adjust プレビューの HTTP ポーリングのみで、レガシー <code>.bin</code> 形式にハードワイヤ</td><td>取得中のライブ表示は構造的に担えない。<strong>ライブは AnalogBoard 側の責務</strong>（FR-13 の設計通り）</td></tr>
+          <tr><td>import</td><td>API プロセス内で同期実行（Celery は DR/ML/export 用）。<code>dataset_import_steps.py:239</code> で A/H/W を無条件再計算（S2 が是正対象）</td><td>共存時の import 負荷は API プロセスに乗る。D5 違反の是正（S2）は統合有無と無関係に必須</td></tr>
+          <tr><td>パス制約</td><td>import パスは <code>DATA_DIR</code> 内に制限（<code>validate_path_within_data_dir</code>）。Docker では <code>/data</code> ボリュームマッピング</td><td><strong>ハンドオフはコンテナ可視パスで渡す必要</strong>（Windows 絶対パス不可）。finalize イベントのペイロード設計に直結</td></tr>
+          <tr><td>派生ストア</td><td><code>{source_dir}/sys_app/store/</code> に Parquet/Zarr キャッシュを取得データと同居配置。Zarr キャッシュ既定 50GB</td><td>ディスク・I/O の競合面。単一書き手規則とディスク残監視の拡張が要る（→変更②⑥）</td></tr>
+          <tr><td>フロント</td><td>Next.js same-origin <code>/api</code> rewrite proxy あり（CORS 不要で埋込可）。ただし <code>NEXT_PUBLIC_API_URL</code> はイメージビルド時焼込み</td><td>WebView2 埋込は低コスト。ただし API origin の実行時変更はイメージ再ビルド（シェル設計時の注意点）</td></tr>
+        </tbody>
+      </table>
+
+      <h3>gcsa（共有解析ライブラリ・ストアの権威実装）</h3>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>事実</th><th>統合への含意</th></tr></thead>
+        <tbody>
+          <tr><td>性格</td><td>GUI なしの importable Python ライブラリ＋任意 Rust(PyO3) 拡張（A/H/W・polygon gating・binary parse 等の高速路）</td><td>統合形態に依らず「共有数値核」として維持するのが正解。Rust バイナリは Python 版毎ビルドの配布注意</td></tr>
+          <tr><td>完了概念</td><td><strong>finalized フラグ・パーティションマニフェスト不在</strong>。streaming writer は全 append 後に meta.json を書く＝「meta.json 最終書込」が暗黙のコミットポイントで、書きかけ dataset はリーダから不可視</td><td>AnalogBoard は再アーム append のため meta.json を先に書く＝<strong>この暗黙規約が壊れる</strong>。明示 finalization マーカが正しい代替（→変更②）</td></tr>
+          <tr><td>並行安全性</td><td>docstring は「Cross-process access」を謳うが実体はプロセス内 RLock のみ。ファイルロックなし。append 経路は atomic-rename の保護外</td><td>「取得中に別プロセスが読む」は現状未サポート。単一書き手規則＋可視性マーカで契約化する（→変更②）</td></tr>
+          <tr><td>リーダ検証</td><td><code>validate_partition_set</code> が 0..n-1 の完全集合と<strong>正確な round-robin 分配式</strong>を要求。全読みは途中状態で fail-loud、スライス読みは長さ検証をバイパス（サイレント不整合の窓）</td><td>パーティションレイアウト変更＝リポジトリ横断の契約変更。シャーディング方式はフェーズ0で決着必須（→変更③）</td></tr>
+          <tr><td>fl_waveform</td><td>ZarrStore に <strong>fl_waveform 配列サポートは未実装</strong>（CSV エクスポータのみ）。D10 の生FL保全は gcsa 側スキーマ追加（G スコープ）が前提</td><td>「契約は9割統合対応済み」の唯一の大きな例外。G1/G3 実行時に確実に含める</td></tr>
+          <tr><td>sys_app との関係</td><td>sys_app は現在 gcsa ZarrStore を<strong>読んでいない</strong>（cfg/bin を lazy-import アダプタ経由で再取込し、独自の ad-hoc zarr を書く）。S1〜S8 が繋ぐ計画で<strong>実行保留中</strong></td><td>射影 ETL（S1/S3/S4/S5）は「二アプリ前提」の投資。統合方針を早く決めるほど捨てコードを避けられる——ただし G1〜G3 と契約系決定（D13/D14/D15）はどの形態でも価値が残る</td></tr>
+          <tr><td>P1（暗号化）との関係</td><td>compressor は numcodecs 1スロット。<code>GCSA_COMPRESSOR</code> env は {zstd,lz4} allowlist のため、暗号コーデックは <code>ZarrStoreConfig(compressor=...)</code> のプログラム的注入＋レジストリ登録が必要</td><td>P1 採用時の G4 プロンプト要件が明確化。なお同居構成では保護済みストアの隣に sys_app の平文射影面が置かれる点は P1 の注記通り</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== CHANGES NOW ===== -->
+    <section id="changes">
+      <h2>今やるべき設計変更（6件）</h2>
+      <p>
+        3設計案が提案した計21項目を、固定決定 D1〜D18・アーキテクチャ不変条件・コード実態と突き合わせて絞り込んだ生存項目。
+        いずれも<strong>統合を決めなくても単独で価値がある</strong>（クラッシュ回復・回帰決定性・今日の正しさ）ことを採用基準とした。
+        すべて提案であり、採用はオーナー判断。ホットパス監査済み——EP6 読取・CRT 契約・ホットパス計装のいずれにも触れない。
+      </p>
+
+      <table class="spec-table">
+        <thead><tr><th>#</th><th>変更</th><th>コスト</th><th>期限</th></tr></thead>
+        <tbody>
+          <tr><td>①</td><td>C ABI 中立性ルールの明文化</td><td><span class="badge badge-confirmed">trivial・文言のみ</span></td><td>フェーズ1設計前</td></tr>
+          <tr><td>②</td><td>finalization／パーティション可視性契約</td><td><span class="badge badge-should">small</span></td><td><strong>meta.json 凍結前（必須）</strong></td></tr>
+          <tr><td>③</td><td>パーティションシャーディング方式の決着</td><td><span class="badge badge-must">medium・要検討</span></td><td><strong>フェーズ0（D12 往復と同時）</strong></td></tr>
+          <tr><td>④</td><td>フィード fan-out ポイントの設計時定義</td><td><span class="badge badge-should">small</span></td><td>フェーズ1コア設計時</td></tr>
+          <tr><td>⑤</td><td>Tier1 非WPF ホスト適合テスト</td><td><span class="badge badge-should">small・既計画と共有</span></td><td>フェーズ1テスト計画</td></tr>
+          <tr><td>⑥</td><td>デプロイトポロジ節＋共存 NFR＋オーナー質問</td><td><span class="badge badge-confirmed">small・文言のみ</span></td><td>プラン次回改訂</td></tr>
+        </tbody>
+      </table>
+
+      <h3>① C ABI 中立性ルールの明文化</h3>
+      <p>
+        C ABI を越えるのは<strong>版付き POD／シリアライズ可能構造体のみ</strong>とする規則をプランのアーキテクチャ節に明記する。
+        コマンド（start/stop・一括設定適用・レシピ）とフィードフレーム（ビニング済み scatter・histogram・カウンタ・GMI スナップショット ≤100×2400・リンクヘルス）を列挙し、
+        .NET/WPF/COM 型とコールバックのオブジェクトグラフを禁止、コールバックは frame-ready 通知＋pull か polled queue に限定する。
+        プランは既に「集計のみ越境」「必要ならコア別プロセス化」と示唆しているが、<em>規則として</em>は書かれていない。
+        これ1つで同一コアが WPF（現行）・常駐サービス・将来のフロント差替えのすべてに対応する——最安の統合保険。D1 と無衝突。
+      </p>
+
+      <h3>② finalization／パーティション可視性契約 <span class="badge badge-must">凍結前必須</span></h3>
+      <p>3視点が<strong>独立に</strong>導出した最重要項目。出力契約の凍結前に meta.json へ additive に入れる：</p>
+      <ul>
+        <li><code>status: open|finalized</code>・<code>finalized_at</code>・単調増加の <code>write_generation</code></li>
+        <li><strong>パーティションマニフェスト</strong>：配列毎（pulse_features / gmi_waveform / fl_waveform）の現在行数と per-partition <code>sealed</code> フラグ</li>
+        <li><strong>単一書き手規則</strong>：<code>datasets/&lt;id&gt;/</code> 内の書き手は取得コアのみ（sys_app 派生面は <code>{source_dir}/sys_app/store/</code> に既に分離されていることを契約に昇格）</li>
+        <li><strong>finalize イベント</strong>：atomic finalize 時に writer スレッドで発火（dataset id＋ストアパス）。transport 中立——ネイティブコアから sys_app への HTTP 直結は検証で却下済み</li>
+        <li>ストアフォルダ＋meta.json を<strong>唯一のクロスアプリレジストリ</strong>と明記。派生面は (dataset_id, feature_schema_version, write_generation) をキーとするキャッシュと位置づける</li>
+      </ul>
+      <p>
+        根拠：(a) 現行計画のままでは <em>今日の正しさの穴</em>がある——S5 は event_count を <code>pulse_features.shape[0]</code> から導出するため、
+        取得中（再アーム append 中）に import すると<strong>エラーなしで切詰められたイベント数</strong>が確定する。temp→atomic rename は「1ファイルのバイト列」しか守らず、複数パーティション＋複数配列＋metaの横断整合は守らない。
+        (b) gcsa の暗黙 finalization（meta.json 最終書込）は、再アーム append のため meta.json を先に書く AnalogBoard の書込順と両立しない——明示マーカが正しい代替。
+        (c) G1/S1/S5 プロンプトからこのマーカを参照するよう下流改変プランの固定入力契約表にも反映し、フェーズ0往復で gcsa が additive フィールドを許容することを確認する。
+      </p>
+
+      <figure class="diagram-container">
+        <div class="mermaid">
+stateDiagram-v2
+    [*] --> open : 取得開始（meta.json 初回書込 status=open）
+    open --> open : 再アーム毎に partition append・write_generation++
+    open --> finalized : 取得終了（manifest 確定・finalized_at 記録・finalize イベント発火）
+    finalized --> [*]
+    note right of open
+        外部リーダは sealed な partition の
+        prefix のみ信頼可（follow 可能）
+    end note
+    note right of finalized
+        sys_app の import は
+        finalized のみを対象とする
+    end note
+        </div>
+        <figcaption>図2. データセットのライフサイクル契約（提案）。「読める状態」を暗黙の書込順ではなく明示フィールドで宣言する。</figcaption>
+      </figure>
+
+      <h3>③ パーティションシャーディング方式の決着（フェーズ0）</h3>
+      <p>
+        プランのストア仕様は round-robin（<code>e % n_partitions</code>）を踏襲するが、この方式は<strong>全パーティションが同時に成長</strong>するため
+        「ここまでは確定」という sealed prefix が存在せず、取得中の追従読取・安全な途中 import に構造的に不利。
+        さらに gcsa のリーダ検証は<strong>正確な round-robin 分配式そのもの</strong>を検証しており、レイアウト変更は後からだとリポジトリ横断の契約変更になる。
+        選択肢は (a) append-sequential＋seal（partition p を埋めて封印し p+1 へ）へ変更、(b) round-robin 維持＋マニフェストの per-partition sealed で緩和、の2つ。
+        どちらを選んでも既計画の phase-0 D12 往復検証（gcsa が実ロードできること）を通すことが非交渉条件。<strong>紙の上の今が最後の安い変更点</strong>。
+      </p>
+
+      <h3>④ フィード fan-out ポイントの設計時定義</h3>
+      <p>
+        集計フレームは BlockingQueue の<strong>消費側</strong>（EP6 読取・ZarrWriter スレッドの外）で生成し、
+        sequence number＋monotonic timestamp を付与、multi-sink の attach point を設計上1箇所命名する（現在の sink は C ABI の1本のみ。<strong>第2 sink は作らない</strong>）。
+        将来 web フロントや監視ミラーを足すときにホットパスへ触れない構造を、コードでなく設計で保証する。
+        統合と無関係の即時価値：シーケンス番号により Tier1/2 回帰でフィード再生が決定的になる。
+      </p>
+
+      <h3>⑤ Tier1 非WPF ホスト適合テスト</h3>
+      <p>
+        最小の非WPF ホスト（素の C/C++ またはコンソール）から C ABI 経由で start→取得（エミュレート）→再アーム→stop→ストア書込の全周を、
+        シリアライズされたコマンド／フレームだけで駆動するテストをフェーズ1テスト計画に追加。
+        ①の規則を「レビューで守る」から「コンパイル／テストで守る」に変える。既計画の Tier1 インプロセスハーネスとコストの大半を共有。
+      </p>
+
+      <h3>⑥ デプロイトポロジ節＋共存 failure-domain NFR＋オーナー質問</h3>
+      <p>
+        プランに短い節を追加：(A) 計測PC同居（WPF＋WSL2/Docker sys_app）vs (B) 分離（計測PC＋解析ワークステーション）を列挙し、
+        WSL2/Docker の install・update・support の所有者を命名、出荷既定の選択をフェーズ4受入の明示入力にする
+        （同居 soak：200MB/s 持続取得＋sys_app import 並走）。あわせて NFR に共存規則（実装ではなくルールとして）：
+        解析プロセスは取得より低い CPU/IO 優先度・同居時は .wslconfig で WSL2 メモリ上限・取得中の重ジョブ抑止・
+        ディスク残監視（UX-11）を派生面の複製footprint＋Zarr キャッシュ（既定50GB）込みへ拡張。
+        P1 注記（同居構成では平文射影面が保護ストアの隣に置かれる）もここに記録する。
+        この節が下記オーナー判断事項の受け皿になる。
+      </p>
+    </section>
+
+    <!-- ===== REJECTED ===== -->
+    <section id="rejected">
+      <h2>やらないこと（却下・保留）</h2>
+      <p>設計案に含まれたが、検証パスで却下または「時期尚早」と判定された項目。<em>やらない理由</em>ごと記録する。</p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>判定</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>コードベース統合／取得制御の web 移管（案3・案4）</td>
+            <td><span class="badge badge-must">却下</span></td>
+            <td>D1（オーナー確定）・FR-11（常駐ネイティブ）・ガバナンス（gcsa/sys_app 直接改変禁止）・sys_app 実態（push 経路ゼロ・Docker専用）のすべてと衝突</td>
+          </tr>
+          <tr>
+            <td>S1 を projection-copy から「ストア直読リーダ」へ転換</td>
+            <td><span class="badge badge-confirmed">2026-07-10 転換決定</span></td>
+            <td>本書作成時点では「viz 層無改修」を優先し見送りと判定したが、その後 (a) D19 暗号化採用（射影は平文コピーを作り暗号化を無効化）、(b) 実コード調査で現行射影パイプラインの重大問題が判明（RAM ピーク≒生データサイズで大データセット import 不可・読者不在の全波形コピー data.zarr）、(c) 読取 seam が狭く直読差替えは S/M と確認、の3点により<strong>オーナー決定で「registration-only import＋完全直読」へ転換</strong>。唯一の設計変更は補償列の sidecar 化。D11（デュアル・シームレス要件）は不変で達成手段のみ変更</td>
+          </tr>
+          <tr>
+            <td>WebView2 シェルの現時点での構築・スパイク</td>
+            <td><span class="badge badge-wont">時期尚早</span></td>
+            <td>WebView2 は事前準備なしに任意の WPF ウィンドウへ後付け可能＝ゼロ後悔オプション。フェーズ0は実機セッション・描画/Zarr プロトタイプに集中すべき</td>
+          </tr>
+          <tr>
+            <td>自動 import トリガの S プロンプト即時追加</td>
+            <td><span class="badge badge-wont">保留</span></td>
+            <td>下流ハンドオフ動線は UX-16 で<strong>意図的に保留</strong>されている。⑥のオーナー質問で方向が承認されてから下流改変プランに足す（実行保留中なのでまだ間に合う）</td>
+          </tr>
+          <tr>
+            <td>P1（暗号化）用の contract slot を meta.json に予約</td>
+            <td><span class="badge badge-wont">不要</span></td>
+            <td>コーデック検出は <code>.zarray</code> の compressor ID が既に平文で担う。未採用提案のための契約フィールド予約はオーナー判断の先取りになる</td>
+          </tr>
+          <tr>
+            <td>通知の「sys_app で開く」deep link 先行実装</td>
+            <td><span class="badge badge-wont">時期尚早</span></td>
+            <td>UX-02 は汎用アクションボタンを既に持ち、スキーマ変更不要。deep link 自体は UX-16 の判断後</td>
+          </tr>
+          <tr>
+            <td>「取得は全パッケージ形態で別プロセス」の固定文言</td>
+            <td><span class="badge badge-wont">縮小採用</span></td>
+            <td>現行プランはコアを WPF プロセス内 DLL（スレッド分離）としており、NFR は「別スレッド/別プロセス」を許容。文言そのままだと新決定の先取り。<strong>「解析ランタイムを取得コアの障害ドメインに入れない」</strong>という失敗ドメイン規則だけ⑥へ採用</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== OWNER DECISIONS ===== -->
+    <section id="owner">
+      <h2>オーナー判断事項</h2>
+      <ul class="question-list">
+        <li><strong>「ひとつのアプリ」のゴール定義</strong>：一括インストール？一画面？データセット一覧の統合？——推奨は「近期＝案1（自動ハンドオフ）、フェーズ4後に案2（WebView2 埋込）を判断」。この定義が⑥の書きぶりと UX-16 の解凍時期を決める。</li>
+        <li><strong>デプロイトポロジの出荷既定</strong>：計測PC同居（WSL2/Docker 同梱）か、解析ワークステーション分離か。同居なら WSL2/Docker の運用サポート所有者と Docker Desktop ライセンス（Rancher 代替可）の扱いを決める。</li>
+        <li><strong>自動ハンドオフ（UX-16 保留）を進めるか</strong>：進めるなら下流改変プランへ「store 監視 or import_from_path 自動呼出し＋結果の機械可読返却」を新 S プロンプトとして追加（コンテナ可視パスの変換規則を含めること）。</li>
+        <li><strong>P1（チャンク暗号化）の採否時期</strong>：契約凍結前に決めないと <code>.zarray</code> compressor 契約を後から壊す。採用なら D12 の実質本命が c-blosc 自作ライタに変わり G4 が追加される（P1 提案書の記載通り）。</li>
+      </ul>
+    </section>
+
+    <!-- ===== RISKS ===== -->
+    <section id="risks">
+      <h2>リスク</h2>
+
+      <div class="risk-card risk-card--high">
+        <div class="risk-header"><span class="badge badge-risk-high">High</span><span class="risk-title">②を入れずに meta.json が凍結される</span></div>
+        <div class="risk-body">meta.json は下流改変プランで唯一「安定度：中」の契約項目で、凍結が近い。凍結後の追加は S/G プロンプト改訂サイクルを伴う契約変更になり、コストが跳ね上がる。<strong>対策：</strong>次のプラン改訂で②を additive フィールドとして確定し、フェーズ0往復で gcsa 許容を検証。</div>
+      </div>
+      <div class="risk-card risk-card--medium">
+        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">round-robin 維持＋可視性契約なしの組合せ</span></div>
+        <div class="risk-body">sealed prefix が存在しないため、取得中の追従読取・安全な途中 import が将来にわたり構造的に不可能になる。gcsa のリーダ検証が分配式に結合しているため後からの変更はリポジトリ横断。<strong>対策：</strong>③をフェーズ0の D12 往復検証と同時に決着。</div>
+      </div>
+      <div class="risk-card risk-card--medium">
+        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">同居運用の資源競合が無所有のまま出荷される</span></div>
+        <div class="risk-body">WSL2 vmmem のメモリ競合・9p ファイル I/O ペナルティ（sys_app README が /mnt/c を非推奨と明記）・Docker Desktop ライセンス・import の同期実行負荷が、200MB/s 取得と同じ筐体で無管理に併走する。<strong>対策：</strong>⑥のトポロジ節と共存 NFR、フェーズ4の同居 soak を受入条件化。</div>
+      </div>
+      <div class="risk-card risk-card--low">
+        <div class="risk-header"><span class="badge badge-risk-low">Low</span><span class="risk-title">WebView2 埋込時の API origin ビルド時焼込み</span></div>
+        <div class="risk-body"><code>NEXT_PUBLIC_API_URL</code> はイメージビルド時に焼き込まれるため、実行時の API origin 変更はイメージ再ビルドが要る。same-origin proxy 経由なら回避可能で、シェル起動オーケストレーション設計時に吸収できる。</div>
+      </div>
+
+      <h3>前提（Assumptions）</h3>
+      <div class="callout callout-danger">
+        <div class="callout-title">Assumptions</div>
+        <ul>
+          <li>本書は分析であり決定ではない。D1〜D18 の再議論は一切含まず、変更提案6件はすべて additive（オーナー採用待ち）。</li>
+          <li>「WebView2 evergreen runtime が Win11 にプリインストール」は一般に真だがリポジトリからは検証不能（unverified のまま）。案2実施時に確認する。</li>
+          <li>sys_app のデプロイ事実は production 構成（<code>docker/</code>・port 3000/8000）基準。dev 構成（<code>dev_docker/</code>・3001/8001）も Docker 専用で結論は不変。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== TAURI ADDENDUM ===== -->
+    <section id="tauri">
+      <h2>追補：sys_app の Tauri デスクトップ化（実現性評価）</h2>
+
+      <div class="callout callout-info">
+        <div class="callout-title">オーナー方針（2026-07-09）</div>
+        <p>本編の結論を受け、オーナーより「sys_app は ML アルゴリズム追加等で頻繁に更新されるため<strong>別アプリ維持</strong>が望ましい。また sys_app の <strong>Tauri によるデスクトップアプリ化</strong>を視野に入れている」との方向性が示された。本節はその実現性を sys_app / gcsa の実コードに対する追加調査（3エージェント・file:line 検証付き）で評価したもの。</p>
+      </div>
+
+      <h3>評価：方向性は妥当。Tauri 化は実現可能——ただし工数の実体は「Python バックエンドのサイドカー化」が8割</h3>
+      <p>
+        別アプリ維持は本編の結論（3視点独立一致）と完全に整合する。リリースサイクルの非対称——取得側は実機ゲート付きの安定重視、解析側は頻繁更新——はまさに「versioned なストア契約で疎結合に保つ」ことで吸収する設計であり、
+        <code>feature_schema_version</code>（D14）・<code>store_format</code>・gate 正準v1 がその仕組みそのもの。DR/ML タスクの計算本体が現状 TODO スタブである事実も「これから頻繁に足していく」という前提を裏づける。
+      </p>
+      <p>
+        Tauri 化については、Tauri（Rust シェル＋WebView2）が担えるのはフロントエンドの器と updater・deep-link 程度で、
+        <strong>本体は Python バックエンド（FastAPI＋gcsa）をネイティブ Windows のサイドカー実行ファイルに固めること</strong>。
+        この難所を3領域に分けて実コードで検証した結果、いずれも「困難」ではなく「列挙可能な作業」だった。
+      </p>
+
+      <table class="spec-table">
+        <thead><tr><th>領域</th><th>検証済みの現状</th><th>Tauri 化に必要な作業</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>① ジョブ基盤<br/>（Celery/Redis の除去）</strong></td>
+            <td>結合は驚くほど薄い：タスクは全6個（うち UMAP/t-SNE/SVM/LightGBM/predict の<strong>4個は TODO スタブ</strong>、実装済は dataset.export のみ）。<code>apply_async</code> 呼出は全コードで<strong>2箇所</strong>（<code>job_submission_service.py:102</code>・<code>dataset_export_service.py:79</code>）。ジョブ状態・進捗・結果は<strong>すべて SQLite</strong>（Celery result backend は一度も読まれない）。retry/ETA/chord/revoke 等の高度機能は不使用。Redis は実質ブローカ専用（メタデータキャッシュは既定 in-memory）。フロントは 2秒 HTTP ポーリングで transport 変更不要</td>
+            <td>in-process ジョブランナー（ThreadPool/subprocess、ml_light/ml_heavy/dr_heavy レーンと time limit を再現）を書き、enqueue 2関数＋Celery 依存のヘルスエンドポイントを差替え。<strong>注意：</strong>Celery 不在時の既存フォールバック（TaskStub）は enqueue を黙って握り潰すテスト専用実装であり、そのままでは使えない</td>
+          </tr>
+          <tr>
+            <td><strong>② フロントエンド<br/>（Next.js → webview）</strong></td>
+            <td>移行に異例に好条件：Next.js 15 App Router・実ルート5個・<strong>全ページ client component</strong>。route handler・middleware・server action・next/image・SSR データ取得・WebSocket/SSE すべてゼロ。fetch は <code>lib/api/client.ts</code> の <code>buildUrl()</code> <strong>1箇所</strong>に集約。Node サーバの仕事は静的配信と <code>/api</code> rewrite proxy だけ</td>
+            <td>推奨解：静的 export を <strong>FastAPI サイドカーから same-origin 配信</strong>（StaticFiles）——CORS 追加・実行時 API ベース URL・rewrites 消失の3問題を一挙に解消（相対 <code>/api</code> パスがそのまま動く）。構造対応が要るのは <code>/datasets/[id]</code> 動的ルートのみ（<code>generateStaticParams</code> 不在で export 失敗。<code>/workspace</code> が既に使う query-param パターンへの再構成で解決可）</td>
+          </tr>
+          <tr>
+            <td><strong>③ Python スタックの<br/>Windows ネイティブ動作</strong></td>
+            <td><strong>最大の懸念だった gcsa は解決済み</strong>：CI（build-wheel.yml）で Windows x64 ネイティブ wheel（py3.10/3.11・maturin）をビルド・テスト・公開済み。Rust 拡張に unix 固有コードなし。SQLite は既定設定でパス処理も pathlib——Windows 固有の危険なし</td>
+            <td>(a) <code>sample_meta_service.py:5</code> の module-scope <code>import fcntl</code> 1件を移植（現状 Windows では起動即クラッシュ）。(b) PyInstaller 凍結：numba/llvmlite（umap 経由）が既知の難所、gcsa の lazy import（PEP-562）を hiddenimports に列挙、alembic をデータ同梱し programmatic 実行、uvicorn は単一プロセス <code>uvicorn.run</code> へ。(c) oneDAL/sklearnex の扱いを決める（下記）。バンドルは展開後 400〜800MB 見込み</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>決めが必要な2点</h3>
+      <ul>
+        <li><strong>sklearnex / Intel oneDAL</strong>：現行 Docker イメージは oneDAL ネイティブライブラリなしでは gcsa の import に失敗する構成。デスクトップ版で (a) 大容量の oneDAL DLL 群を同梱するか、(b) sklearnex を除外するか——除外すると sklearnex 直列化済み SVM アーティファクトの読込が <code>ModelArtifactError</code> になるため、既存モデル資産の扱いとセットで判断が要る。</li>
+        <li><strong><code>/datasets/[id]</code> ルートの再構成方式</strong>：query-param 化（既存 <code>/workspace</code> パターン）か、プレースホルダ param＋クライアント側解決か。</li>
+      </ul>
+
+      <h3>AnalogBoard 側との相乗効果</h3>
+      <ul>
+        <li>計測PCから <strong>WSL2＋Docker Desktop が消える</strong>——本編⑥（デプロイトポロジ）の同居案が抱えていた最大の負担（vmmem メモリ競合・9p I/O ペナルティ・Docker Desktop ライセンス・サポート所有者問題）がまとめて解消する。</li>
+        <li><strong>DATA_DIR のコンテナパス変換問題が消滅</strong>——ハンドオフは Windows ネイティブパスの <code>import_from_path</code> で直に成立。finalize イベント→自動登録の実装が単純化する。</li>
+        <li>Tauri の組込み updater は「頻繁に更新する解析アプリ」という運用要件そのものに合う（Windows コード署名の準備は必要）。deep-link プラグインは通知センターからの「sys_app で開く」動線に使える。</li>
+        <li>ただし<strong>共存 failure-domain 規則（本編⑥）は引き続き必要</strong>——Docker が消えても、取得中の CPU/IO 競合（特に import・ML ジョブ）と、finalization マーカ（本編②）の必要性は変わらない。むしろ同居が容易になるぶん「取得中に import される」確率は上がる。</li>
+      </ul>
+
+      <h3>進め方の推奨</h3>
+      <p>
+        Tauri 化は AnalogBoard のフェーズ0〜4 とも S1〜S8 とも独立しており、<strong>今決める必要はない</strong>。ただし安い先回りが2つ：
+        (1) 下流改変プラン実行時（S プロンプト）に <strong>Celery seam を今より深くしない・Redis 依存を増やさない</strong>方針を一文添える（現状の薄さが Tauri 化の最大の資産）。
+        (2) DR/ML の計算本体（現状スタブ）を実装する際、ランナーを <strong>Celery 非依存の関数</strong>として書き enqueue 層と分離しておく（既にその形の seam：UMAP_RUNNER 等のモジュールレベル差替え点がある）。
+      </p>
+
+      <div class="callout callout-warning">
+        <div class="callout-title">調査で見つかった既存の問題（Tauri と無関係・sys_app 側への展開推奨）</div>
+        <ul>
+          <li><strong>export ジョブのキュー配線ギャップ（要確認）</strong>：<code>dataset.export</code> は task_routes のどのパターンにも一致せず既定 <code>celery</code> キューへ入るが、prod/dev の worker は <code>-Q dr_heavy,ml_light,ml_heavy</code> しか購読していない——Docker 構成では export ジョブが永久に queued のままになる可能性（構成からの推定・未実行検証）。</li>
+          <li><strong>cancel の実効性</strong>：DELETE /jobs/{id} は SQLite 上で cancelled にするだけで、実行中タスクは中断されない。さらに完了時 <code>set_result()</code> が無条件に completed へ上書きし、実行中キャンセルを黙って取り消す。</li>
+          <li><strong>import の同期実行</strong>：最重量ワークロードの dataset import が async エンドポイント内で同期実行され、完了までイベントループを塞ぐ。デスクトップ化（単一プロセス）ではジョブランナーへ移すべき。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== APPENDIX ===== -->
+    <section id="appendix">
+      <h2>付録：調査プロセス</h2>
+
+      <h3>方法</h3>
+      <ol>
+        <li><strong>並行精査（4）</strong>：再構築プラン Draft 1.12 全読・下流改変プラン Draft 0.4 全読・sys_app コード探索・gcsa コード探索（構造化ファクト計137件、file:line 付き）</li>
+        <li><strong>設計パネル（3）</strong>：製品/デプロイ・リアルタイム信頼性・契約ミニマリストの3レンズが独立に統合戦略＋「今やる変更」を提案（計21項目）</li>
+        <li><strong>敵対的検証（2）</strong>：(a) 全提案を D1〜D18・アーキテクチャ不変条件・ガバナンス規則と突き合わせ（21判定→生存6件に統合）、(b) 設計が依拠した事実主張22件を実コードでスポットチェック（verified 22 / refuted 1 / unverified 1）＋見落とし事実8件を回収</li>
+      </ol>
+      <p>
+        反証された主張は「sys_app API は無版」の1件のみ（実際は全ルータ <code>/api/v1</code> 接頭）。
+        回収した見落とし事実（DATA_DIR パス制約・import 同期実行・same-origin proxy・fl_waveform 未実装・gcsa の meta.json-last 慣習・分配式結合の検証・RLock のみの並行制御・準ライブ面のレガシー結合）は本文へ反映済み。
+      </p>
+
+      <h3>ソース・トレーサビリティ</h3>
+      <table class="spec-table">
+        <thead><tr><th>本書の節</th><th>主なソース</th><th>扱い</th></tr></thead>
+        <tbody>
+          <tr><td>結論：統合の是非</td><td>3設計案の収束（独立一致）＋競合検証</td><td><span class="badge badge-inferred">Synthesized</span></td></tr>
+          <tr><td>事実確認：sys_app</td><td><code>../sys_app</code>（README・docker/・apps/api/src・next.config.js ほか）</td><td><span class="badge badge-confirmed">Verified</span></td></tr>
+          <tr><td>事実確認：gcsa</td><td><code>../gcsa/src/gcsa/store/</code>（zarr_store.py・_zarr_partition.py・_zarr_meta.py・measurement_streaming.py ほか）</td><td><span class="badge badge-confirmed">Verified</span></td></tr>
+          <tr><td>設計変更①〜⑥</td><td>3設計案の changes_now 21項目 → 競合検証で統合・却下後の生存項目</td><td><span class="badge badge-open">Proposal（未採用）</span></td></tr>
+          <tr><td>やらないこと</td><td>競合検証の rejected_or_conflicting（却下理由ごと保全）</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>プラン引用（D1〜D18・FR・UX・NFR）</td><td><code>docs/plans/260710-analogboard-rebuild-plan.html</code>・<code>docs/plans/260703-downstream-modification-plan.html</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+          <tr><td>追補：Tauri デスクトップ化</td><td>追加調査3エージェント（Celery/ジョブ基盤・Next.js export 可否・Windows ネイティブ／gcsa wheel CI）、file:line 検証付き</td><td><span class="badge badge-confirmed">Verified</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-title">本書の位置づけ</div>
+        <p>統合可否と設計変更の<strong>意思決定材料</strong>。採用が決まった項目は、再構築プラン（②③④⑤⑥は該当節へ、①はアーキテクチャ節へ）と下流改変プラン（②のマーカ参照を G1/S1/S5 に反映）へオーナー承認のうえ反映する。本書自体は正規仕様ではない。</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="doc-footer">
+  <p>Generated on 2026-07-09 — 9 サブエージェントによる多視点調査（精査4・設計3・敵対的検証2）＋追補調査3エージェント（ジョブ基盤・フロントエンド・Windows ネイティブ）の統合結果。</p>
+  <p>図の描画に Mermaid（CDN: cdn.jsdelivr.net）を使用。オフライン閲覧時は図がプレースホルダ表示になります。</p>
+  <p>正規仕様は <code>docs/plans/260710-analogboard-rebuild-plan.html</code>（親プラン）および <code>docs/plans/260703-downstream-modification-plan.html</code> を参照。</p>
+</footer>
+
+<!-- Lightbox modal for diagrams (Pan & Zoom) -->
+<div class="diagram-modal" id="diagramModal" role="dialog" aria-modal="true" aria-label="Enlarged diagram" tabindex="-1">
+  <div class="diagram-modal-toolbar">
+    <div class="diagram-modal-toolbar-group">
+      <button class="diagram-modal-btn" id="zoomOut" aria-label="Zoom out">&minus;</button>
+      <span class="diagram-modal-zoom-label" id="zoomLabel">100%</span>
+      <button class="diagram-modal-btn" id="zoomIn" aria-label="Zoom in">+</button>
+      <button class="diagram-modal-btn" id="zoomReset" aria-label="Reset zoom" style="font-size:0.6875rem;width:auto;padding:0 0.5rem;">Reset</button>
+    </div>
+    <span class="diagram-modal-caption-bar" id="modalCaption"></span>
+    <button class="diagram-modal-btn" id="modalClose" aria-label="Close">&times;</button>
+  </div>
+  <div class="diagram-modal-viewport" id="modalViewport">
+    <div class="diagram-modal-content" id="modalContent"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', fontFamily: 'inherit' });
+
+  // Diagram Pan & Zoom viewer
+  (function() {
+    var modal = document.getElementById('diagramModal');
+    var viewport = document.getElementById('modalViewport');
+    var content = document.getElementById('modalContent');
+    var caption = document.getElementById('modalCaption');
+    var zoomLabel = document.getElementById('zoomLabel');
+    var btnClose = document.getElementById('modalClose');
+    var btnIn = document.getElementById('zoomIn');
+    var btnOut = document.getElementById('zoomOut');
+    var btnReset = document.getElementById('zoomReset');
+
+    var scale = 1, panX = 0, panY = 0, fitScale = 1;
+    var dragging = false, startX = 0, startY = 0, startPanX = 0, startPanY = 0;
+    var lastFocusedDiagram = null;
+    var MIN_SCALE = 0.1, MAX_SCALE = 5, STEP = 0.25;
+    var WHEEL_ZOOM_SENSITIVITY = 0.005;
+    var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+
+    function applyTransform() {
+      content.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + scale + ')';
+      zoomLabel.textContent = Math.round(scale * 100) + '%';
+    }
+
+    function fitToView() {
+      scale = 1; panX = 0; panY = 0;
+      content.style.transform = 'none';
+      requestAnimationFrame(function() {
+        var svg = content.querySelector('svg');
+        if (!svg) { applyTransform(); return; }
+
+        var vw = viewport.clientWidth;
+        var vh = viewport.clientHeight;
+        var rect = svg.getBoundingClientRect();
+        var svgW = rect.width;
+        var svgH = rect.height;
+
+        if (!svgW || !svgH) { applyTransform(); return; }
+
+        var PAD = 48;
+        fitScale = Math.min((vw - PAD * 2) / svgW, (vh - PAD * 2) / svgH);
+        fitScale = Math.min(fitScale, 2);
+        fitScale = Math.max(fitScale, MIN_SCALE);
+        scale = fitScale;
+
+        panX = (vw - svgW * scale) / 2;
+        panY = (vh - svgH * scale) / 2;
+        applyTransform();
+      });
+    }
+
+    function clampScale(value) {
+      return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+    }
+
+    function zoomTo(nextScale, cx, cy) {
+      var prev = scale;
+      scale = clampScale(nextScale);
+      if (cx !== undefined && cy !== undefined && prev !== scale) {
+        var ratio = scale / prev;
+        panX = cx - ratio * (cx - panX);
+        panY = cy - ratio * (cy - panY);
+      }
+      applyTransform();
+    }
+
+    function zoomBy(delta, cx, cy) {
+      zoomTo(scale + delta, cx, cy);
+    }
+
+    function normalizeWheel(e) {
+      var unit = 1;
+      if (e.deltaMode === 1) unit = 16;
+      else if (e.deltaMode === 2) unit = viewport.clientHeight;
+      return { dx: e.deltaX * unit, dy: e.deltaY * unit };
+    }
+
+    function isLikelyTrackpadPinch(e, wheel) {
+      return isMac && e.ctrlKey && !e.metaKey && e.deltaMode === 0 &&
+        Math.abs(wheel.delta) < 80 && Math.abs(wheel.dx) < 8;
+    }
+
+    function shouldZoomOnWheel(e, wheel) {
+      if (isMac ? e.metaKey : e.ctrlKey) return true;
+      return isLikelyTrackpadPinch(e, wheel);
+    }
+
+    function zoomByWheel(wheel, cx, cy) {
+      var factor = Math.exp(-wheel.delta * WHEEL_ZOOM_SENSITIVITY);
+      zoomTo(scale * factor, cx, cy);
+    }
+
+    function panByWheel(e, wheel) {
+      var dx = wheel.dx;
+      var dy = wheel.dy;
+      if (e.shiftKey && Math.abs(dx) < Math.abs(dy)) {
+        dx = dy;
+        dy = 0;
+      }
+      panX -= dx;
+      panY -= dy;
+      applyTransform();
+    }
+
+    function focusElement(el) {
+      if (!el || typeof el.focus !== 'function') return;
+      try { el.focus({ preventScroll: true }); }
+      catch (err) { el.focus(); }
+    }
+
+    function getDiagramLabel(figure) {
+      var figcap = figure.querySelector('figcaption');
+      var label = figcap && figcap.textContent ? figcap.textContent.trim() : '';
+      return label ? 'Open enlarged diagram: ' + label : 'Open enlarged diagram';
+    }
+
+    function isInteractiveTarget(target) {
+      return target && target.closest && target.closest('a, button, input, textarea, select, summary');
+    }
+
+    function openModal(figure) {
+      var svg = figure.querySelector('svg');
+      var mermaidDiv = figure.querySelector('.mermaid');
+      var figcap = figure.querySelector('figcaption');
+
+      content.innerHTML = '';
+      if (svg) {
+        var clone = svg.cloneNode(true);
+        clone.removeAttribute('style');
+        content.appendChild(clone);
+      } else if (mermaidDiv) {
+        content.innerHTML = mermaidDiv.innerHTML;
+      }
+
+      caption.textContent = figcap ? figcap.textContent : '';
+      lastFocusedDiagram = figure;
+      modal.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+      focusElement(modal);
+      fitToView();
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      document.body.style.overflow = '';
+      focusElement(lastFocusedDiagram);
+    }
+
+    // Open from diagram click or keyboard activation
+    document.querySelectorAll('.diagram-container').forEach(function(fig) {
+      if (!fig.hasAttribute('tabindex')) fig.setAttribute('tabindex', '0');
+      if (!fig.hasAttribute('role')) fig.setAttribute('role', 'button');
+      if (!fig.hasAttribute('aria-haspopup')) fig.setAttribute('aria-haspopup', 'dialog');
+      if (!fig.hasAttribute('aria-controls')) fig.setAttribute('aria-controls', 'diagramModal');
+      if (!fig.hasAttribute('aria-label')) fig.setAttribute('aria-label', getDiagramLabel(fig));
+
+      fig.addEventListener('click', function(e) {
+        if (isInteractiveTarget(e.target)) return;
+        openModal(fig);
+      });
+      fig.addEventListener('keydown', function(e) {
+        if (isInteractiveTarget(e.target)) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openModal(fig);
+        }
+      });
+    });
+
+    // Toolbar buttons
+    btnClose.addEventListener('click', closeModal);
+    btnIn.addEventListener('click', function() { zoomBy(STEP); });
+    btnOut.addEventListener('click', function() { zoomBy(-STEP); });
+    btnReset.addEventListener('click', fitToView);
+
+    // Wheel: Cmd/Ctrl + wheel zooms. Plain wheel pans the enlarged diagram.
+    viewport.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      var wheel = normalizeWheel(e);
+      wheel.delta = wheel.dy || wheel.dx;
+
+      var rect = viewport.getBoundingClientRect();
+      var cx = e.clientX - rect.left;
+      var cy = e.clientY - rect.top;
+
+      if (shouldZoomOnWheel(e, wheel)) {
+        zoomByWheel(wheel, cx, cy);
+      } else {
+        panByWheel(e, wheel);
+      }
+    }, { passive: false });
+
+    // Safari/WebKit trackpad pinch support.
+    if ('ongesturestart' in window) {
+      var gestureStartScale = 1;
+      viewport.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+        gestureStartScale = scale;
+      });
+      viewport.addEventListener('gesturechange', function(e) {
+        e.preventDefault();
+        var rect = viewport.getBoundingClientRect();
+        var cx = e.clientX ? e.clientX - rect.left : rect.width / 2;
+        var cy = e.clientY ? e.clientY - rect.top : rect.height / 2;
+        zoomTo(gestureStartScale * e.scale, cx, cy);
+      });
+    }
+
+    // Mouse drag to pan
+    viewport.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startPanX = panX; startPanY = panY;
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      panX = startPanX + (e.clientX - startX);
+      panY = startPanY + (e.clientY - startY);
+      applyTransform();
+    });
+    window.addEventListener('mouseup', function() { dragging = false; });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+      if (!modal.classList.contains('is-open')) return;
+      if (e.key === 'Escape') closeModal();
+      else if (e.key === '+' || e.key === '=') zoomBy(STEP);
+      else if (e.key === '-') zoomBy(-STEP);
+      else if (e.key === '0') fitToView();
+    });
+  })();
+
+  // TOC: highlight active section on scroll
+  (function() {
+    var links = document.querySelectorAll('.toc a[href^="#"]');
+    var sections = Array.from(links).map(function(a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+    if (!sections.length) return;
+    function onScroll() {
+      var current = sections[0];
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].getBoundingClientRect().top <= 80) current = sections[i];
+      }
+      links.forEach(function(a) {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + current.id);
+      });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+</script>
+</body>
+</html>

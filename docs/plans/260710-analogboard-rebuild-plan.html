@@ -738,9 +738,9 @@ pre {
   <p class="subtitle">高速多パラメータ計測アプリの刷新 — ストラングラー型リビルド／新UI／堅牢化／リアルタイム scatter・gating／4GB制限撤廃／自動再接続／診断ログ／実機エミュレーション</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実装プラン</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.11</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.0</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-06（FR-13/UX-20 追加。実機セッション：ケーブル交換不可の実態に合わせ管理変数を「スイッチ区間の着脱」へ修正、win11-driver-compat の dev からの再作成（オーナー決定）と手順書リンクを追記。実機PC＝Win11・1台確定によりフェーズ4ゲートを Win11 のみへ簡約、実験2を条件付き（レジストリ回避）化）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（<strong>Draft 2.0</strong>：ファイル名を 260703→260710 へ更新。D20（別アプリ維持・一製品複数プロセス）／D21（ストア可視性契約＝finalization マーカ・write_generation・パーティションマニフェスト・min/max レンジ）／D22（sys_app ストア完全直読・射影廃止）を追加し、D11 の達成手段を直読へ改訂。C ABI 中立性ルール・フィード fan-out・finalize イベント・非WPF Tier1 適合テスト・共存 NFR・デプロイトポロジ節を追加。フェーズ0 に契約凍結＋シャーディング決着を明記（実機確認は 2026-07-13 週予定・完了後に実装着手）。根拠調査：docs/260709-analogboard-sysapp-integration-study.html。7-09：P1 採用→D19。7-06：FR-13/UX-20 追加ほか）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> オーナー／開発チーム</span>
     <span class="doc-meta-item"><strong>Source:</strong> prompt.md ＋ 2件のコードベース調査</span>
   </div>
@@ -817,7 +817,7 @@ pre {
     <!-- ===== DECISIONS ===== -->
     <section id="decisions">
       <h2>確定した意思決定</h2>
-      <p>2026-07-03 にオーナーと確定した17件（D12以降は未決事項レビューで確定）。以降の設計はこれを前提とする。</p>
+      <p>オーナーと確定した22件（D1〜D18：2026-07-03〜06、D19〜D22：2026-07-09〜10 の統合検討スタディ後に確定）。以降の設計はこれを前提とする。</p>
       <table class="spec-table">
         <thead><tr><th>#</th><th>論点</th><th>決定</th><th>要点</th></tr></thead>
         <tbody>
@@ -831,7 +831,7 @@ pre {
           <tr><td>D8</td><td>現場版の扱い</td><td><strong>版監査＋現行buildを暫定deploy</strong></td><td>旧pre-loggingビルドなら暫定deployで診断ログを先行投入し残欠陥を較正。</td></tr>
           <tr><td>D9</td><td>主出力形式</td><td><strong>gcsaネイティブ Zarr ストア</strong></td><td>特徴量(float64)＋生FH(uint16)＋生FL(uint16)。追記対応・圧縮・atomic。fl/fh生binは移行互換のみ。</td></tr>
           <tr><td>D10</td><td>生FL波形の保全</td><td><strong>既定で残す（後日再判断）</strong></td><td>再解析・特徴量再計算の余地を確保。容量都合で後日OFF切替できるオプションとして設計。採用に伴い gcsa に <code>fl_waveform</code> リーダ追加（改変プロンプト）。</td></tr>
-          <tr><td>D11</td><td>下流シームレス</td><td><strong>gcsa と sys_app の両方でシームレス</strong></td><td>gcsaは構造上シームレス。sys_appは「射影」方式で対応（ストア→既存Parquet/JSONへ取り込み時に射影、再計算しない）。sys_app 8点・gcsa 3点の改変プロンプトが要（「sys_app シームレス契約」節）。要件でありハード依存。</td></tr>
+          <tr><td>D11</td><td>下流シームレス</td><td><strong>gcsa と sys_app の両方でシームレス</strong></td><td>gcsaは構造上シームレス。sys_app の達成手段は当初「射影」方式だったが、<strong>2026-07-10 に D22（ストア完全直読）へ改訂</strong>——要件（デュアル・シームレス）自体は不変。改変プロンプトは下流改変プラン Draft 1.0（直読版）参照。要件でありハード依存。</td></tr>
           <tr><td>D12</td><td>Zarr C++ライタ</td><td><strong>acquire-zarr 第一候補</strong></td><td>取得機器向けストリーミング書込特化・Windowsバイナリ・Apache-2.0。フェーズ0で gcsa 往復検証し、レイアウト非互換なら c-blosc＋最小自作へフォールバック。ZarrWriter インターフェースで隔離し差替可能に。商用搭載の SBOM/保守観点で軽量既製品を優先。</td></tr>
           <tr><td>D13</td><td>gate の下流出力</td><td><strong>出力する（正準v1のみ）</strong></td><td>ストアの gates/ ＋ sys_app互換 正準v1 payload で出力。v2.0拡張（fill_*・階層root）は出さない。UIは正準v1で表現できる gate 種のみ提示（UX-03）。</td></tr>
           <tr><td>D14</td><td>特徴量の版管理</td><td><strong>整数版＋meta.versions</strong></td><td>feature_schema_version=1（gcsa v1 準拠）から開始、算出値が変わる改訂で+1。versions にアプリ/FW/アルゴ版を記録。同一データセット内の版混在禁止。下流は記録値権威・版は表示のみ（UX-12）。</td></tr>
@@ -839,6 +839,10 @@ pre {
           <tr><td>D16</td><td>切替スイッチ</td><td><strong>除去を標準化</strong></td><td>機械から出る固定ケーブルは交換不可のため、管理対象は先端の<strong>スイッチ区間（メス—スイッチ—オス・着脱可能）</strong>。直結（区間除去）を標準とし、外した区間をラベル保管、対照実験（#1）でのみ再装着。</td></tr>
           <tr><td>D17</td><td>物理ch順の前提</td><td><strong>gcsa想定順で先行実装</strong></td><td><code>FSC,SSC,FL1..FL6</code>／<code>fsGMI..bfGMI</code> 前提で Decoder/Writer を実装し、実機#7の実サンプル照合で凍結。差異は ch-mapping 表1枚で吸収できる設計にする。</td></tr>
           <tr><td>D18</td><td>UI仕様の突き合わせ</td><td><strong>現行設定項目の完全継承＋ダイアログ集約</strong></td><td>現行アプリの全設定項目（「UI仕様」節の一覧）を新アプリでも設定可能にする。チャンネル毎設定（ゲイン段・Offset・Ext Ctrl・有効）はモーダルダイアログに集約（UX-18）。開始/停止ボタンは Manual Get ON のときのみ表示（UX-19）。</td></tr>
+          <tr><td>D19</td><td>ストア暗号化</td><td><strong>チャンク暗号化を採用（抑止レベル）</strong></td><td>測定配列チャンクのみ Blosc(lz4)圧縮→AES-256-GCM 暗号化し、<code>.zarray</code> compressor を独自ID（例 <code>gcsa-aes</code>）に。鍵は難読化した共通鍵をアプリ（C++コア）と gcsa に埋込、チャンクヘッダの <code>key_id</code>（1バイト）で将来の鍵替えに備える。<strong>バイナリ解析には耐えない抑止レベルであることを明記した上での採用</strong>。<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準v1）は平文維持。帰結：c-blosc＋最小自作ライタが実質第一候補（D12 のフォールバック昇格）、フェーズ0往復検証は暗号化コーデック込み、gcsa へ G4（カスタム numcodecs コーデック登録＋埋込鍵）。GCM 認証タグによりチャンク単位のサイレント破損検知が付随。詳細は「リスクと未決事項」節の提案 P1 参照。2026-07-09 採用。</td></tr>
+          <tr><td>D20</td><td>アプリ統合方針</td><td><strong>AnalogBoard と sys_app は別アプリ維持</strong></td><td>コードベース統合はしない（3視点独立調査で一致・<code>docs/260709-analogboard-sysapp-integration-study.html</code>）。到達形は「一製品・複数プロセス」——同梱配布＋自動ハンドオフ（近期）、必要なら WPF シェルへの WebView2 埋込（将来アドオン）。根拠：sys_app は ML 追加で頻繁更新（リリースサイクル非対称）、取得側は常駐ネイティブ必須（FR-11）＋障害ドメイン隔離、解析数値核は gcsa（Python+Rust）。sys_app は ML/DR 実装後に Tauri デスクトップ化を計画。2026-07-09 決定。</td></tr>
+          <tr><td>D21</td><td>ストア可視性契約</td><td><strong>finalization マーカ＋パーティションマニフェスト導入</strong></td><td>meta.json に additive：<code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・特徴量毎 min/max レンジ。単一書き手規則（<code>datasets/&lt;id&gt;/</code> の書き手は取得コアのみ）＋「ストア＋meta.json＝唯一のクロスアプリレジストリ」。取得中 import のサイレント切詰め防止・再アーム append と gcsa の meta.json-last 慣習の非両立を解消・クラッシュ回復に単独価値。出力契約凍結前に確定、フェーズ0往復で gcsa 許容を検証。2026-07-09 決定。</td></tr>
+          <tr><td>D22</td><td>sys_app 読取方式</td><td><strong>ストア完全直読（registration-only import）</strong></td><td>射影コピー（旧 S1）を廃し、sys_app は登録のみの import＋gcsa 経由のストア直読へ。根拠（実コード調査 2026-07-10）：旧射影はピーク RAM≒生データサイズで大データセット不可・読者不在の全波形コピー・D19 暗号化を平文コピーが無効化。読取 seam は狭く（DuckDBFeatureStore 1箇所・波形チェーン1本）差替えは S/M、唯一の設計変更は補償列の sidecar 化。D11 の達成手段変更であり要件は不変。2026-07-10 決定。</td></tr>
         </tbody>
       </table>
     </section>
@@ -1008,6 +1012,8 @@ flowchart TB
         <li><strong>プロセス/スレッド分離</strong>：取得の読取スレッド、デコード、ファイル書込を分離し、<code>BlockingQueue</code>で背圧をかける。UIのハングやログ出力が取得ホットパスを乱さない（過去の「計装が取得を壊した」失敗を構造的に防ぐ）。必要なら取得コアを別プロセス化してUIハングと完全隔離。</li>
         <li><strong>生データは越境させない</strong>：C ABI を渡るのは密度ビニング済みscatter・ヒストグラム・カウンタ・イベント特徴量、および<strong>固定上限のサンプリング済みGMI波形スナップショット</strong>（FR-13。既定〜100波形×2400サンプル、コア側でサンプリング／必要ならデシメーション済み——生ストリームの転送ではない）のみ。GCが200MB/sの経路に触れない設計ルールを初日から強制（WPF採用時）。</li>
         <li><strong>通信層の刷新点</strong>：エンドポイント毎の明示的タイムアウト、<code>Abort()/Reset()→ReConnect()</code>による回復、<code>BeginDataXfer/FinishDataXfer</code>のキュー型非同期転送、EP6バルク読取に直列化されない独立したEP4ステータスチャネル、<code>UsbdStatus/NtStatus/LastError</code>のログ化。</li>
+        <li><strong>C ABI 中立性ルール（2026-07-10 追加）</strong>：C ABI を越えるのは<strong>版付き POD／シリアライズ可能構造体のみ</strong>。コマンド（start/stop・一括設定適用・レシピ読込）とフィードフレーム（ビニング済み scatter・histogram・カウンタ・GMI スナップショット ≤100×2400・リンクヘルス）を列挙型で定義し、.NET/WPF/COM 型・コールバックのオブジェクトグラフを禁止。コールバックは frame-ready 通知＋pull か polled event queue に限定。これにより同一コアを in-proc（WPF・フェーズ1〜4）／常駐サービス／将来の別フロントエンドから無改修でホスト可能にする。フェーズ1のテスト計画に<strong>非WPF最小ホスト（素の C/C++ or コンソール）で start→取得（エミュ）→再アーム→stop→ストア書込の全周を駆動する Tier1 適合テスト</strong>を置き、規則をコンパイル／テストで機械的に強制する。</li>
+        <li><strong>フィード fan-out ポイント（2026-07-10 追加）</strong>：集計フレームは <code>BlockingQueue</code> の<strong>消費側</strong>（デコード/集計スレッド。EP6 読取・ZarrWriter スレッドの外）で生成し、<strong>sequence 番号＋monotonic timestamp</strong> を付与する。multi-sink の attach point を設計上1箇所命名する（現在の sink は C ABI の1本のみ。<strong>第2 sink は実装しない</strong>——将来のミラー追加時にホットパスへ触れない構造だけを保証する）。sequence 番号は Tier1/2 回帰のフィード再生決定性にも使う。</li>
       </ul>
     </section>
 
@@ -1220,13 +1226,13 @@ flowchart TB
           </tr>
           <tr>
             <td><code>UX-16</code></td><td>FR-10</td>
-            <td><strong>下流ハンドオフ導線</strong>：ストア出力の進捗・成否表示、sys_app/gcsa への受け渡し導線（出力フォルダを開く・取り込み手順の提示等）。フェーズ3.5 の往復テスト成果物ができてから UI 露出を再判断。</td>
+            <td><strong>下流ハンドオフ導線</strong>：ストア出力の進捗・成否表示、sys_app/gcsa への受け渡し導線（出力フォルダを開く・取り込み手順の提示等）。<strong>2026-07-10 方針確定</strong>：土台（finalize イベント＝D21 付随・UX-02 の汎用アクションボタン）を先に整備し、フェーズ3.5 の往復テスト合格後に実装レベルを判断——レベル1＝通知から <code>import_from_path</code> を1回叩く半自動、レベル2＝finalize→無操作自動登録。レベル2 は sys_app の Tauri デスクトップ化後が最安（DATA_DIR コンテナパス変換が消え Windows パス直渡しになるため）。</td>
             <td><span class="badge badge-could">Could</span></td><td>中</td>
-            <td><span class="badge badge-open">保留</span></td>
+            <td><span class="badge badge-open">保留（判断時期・段階を確定済み）</span></td>
           </tr>
           <tr>
             <td><code>UX-17</code></td><td>FR-10/11</td>
-            <td><strong>サンプル名・コメント</strong>：ラン開始時に任意のサンプル名を付与。<strong>未入力時の既定は連番 <code>tube_1</code>, <code>tube_2</code>…</strong>（タイムスタンプは使わない）。連番はセッション/日単位でインクリメントし、次番号はレシピ等と共に永続化して再起動後も継続、既存名と衝突する番号はスキップ。計測後もデータセット管理画面（UX-12）から表示名の変更・コメント（自由記述メモ）・タグの追記/編集が可能。保存は <code>meta.json</code> の追加フィールド（<code>display_name</code>/<code>comment</code>/<code>tags</code>、additive で下流は無視しても壊れない）。フォルダ名は<strong>サニタイズ済みサンプル名そのもの</strong>（例 <code>tube_1/</code>）を採用し、衝突時のみ短い曖昧回避サフィックス（<code>_2</code> 等）を付す。<strong>後からのリネームは表示名のみ</strong>——フォルダ名・dataset id（内部で安定なユニークID）は変えず参照を壊さない。sys_app は射影取り込み時に表示名を Dataset 名として採用（S1）。</td>
+            <td><strong>サンプル名・コメント</strong>：ラン開始時に任意のサンプル名を付与。<strong>未入力時の既定は連番 <code>tube_1</code>, <code>tube_2</code>…</strong>（タイムスタンプは使わない）。連番はセッション/日単位でインクリメントし、次番号はレシピ等と共に永続化して再起動後も継続、既存名と衝突する番号はスキップ。計測後もデータセット管理画面（UX-12）から表示名の変更・コメント（自由記述メモ）・タグの追記/編集が可能。保存は <code>meta.json</code> の追加フィールド（<code>display_name</code>/<code>comment</code>/<code>tags</code>、additive で下流は無視しても壊れない）。フォルダ名は<strong>サニタイズ済みサンプル名そのもの</strong>（例 <code>tube_1/</code>）を採用し、衝突時のみ短い曖昧回避サフィックス（<code>_2</code> 等）を付す。<strong>後からのリネームは表示名のみ</strong>——フォルダ名・dataset id（内部で安定なユニークID）は変えず参照を壊さない。sys_app は登録（registration-only import）時に表示名を Dataset 名として採用（S1）。</td>
             <td><span class="badge badge-must">Must</span></td><td>低</td>
             <td><span class="badge badge-confirmed">確定</span></td>
           </tr>
@@ -1650,20 +1656,22 @@ flowchart LR
         <tbody>
           <tr><td><code>datasets/&lt;id&gt;/pulse_features/partition_{p}.zarr</code></td><td>float64 <code>(N,24)</code>、アプリ算出A/H/W。<strong>権威・下流は再計算なし</strong>。chunk <code>(10000,None)</code>。</td><td><span class="badge badge-confirmed">native</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/gmi_waveform/partition_{p}.zarr</code></td><td>uint16 <code>(N,5,2400)</code>、生FH(GMI)。ML/DR用。chunk <code>(2000,None,None)</code>。</td><td><span class="badge badge-confirmed">native</span></td></tr>
-          <tr><td><code>datasets/&lt;id&gt;/fl_waveform/partition_{p}.zarr</code><br>（任意・新規）</td><td>uint16 <code>(N,8,2400)</code>、生FL保全（再解析・特徴量再計算用）。容量重視ならOFF。</td><td><span class="badge badge-should">要gcsa追加</span></td></tr>
+          <tr><td><code>datasets/&lt;id&gt;/fl_waveform/partition_{p}.zarr</code><br>（既定ON・新規）</td><td>uint16 <code>(N,8,2400)</code>、生FL保全（再解析・特徴量再計算用）。容量重視ならOFF可（D10）。</td><td><span class="badge badge-must">要gcsa追加（未実装確認済・凍結前必須）</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/meta.json</code> ＋ <code>.gcsa_store.json</code></td><td>channels・features・cfg_params・versions・provenance を内包（自己記述）。<code>store_format=1</code>。</td><td><span class="badge badge-confirmed">native</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/gates/&lt;gate_id&gt;.json</code></td><td>gate定義（別途 sys_app互換の正準v1 payload でもエクスポート）。</td><td><span class="badge badge-confirmed">native</span></td></tr>
         </tbody>
       </table>
       <ul>
-        <li>Zarr v2 ＋ Blosc(lz4,clevel5,shuffle)、書込は temp→atomic rename。破損サイレントや巨大ファイルを解消。</li>
-        <li><strong>パーティション追記対応</strong>＝取得中ストリーミング／4GB再アームは「番号Nのペアbin juggling」から「ストアへ append」へ単純化（fl/fhロックステップ制約が消える）。イベントは <code>e % n_partitions</code> の round-robin シャーディング。</li>
-        <li>実装コスト：C++ の Zarr v2 ライタは <strong>acquire-zarr を第一候補</strong>とする（D12。取得機器向けストリーミング書込特化・Windowsビルド済みバイナリ・Apache-2.0）。フェーズ0の gcsa 往復検証でレイアウト非互換なら c-blosc＋最小自作へフォールバック。ZarrWriterモジュールに隔離しEP6ホットパス外（writerスレッド）。</li>
+        <li>Zarr v2 ＋ Blosc(lz4,clevel5,shuffle)、書込は temp→atomic rename。破損サイレントや巨大ファイルを解消。<strong>D19 採用により測定配列チャンクは Blosc 圧縮後に AES-256-GCM で暗号化</strong>（独自 codec ID・<code>key_id</code> 1バイト・meta/gate は平文。GCM 認証タグがチャンク単位の破損検知を兼ねる）。</li>
+        <li><strong>パーティション追記対応</strong>＝取得中ストリーミング／4GB再アームは「番号Nのペアbin juggling」から「ストアへ append」へ単純化（fl/fhロックステップ制約が消える）。シャーディングは <code>e % n_partitions</code> の round-robin を踏襲予定だが、<strong>方式はフェーズ0で決着（未決事項参照）</strong>——round-robin は全パーティションが同時成長し sealed prefix が存在しないため、維持する場合はマニフェストの per-partition <code>sealed</code> で外部リーダの追従安全性を担保する。gcsa のリーダ検証は分配式そのものを検証しており、決定はリポジトリ横断契約（gcsa バリデータ改修とセット）。</li>
+        <li><strong>可視性契約（D21・2026-07-10 追加）</strong>：meta.json に additive で <code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・特徴量毎 min/max レンジを記録する。gcsa の従来慣習（meta.json 最終書込＝暗黙のコミットポイント）は再アーム append のため meta.json を先に書く本アプリと両立しない——明示マーカが代替となる。<strong>単一書き手規則</strong>：<code>datasets/&lt;id&gt;/</code> 内の書き手は取得コアのみ（下流の派生物はデータセットフォルダ外に置く）。<strong>ストアフォルダ＋meta.json が唯一のクロスアプリレジストリ</strong>であり、下流の派生面は (dataset_id, feature_schema_version, write_generation) をキーとするキャッシュと位置づける。</li>
+        <li><strong>finalize イベント（2026-07-10 追加）</strong>：atomic finalize 時に writer スレッドで発火する完了フック（dataset id＋ストア絶対パス。transport 中立——特定サービスへの HTTP 直結はしない）。UX-16（下流ハンドオフ）の enabling primitive であり、EP6 ホットパス外で完結する。</li>
+        <li>実装コスト：C++ の Zarr v2 ライタは <strong>c-blosc＋最小自作ライタを実質第一候補</strong>とする（D19 採用の帰結。acquire-zarr はカスタム暗号コーデック段を挟めない可能性が高い——D12 のフォールバック昇格）。フェーズ0の gcsa 往復検証は<strong>暗号化コーデック込み</strong>で実施。ZarrWriterモジュールに隔離しEP6ホットパス外（writerスレッド）。</li>
       </ul>
 
       <div class="callout callout-warning">
         <div class="callout-title">gcsa 改変プロンプト（生FL配列リーダの追加）</div>
-        <p>特徴量(<code>pulse_features</code>)・生FH(<code>gmi_waveform</code>)・meta・gate は gcsa がそのまま読むため<strong>gcsa改変は原則不要</strong>。唯一、生FL保全(<code>fl_waveform</code>)を採用する場合のみ小さなリーダ追加が要る（gcsaは直接改変せずプロンプト方式）：</p>
+        <p><strong>2026-07-10 更新</strong>：D19（暗号コーデック＝G4）・D21（可視性マーカ意味論）・D22（直読の読取並行性）の採用により、gcsa 改変は「fl_waveform のみ」から拡大した。全体は下流改変プラン（Draft 1.0）の G 系プロンプトと gcsa リポジトリの実装プラン（<code>gcsa/docs/plans/active/260710-analogboard-store-support-plan.html</code>）に集約。なお <code>fl_waveform</code> は ZarrStore に<strong>未実装と確認済み（2026-07-09 調査）</strong>で、D10 既定ON＋直読の前提として<strong>契約凍結前必須</strong>へ昇格。以下は原初プロンプト（歴史的経緯として保持）：</p>
         <pre>gcsa Modification Prompt
 - What to change: add an optional `fl_waveform` artifact (uint16 (N,8,2400))
   to ZarrStore read path, symmetric to the existing `gmi_waveform`.
@@ -1692,11 +1700,18 @@ flowchart LR
           <li><strong>sys_app に gcsa ストアのリーダが無い</strong>。sys_app の権威的な特徴量読取面は自前の <code>sys_app/store/pulse_features_{id}.parquet</code>（<code>event_idx</code> int64 ＋ 特徴量名ごとの float32 列）＋ GMI の <code>waveforms.json</code>。<code>ZarrStore</code>/<code>gcsa_store</code> の参照はゼロ。ストアだけ渡すと Parquet 不在で import が落ちる。</li>
           <li><strong>sys_app は取り込み時に必ず A/H/W を生FLから再計算する</strong>（<code>dataset_import_steps.py:239</code> で無条件に <code>extract_pulse_features</code>）。＝ D5（アプリ算出を権威）が無視・上書きされる。</li>
         </ol>
-        <p>朗報：sys_app の<strong>読取・可視化・gating 層は既に D5 と整合的</strong>（記録済み Parquet を優先し、再計算はフォールバック）で、<strong>座標は plotted 値も gate 幾何も生ADC線形</strong>で gcsa と一致（log/biexp は表示時のみ）。よって最小差分の解は「取り込み時に gcsa ストアを sys_app の既存 Parquet/JSON 面へ射影（projection）し、再計算しない」こと。これで可視化/gating/compensation のコードは無改変のまま D5 を満たす。</p>
+        <p>朗報：sys_app の<strong>読取・可視化・gating 層は既に D5 と整合的</strong>（記録済み Parquet を優先し、再計算はフォールバック）で、<strong>座標は plotted 値も gate 幾何も生ADC線形</strong>で gcsa と一致（log/biexp は表示時のみ）。当初は「取り込み時の射影（projection）コピー」を解としたが、<strong>2026-07-10 のオーナー決定（D22）で「registration-only import＋ストア完全直読」へ転換</strong>した（下記）。</p>
       </div>
 
-      <h3>射影（projection）アーキテクチャ</h3>
-      <p>sys_app は自前の Parquet/JSON を<strong>内部の派生面</strong>として保持しつつ、取り込み時に<strong>gcsa ストアから射影して生成</strong>する（再計算しない）。取得側→gcsa は無改変で読め、sys_app 側は取り込み口にストア対応を1本追加するだけで既存の可視化/gating/compensation を温存できる。</p>
+      <h3>直読（direct read）アーキテクチャ（2026-07-10 改訂・旧：射影）</h3>
+      <p>sys_app は取り込み時にデータを<strong>複製せず</strong>、ストアの meta.json＋配列形状から Dataset 行を登録するだけ（registration-only import・ミリ秒級）とし、特徴量・波形の読取は <strong>gcsa 経由でストアを直接読む</strong>。転換の根拠（2026-07-10 実コード調査で確定）：</p>
+      <ul>
+        <li>旧射影パイプラインは全計測を RAM にロードし（ピーク RAM ≒ 生データサイズ。1M イベント ≒ 62GB）、<strong>大データセットの import が構造的に不可能</strong></li>
+        <li>読者が存在しない全波形コピー（<code>data.zarr</code>・~62KB/イベント）を書いていた（純粋な無駄）</li>
+        <li><strong>D19 暗号化と両立しない</strong>——射影は保護済みストアの隣に全データの平文コピーを作る</li>
+        <li>sys_app の読取 seam は狭い（特徴量は <code>DuckDBFeatureStore</code> 1箇所・コンシューマ2モジュール、波形は読取チェーン1本・128イベント上限プレビュー）ため、差替えコストは S/M。唯一の設計変更は補償（<code>Comp-</code> 列の parquet 上書き）の sidecar 化</li>
+      </ul>
+      <p>D11（デュアル・シームレス要件）は不変で、達成手段のみ変更。詳細な改変プロンプトは下流改変プラン（Draft 1.0・直読版）に集約。</p>
 
       <h3>シームレス出力契約（本アプリが満たすこと）</h3>
       <table class="spec-table">
@@ -1705,8 +1720,8 @@ flowchart LR
           <tr><td>特徴量カラム順（pin済）</td><td>gcsa <code>PulseFeatureExtractor.extract_all</code> と<strong>バイト一致</strong>。順序は<strong>チャンネルごとに A→H→W</strong>：<code>FSC_A,FSC_H,FSC_W, SSC_A,SSC_H,SSC_W, FL1_A…FL1_W, …, FL6_A,FL6_H,FL6_W</code>（計24）。sys_app は名前で位置解決し gate軸・統計がこの文字列に依存。補償対象は <code>_A/_H</code> のみ。</td></tr>
           <tr><td>GMI チャンネル順</td><td>index順 <code>0=fsGMI,1=ssGMI,2=flGMI,3=dGMI,4=bfGMI</code>（<code>FH_CHANNEL_NAMES</code>）。誤順は GMI プロットを黙って取り違える。</td></tr>
           <tr><td>座標空間</td><td>全特徴量・gate座標を<strong>生ADC線形</strong>で記録（log/biexp を焼き込まない）。表示変換はリクエスト毎に下流が適用。</td></tr>
-          <tr><td>meta.json 必須</td><td>順序付き24特徴量名、空間トークン <code>pulse_features</code>、順序付き5 GMI名、イベント数、<strong>per-event の整数 event index</strong>（or 暗黙0..N-1）、（推奨）安定 dataset id。任意（additive）：<code>display_name</code>・<code>comment</code>・<code>tags</code>（UX-17。下流は無視可、sys_app は取り込み時に表示名として採用＝S1）。</td></tr>
-          <tr><td>精度</td><td>ストアは float64。sys_app Parquet は現状 float32＋<code>round(6)</code>。<strong>推奨：ストアは float64 を記録</strong>し、sys_app は float32 表示許容差を明文化（厳密一致が要れば Parquet を float64 化する sys_app 改変）。</td></tr>
+          <tr><td>meta.json 必須</td><td>順序付き24特徴量名、空間トークン <code>pulse_features</code>、順序付き5 GMI名、イベント数、<strong>per-event の整数 event index</strong>（or 暗黙0..N-1）、安定 dataset id。<strong>可視性契約（D21・additive）</strong>：<code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・<strong>特徴量毎の min/max レンジ</strong>（writer スレッドで取得中に累積計算。sys_app の channels_json 登録が全行スキャン不要になる）。任意（additive）：<code>display_name</code>・<code>comment</code>・<code>tags</code>（UX-17。下流は無視可、sys_app は登録時に表示名として採用）。</td></tr>
+          <tr><td>精度</td><td>ストアは float64（<strong>確定 D15</strong>：sys_app 側も内部面を float64 化し <code>round(6)</code> 除去。往復判定は bit 一致。直読転換後は特徴量読取が gcsa 直読になるためこの座標は自然に一致する）。</td></tr>
           <tr><td>生FL（D10）</td><td><code>fl_waveform</code>(N,8,2400) を保全。ただし sys_app 表示には無関係で、再計算フォールバックを残す場合のみ意味を持つ。シームレスは記録済み特徴量に乗る。</td></tr>
           <tr><td>gate（交換時）</td><td>sys_app の6種 <code>polygon/rectangle/threshold/histogram-range/quadrant/boolean</code>（<code>all</code>・<code>ellipse</code>不可）。gcsa v1は逆に <code>all</code>あり <code>histogram-range</code>無し → <strong>gate は取得データとは別のすり合わせ seam</strong>（下記改変プロンプト）。</td></tr>
         </tbody>
@@ -1715,33 +1730,38 @@ flowchart LR
       <h3>必要な sys_app 改変（プロジェクトルール：直接改変せず改変プロンプト）</h3>
       <div class="callout callout-info">
         <div class="callout-title">別紙：下流改変プラン</div>
-        <p>S1〜S8・G1〜G3 の詳細（what/why/how/verify・file:line）は別紙 <code>docs/plans/260703-downstream-modification-plan.html</code> にまとめた。<strong>暫定・書き換え前提</strong>で、AnalogBoard 側の改変が終わった時点で実行する。</p>
+        <p>S/G 系改変プロンプトの詳細（what/why/how/verify・file:line）は別紙 <code>docs/plans/260703-downstream-modification-plan.html</code>（<strong>Draft 1.0・直読版に改訂済み</strong>）にまとめた。D22 転換により S1 は registration-only import＋直読リーダへ再設計、S2/S5 は廃止（不変条件は直読リーダへ内在化）、S9（補償 sidecar）・S10（CI 凍結コーパス）・G4（暗号コーデック）等を追加。AnalogBoard 側の出力契約凍結後に実行する。実装の実体は各リポジトリの plan（gcsa: <code>docs/plans/active/260710-analogboard-store-support-plan.html</code>、sys_app: <code>docs/plans/260710-analogboard-store-and-desktop-plan.html</code>）に展開済み。</p>
       </div>
-      <p>「gcsa と sys_app でシームレス」は要件なので、これは nice-to-have ではなく<strong>ハード依存</strong>。8点の改変プロンプトを別紙として sys_app に提示する。</p>
+      <p>「gcsa と sys_app でシームレス」は要件なので、これは nice-to-have ではなく<strong>ハード依存</strong>。改変プロンプトを別紙（Draft 1.0・直読版）として sys_app に提示する。</p>
       <table class="spec-table">
         <thead><tr><th>#</th><th>改変（what）</th><th>要点（why）</th></tr></thead>
         <tbody>
-          <tr><td>S1</td><td>gcsa ストア取り込みモードを追加し、<code>pulse_features/gmi_waveform/(fl_waveform)/meta.json</code> を既存の Parquet/JSON へ<strong>射影</strong>（bin→再計算の前段を置換、bin取り込みは互換で残す）</td><td>D9のストアを sys_app が読めるようにしつつ可視化/gating/compensation を温存し D5を満たす</td></tr>
-          <tr><td>S2</td><td>特徴量算出を「記録済みが無い時のみ」に条件化（import と recovery の両方）</td><td>無条件再計算（<code>:239</code>/<code>:314</code>）が D5 の記録値を上書きするのを防ぐ</td></tr>
-          <tr><td>S3</td><td><code>channels_json</code> の名前と順序を meta.json の宣言リストから決める（dict挿入順に依存しない）</td><td>位置行列(N,24)に名前が無く、誤ラベルは gate軸検証・統計を壊す</td></tr>
-          <tr><td>S4</td><td>GMI波形JSONをストアの単一 <code>gmi_waveform</code>(N,5,2400) から生成し順序ガード</td><td>cfg経由の fh 再読込を廃し、誤順プロットを防ぐ</td></tr>
-          <tr><td>S5</td><td>ストアモードでは <code>_cfg.txt</code>＋bin を任意化しバイトサイズ検査をスキップ、event_count はストア形状から</td><td>D9でbinは任意互換。現状 import は cfg必須・byte検査</td></tr>
-          <tr><td>S6</td><td>Parquet 精度ポリシー確定（float64化 or float32許容差を明文化）</td><td>ストアfloat64 と Parquet float32＋round(6) の差の扱い</td></tr>
+          <tr><td>S1</td><td><strong>registration-only import＋直読リーダ</strong>：meta.json＋配列形状から Dataset 行を登録（複製なし・<code>status=finalized</code> のみ）。特徴量読取を <code>DuckDBFeatureStore</code>（Parquet）から gcsa 経由の直読リーダへ差替え（bin取り込みは互換で残す）</td><td>D22。旧射影は RAM 制約・読者不在コピー・D19 平文コピーの3問題。読取 seam は1箇所にチョーク済みで差替えは S/M</td></tr>
+          <tr><td>S2</td><td><span style="color:var(--color-text-muted)">廃止（2026-07-10）——registration-only 化で対象コードパスが消滅。D5 不変条件は直読リーダに内在化し再計算スパイで検証</span></td><td>—</td></tr>
+          <tr><td>S3</td><td><code>channels_json</code> の名前・順序・<strong>レンジ</strong>を meta.json（宣言リスト＋D21 min/max）から決める</td><td>位置行列(N,24)に名前が無く、誤ラベルは gate軸検証・統計を壊す。レンジの全行スキャンは registration-only と非両立</td></tr>
+          <tr><td>S4</td><td>GMI波形をストアの <code>gmi_waveform</code>(N,5,2400) から<strong>直接スライス</strong>（waveforms.json 生成廃止・128イベント上限プレビュー維持・順序ガード）</td><td>cfg経由の fh 再読込と import 時 JSON 生成を廃し、誤順プロットを防ぐ</td></tr>
+          <tr><td>S5</td><td><span style="color:var(--color-text-muted)">廃止（2026-07-10）——S1 に吸収。event_count はマニフェスト（D21）から・finalized ガードで取得中 import のサイレント切詰めも解消</span></td><td>—</td></tr>
+          <tr><td>S6</td><td>精度ポリシー確定（float64・<code>round(6)</code> 除去。D15。直読転換後は残る内部面と読取パスが対象）</td><td>往復判定を bit 一致に単純化</td></tr>
           <tr><td>S7</td><td>gate種の整合（gcsa <code>all</code>↔sys_app 仮想root、sys_app <code>histogram-range</code>↔gcsa）＋ gcsa-clean v1 エクスポート派生</td><td>両者の gate型集合が非一致・既定export は v2.0＋fill_*＋階層</td></tr>
           <tr><td>S8</td><td>空間トークンを meta.json から取得＋ gate色を <code>#RRGGBB</code> に正規化</td><td>bindings.space の整合、非HEX色の拒否/再パレット回避</td></tr>
+          <tr><td>S9</td><td><strong>補償列の sidecar 化【新規】</strong>：<code>Comp-</code> 列を特徴量ファイル上書きから内部 sidecar＋読取時合成ビューへ</td><td>読み取り専用の暗号化ストア（D19/D21 単一書き手）と両立させる唯一の設計変更</td></tr>
+          <tr><td>S10</td><td><strong>CI 凍結ストアコーパス【新規】</strong>：登録→直読→scatter/gate 統計ゴールデン一致を CI 常設</td><td>頻繁更新される sys_app が過去データセットを壊さないことの担保（D20 分離の前提）</td></tr>
+          <tr><td>S11</td><td><strong>旧射影機構の退役【新規】</strong>：<code>data.zarr</code>/<code>pulse_features.zarr</code>/<code>waveforms.json</code> 生成・ZarrCacheManager のストア対象化を廃止</td><td>ディスク2重化と平文コピー（D19 無効化）の排除</td></tr>
         </tbody>
       </table>
 
       <h3>必要な gcsa 改変（改変プロンプト）</h3>
       <ul>
-        <li><strong>G1</strong>：本アプリが書き sys_app が射影する<strong>正準ストアスキーマを凍結・公開</strong>（順序付き特徴量名・GMI名順・dtype/shape を返す小API）。</li>
+        <li><strong>G1</strong>：本アプリが書き sys_app が<strong>直読</strong>する<strong>正準ストアスキーマを凍結・公開</strong>（順序付き特徴量名・GMI名順・dtype/shape・min/max を返す小API）＋<strong>D21 可視性マーカの意味論</strong>（<code>status=open</code> は既定拒否。字段は DatasetMeta の first-class フィールドとしてモデル化——gcsa の meta round-trip は未知キーを落とすため）。</li>
         <li><strong>G2</strong>：ストア読取・解析が<strong>記録済み <code>pulse_features</code> を権威として返し、既存時に黙って再計算しない</strong>（再計算は明示opt-in）。</li>
-        <li><strong>G3</strong>：（既出）生FL <code>fl_waveform</code> リーダ追加。加えて gate モデルのすり合わせ（<code>all</code>/root、<code>histogram-range</code>、余剰キー許容、色正規化）。</li>
+        <li><strong>G3</strong>：生FL <code>fl_waveform</code> 配列型の追加（<strong>未実装確認済み・凍結前必須</strong>）。加えて gate モデルのすり合わせ（<code>all</code>/root、<code>histogram-range</code>、余剰キー許容、色正規化）。</li>
+        <li><strong>G4【新規】</strong>：AES-256-GCM チャンク暗号コーデック（D19。<code>gcsa-aes</code>・<code>key_id</code>・import 時自動登録・ワイヤ形式を C++ ライタと凍結）。</li>
+        <li><strong>G5【新規】</strong>：リーダ堅牢化（シャーディング決定へのバリデータ追従・スライス読み検証の穴をマニフェストで閉じる・読取並行性指針・CI コーパス）。</li>
       </ul>
 
       <div class="callout callout-success">
-        <div class="callout-title">デュアル・シームレスの受け入れテスト（1本で証明）</div>
-        <p>本アプリのビルド受け入れに次の往復ゲートを置く：<strong>ストアを書く → gcsa が <code>pulse_features</code> を無改変・無再計算で開く → sys_app が Parquet(24名前付き列, N行)へ射影 → scatter＋gate統計クエリがストアの値と一致</strong>。この1テストがデュアル・シームレスを担保する。</p>
+        <div class="callout-title">デュアル・シームレスの受け入れテスト（1本で証明・直読版）</div>
+        <p>本アプリのビルド受け入れに次の往復ゲートを置く：<strong>ストア（暗号化・finalized）を書く → gcsa（G4 登録済み）が <code>pulse_features</code> を無改変・無再計算で開く → sys_app が registration-only で登録し直読で scatter＋gate統計クエリ → 値がストアと bit 一致（再計算スパイ0回・複製ゼロ）</strong>。この1テストがデュアル・シームレスを担保し、S10/G5 で CI コーパスとして常設化する。</p>
       </div>
     </section>
 
@@ -1949,7 +1969,7 @@ stateDiagram-v2
       <div class="callout callout-danger">
         <div class="callout-title">再起動前に確保するもの</div>
         <ul>
-          <li><code>feature/win11-driver-compat</code> はWindows実機のローカルworktree（<code>D:\...\AnalogBoard-win11-driver</code>）にのみ存在。<strong>originへpush必須。</strong>【2026-07-06 更新・オーナー決定】origin に存在しないことを確認し、<strong><code>dev</code> から切り直して再作成する</strong>（変更範囲は <code>docs/driver_next.md</code> が正：<code>AnalogBoard_Dll</code> の endpoint discovery hardening。public API 維持・取得セマンティクス非接触。同梱 <code>CyLib/header</code> は SDK 1.3 世代一致確認済み＝ヘッダ差し替え不要、<code>CyAPI.lib</code> は gitignore の <code>x64/</code> パターンで管理外→worktree へ手動補完、入手元は main tree または <code>C:\Program Files (x86)\Cypress\EZ-USB FX3 SDK\1.3\library\cpp\lib\x64</code>）。再作成後は最初から push して進める。</li>
+          <li><code>feature/win11-driver-compat</code> はWindows実機のローカルworktree（<code>D:\...\AnalogBoard-win11-driver</code>）にのみ存在。<strong>originへpush必須。</strong>【2026-07-06 更新・オーナー決定】origin に存在しないことを確認し、<strong><code>dev</code> から切り直して再作成する</strong>（変更範囲は <code>docs/operations/usb-acquisition-stability/driver_next.md</code> が正：<code>AnalogBoard_Dll</code> の endpoint discovery hardening。public API 維持・取得セマンティクス非接触。同梱 <code>CyLib/header</code> は SDK 1.3 世代一致確認済み＝ヘッダ差し替え不要、<code>CyAPI.lib</code> は gitignore の <code>x64/</code> パターンで管理外→worktree へ手動補完、入手元は main tree または <code>C:\Program Files (x86)\Cypress\EZ-USB FX3 SDK\1.3\library\cpp\lib\x64</code>）。再作成後は最初から push して進める。</li>
           <li><code>CyAPI.lib</code> はgitignoreで別管理 → ビルド非再現。バイナリの保管場所を確定。【2026-07-06 対応】<code>CyLib/x64</code>・<code>CyLib/x86</code> に配置し <code>.gitignore</code> を例外化（要コミット）。アーキテクチャ・<code>LIBCMT</code> 指示を検証済み。</li>
           <li><code>logs/</code> は実機PCにのみ存在（gitignore）。定量分析のため共有が必要。</li>
         </ul>
@@ -1987,7 +2007,7 @@ stateDiagram-v2
           </tr>
           <tr>
             <td>4</td>
-            <td>r18高密度フィールドテスト（既存runbook <code>docs/baseline_next.md</code>）</td>
+            <td>r18高密度フィールドテスト（既存runbook <code>docs/operations/usb-acquisition-stability/baseline_next.md</code>）</td>
             <td>高密度EP6タイムアウトが（直結で）ホスト側で解決済みか確認</td>
             <td>高density×3、100サイクルsoakでType C維持</td>
           </tr>
@@ -2037,13 +2057,13 @@ flowchart LR
         <tbody>
           <tr>
             <td><strong>0 地固め</strong></td>
-            <td>資産のpush/確保（<code>feature/win11-driver-compat</code> は dev から再作成→push＝オーナー決定 2026-07-06）、現場版の監査＋現行buildの暫定deploy、まとめ実機セッション実施（手順書：<code>docs/260706-field-session-runbook.html</code>）、録画コーパス初期化、scatter描画プロトタイプ（表示スケール変換後空間のビニング要件を含む・UX-04。GMI波形〜100本オーバーレイの描画経路も併せて検証・FR-13）、Zarrライタ往復プロトタイプ（acquire-zarr第一候補・D12）</td>
-            <td>実機セッション完了・コーパス取得・描画/Zarr書込が成立</td>
+            <td>資産のpush/確保（<code>feature/win11-driver-compat</code> は dev から再作成→push＝オーナー決定 2026-07-06）、現場版の監査＋現行buildの暫定deploy、まとめ実機セッション実施（<strong>2026-07-13 週に実機確認を予定、完了後に実装着手＝オーナー決定 2026-07-10</strong>。手順書：<code>docs/260706-field-session-runbook.html</code>）、録画コーパス初期化、scatter描画プロトタイプ（表示スケール変換後空間のビニング要件を含む・UX-04。GMI波形〜100本オーバーレイの描画経路も併せて検証・FR-13）、Zarrライタ往復プロトタイプ（D19 暗号化コーデック込み。c-blosc＋最小自作ライタを実質第一候補として検証・D12/D19）、<strong>パーティションシャーディング方式の決着（D21 マニフェストとセット・gcsa バリデータ改修と同一契約変更）</strong>、<strong>出力契約の凍結（D21 可視性契約・min/max レンジ込み）</strong></td>
+            <td>実機セッション完了・コーパス取得・描画/Zarr書込（暗号化込み往復）が成立・出力契約凍結</td>
           </tr>
           <tr>
             <td><strong>1 ネイティブコア</strong></td>
-            <td>非同期通信層（timeout回復・自動再接続）、AcquisitionEngine（4GB再アーム＝Zarr追記）、Decoder（A/H/W算出）、ZarrWriter（pulse_features/gmi_waveform/任意fl_waveform＋meta）、Recorder、構造化Logger、ポリシー移植、Tier1/2エミュレータ、単体テスト移植</td>
-            <td>Tier2で障害注入回帰が緑・gcsaが出力Zarrを改変なしでロード</td>
+            <td>非同期通信層（timeout回復・自動再接続）、AcquisitionEngine（4GB再アーム＝Zarr追記）、Decoder（A/H/W算出＋min/max累積）、ZarrWriter（pulse_features/gmi_waveform/fl_waveform＋meta・<strong>D19 暗号化・D21 マーカ/マニフェスト/finalize イベント</strong>）、Recorder、構造化Logger、ポリシー移植、Tier1/2エミュレータ（<strong>非WPF最小ホストでの C ABI 全周適合テスト含む</strong>）、単体テスト移植</td>
+            <td>Tier2で障害注入回帰が緑・gcsaが出力Zarr（暗号化済み）を改変なしでロード・非WPFホスト適合テスト緑</td>
           </tr>
           <tr>
             <td><strong>2 UI/描画</strong></td>
@@ -2057,7 +2077,7 @@ flowchart LR
           </tr>
           <tr>
             <td><strong>3.5 下流シームレス</strong></td>
-            <td>デュアル・シームレス往復ゲート実装（ストア→gcsa無再計算→sys_app射影→scatter/gate一致）、sys_app 8点・gcsa 3点の改変プロンプト提示、gate seam すり合わせ</td>
+            <td>デュアル・シームレス往復ゲート実装（<strong>直読版</strong>：ストア→gcsa無再計算→sys_app 直読→scatter/gate一致。再計算スパイ0回）、下流改変プロンプト提示（Draft 1.0 直読版：S1 直読化・S9 補償sidecar・S10 CIコーパス・G4 暗号コーデック等）、gate seam すり合わせ、<strong>UX-16 ハンドオフ実装レベルの判断</strong></td>
             <td>往復テスト合格・sys_app/gcsa 改変プロンプト受領</td>
           </tr>
           <tr>
@@ -2091,8 +2111,19 @@ flowchart LR
           <tr><td>互換性</td><td>gate 正準v1 payload（sys_app互換）</td><td><code>gate往復一致</code></td><td><span class="badge badge-must">Must</span></td></tr>
           <tr><td>互換性</td><td>移行互換 .bin＋_cfg.txt（既定OFF・明示エクスポート時のみ。ヘッダレス<code>&lt;u2</code>・FL8/FH5・exact-multiple）</td><td><code>gcsa v1パーサ通過</code></td><td><span class="badge badge-could">Could</span></td></tr>
           <tr><td>テスト</td><td>実機なしの回帰</td><td><code>Tier1/2でCI緑・障害注入</code></td><td><span class="badge badge-should">Should</span></td></tr>
+          <tr><td>テスト</td><td>C ABI のフロントエンド中立性（設計の要点参照）</td><td><code>非WPF最小ホストでの全周 Tier1 適合テスト</code></td><td><span class="badge badge-should">Should</span></td></tr>
+          <tr><td>互換性</td><td>sys_app がストアを直読で開ける（D22。<code>status=finalized</code> のみ対象）</td><td><code>直読往復テスト一致（scatter/gate 統計）</code></td><td><span class="badge badge-must">Must</span></td></tr>
+          <tr><td>堅牢性（共存）</td><td>同一PC上の解析ワークロード（sys_app import/ML 等）が取得を殺さない・飢えさせない</td><td><code>解析は取得より低CPU/IO優先度・取得中の重ジョブ抑止・同居soak（200MB/s取得＋import並走）</code></td><td><span class="badge badge-should">Should</span></td></tr>
+          <tr><td>堅牢性（共存）</td><td>ディスク残監視（UX-11）が下流派生面・キャッシュの footprint を考慮</td><td><code>閾値算定に sys_app 派生面を含める</code></td><td><span class="badge badge-could">Could</span></td></tr>
         </tbody>
       </table>
+
+      <h3>デプロイトポロジと共存規則（2026-07-10 追加・D20 付随）</h3>
+      <p>
+        別アプリ維持（D20）の下で、出荷形態は次の2案を扱う：<strong>(A) 計測PC同居</strong>——現行 sys_app は WSL2＋Docker Desktop 必須のため、同居は vmmem メモリ競合・9p I/O・Docker Desktop ライセンス・サポート所有者の各論点を伴う（sys_app の Tauri デスクトップ化完了後は「計測PC上の2ネイティブアプリ」となりこれらは解消）；<strong>(B) 分離</strong>——計測PC＋解析ワークステーション。出荷既定の選択は<strong>フェーズ4受入の明示入力</strong>とし、同居を選ぶ場合は共存 soak（上表）を受入条件に含める。
+        不変条件：<strong>いかなるパッケージ形態でも、解析ランタイムを取得コアの障害ドメインに入れない</strong>（上表「UIハングが取得ホットパスを乱さない」の一般化）。
+        P1/D19 注記：同居構成では暗号化ストアと同じ筐体に sys_app の内部データが置かれる——D22（直読・複製なし）によりバルクの平文コピーは発生しないが、補償 sidecar 等の派生物は平文である。
+      </p>
       <div class="pyramid">
         <div class="pyramid-level">
           <div class="pyramid-bar" style="width:34%;background:#e03131;">実機受け入れ <span class="count">(希少・Win11)</span></div>
@@ -2116,12 +2147,12 @@ flowchart LR
       <h3>主要リスク</h3>
 
       <div class="risk-card risk-card--medium">
-        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">sys_app は Zarr ストアをそのまま読めない（射影で緩和）</span></div>
-        <div class="risk-body">sys_app に gcsa ストアのリーダが無く、取り込み時に A/H/W を無条件再計算する（D5を無視）。<strong>対策：</strong>ストア→sys_app既存Parquet/JSONへの「射影」取り込みを追加し再計算を条件化（sys_app改変プロンプトS1〜S8）。読取/可視化/gating層は既にD5整合・座標は生ADC線形なので改修は取り込み口に限定。デュアル・シームレス往復テストをビルドゲートに。<strong>要件でありハード依存</strong>——放置すると「両方でシームレス」が満たせない。</div>
+        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">sys_app は Zarr ストアをそのまま読めない（直読転換で対応・2026-07-10 改訂）</span></div>
+        <div class="risk-body">sys_app に gcsa ストアのリーダが無く、取り込み時に A/H/W を無条件再計算する（D5を無視）。<strong>対策（D22）：</strong>registration-only import＋gcsa 経由のストア完全直読へ転換（旧「射影」は RAM 制約・平文コピー・読者不在コピーの3問題で廃止）。読取 seam は狭く（<code>DuckDBFeatureStore</code> 1箇所・波形チェーン1本）差替えは S/M、補償列の sidecar 化のみ設計変更。デュアル・シームレス往復テスト（直読版）をビルドゲートに。<strong>要件でありハード依存</strong>——放置すると「両方でシームレス」が満たせない。</div>
       </div>
       <div class="risk-card risk-card--medium">
-        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">C++ からの Zarr v2 書き込み実装コスト</span></div>
-        <div class="risk-body">主出力を gcsaネイティブ Zarr にするには C++ の Zarr v2＋Blosc ライタが要る。D12 で <strong>acquire-zarr 第一候補・c-blosc＋最小自作フォールバック</strong>と確定したが、acquire-zarr は OME-NGFF 指向のレイアウトを gcsa 期待のストア構造（<code>partition_{p}.zarr</code>）に合わせられるかが未検証。<strong>対策：</strong>フェーズ0で往復プロトタイプ（gcsa が実際にロードできること）を検証してから確定。ZarrWriterをモジュール隔離しEP6ホットパス外（writerスレッド）に置く。互換の生bin出力も残せるので最悪フォールバック可能。</div>
+        <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">C++ からの Zarr v2 書き込み実装コスト（D19 で自作ライタが実質第一候補に）</span></div>
+        <div class="risk-body">主出力を gcsaネイティブ Zarr にするには C++ の Zarr v2＋Blosc＋<strong>AES-GCM 暗号化（D19）</strong>ライタが要る。acquire-zarr（D12 第一候補）はカスタム暗号コーデック段を挟めない可能性が高く、<strong>c-blosc＋最小自作ライタが実質第一候補</strong>に昇格。<strong>対策：</strong>フェーズ0で暗号化コーデック込みの往復プロトタイプ（G4 登録済み gcsa が実際にロードできること）を検証してから確定。ZarrWriterをモジュール隔離しEP6ホットパス外（writerスレッド）に置く。互換の生bin出力も残せるので最悪フォールバック可能。</div>
       </div>
       <div class="risk-card risk-card--medium">
         <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">特徴量アルゴリズムが「仕様」になる（D5）</span></div>
@@ -2152,12 +2183,28 @@ flowchart LR
         <div class="risk-body">デプロイ版と2025-01-29 restoreの一致が未確認。レジスタ挙動（address値のWAVE_WR/RD_CNT、stale 0x000C）は実機で再検証が必要。<strong>対策：</strong>まとめセッションで版とレジスタ挙動を確認。</div>
       </div>
 
-      <h3>未決事項（意思決定はすべて完了 → 「確定した意思決定」節 D1〜D17。残りは実行時確認のみ）</h3>
+      <h3>未決事項（意思決定 D1〜D22 は完了 → 「確定した意思決定」節。残りは実行時確認・フェーズ0決定のみ）</h3>
       <ul class="question-list">
         <li>【実機で確認・まとめセッション#7】物理ch順が gcsa想定（<code>FSC,SSC,FL1..FL6</code> / <code>fsGMI..bfGMI</code>）と一致するか？ ROI/BG既定（FSC/SSC/FL4-6=1100・FL1-3=125・長250・BG[0:50]）が実取得タイミングと整合するか？ 実サンプル1件で照合し、D17（gcsa想定順で先行実装）の前提を凍結。</li>
-        <li>【フェーズ0で確認】acquire-zarr が gcsa ストアレイアウト（<code>partition_{p}.zarr</code>・<code>.zarray</code>・meta 構成）に適合するか？ 往復プロトタイプで確認し、非互換なら c-blosc＋最小自作へフォールバック（D12）。</li>
+        <li>【フェーズ0で確認】Zarr ライタ往復検証は <strong>D19 の暗号化コーデック込み</strong>で実施する。acquire-zarr はカスタムコーデック段を挟めない可能性が高いため、c-blosc＋最小自作ライタを実質第一候補として検証（D12 のフォールバック昇格）。合格条件＝gcsa ストアレイアウト（<code>partition_{p}.zarr</code>・<code>.zarray</code>・meta 構成）適合＋暗号化チャンクの復号往復（G4 コーデック登録済み gcsa で改変なしロード）＋D21 additive 字段の gcsa 許容確認。</li>
+        <li>【フェーズ0で決定】パーティションシャーディング方式：round-robin（<code>e % n_partitions</code>）維持＋マニフェストの per-partition <code>sealed</code> で追従安全性を担保するか、append-sequential＋seal へ変更するか。gcsa のリーダ検証（<code>validate_partition_set</code>）が分配式そのものを検証しているため、決定は gcsa バリデータ改修と同一の契約変更として往復検証で確定する。</li>
       </ul>
-      <p style="font-size:0.875rem;color:var(--color-text-secondary);">2026-07-03 クローズ：Zarrライタ選定（→D12）・特徴量版管理（→D14）・切替スイッチ標準化（→D16）・生FL既定（D10で決定済み）・sys_app の表示空間変換の確認（sys_app 精読で解消：座標は生ADC線形・変換は表示時のみと確認済み）。</p>
+      <p style="font-size:0.875rem;color:var(--color-text-secondary);">2026-07-03 クローズ：Zarrライタ選定（→D12）・特徴量版管理（→D14）・切替スイッチ標準化（→D16）・生FL既定（D10で決定済み）・sys_app の表示空間変換の確認（sys_app 精読で解消：座標は生ADC線形・変換は表示時のみと確認済み）。2026-07-09 クローズ：ストア暗号化提案 P1（オーナー採用 → D19）。</p>
+
+      <h3>検討済みの提案（クローズ）</h3>
+      <div class="callout callout-success">
+        <div class="callout-title"><span class="badge badge-confirmed">採用 → D19</span>&nbsp;P1：Zarr ストアのチャンク暗号化——本アプリ・sys_app のみで開ける出力（2026-07-09 起案・同日採用）</div>
+        <p><strong>動機：</strong>D9 の主出力（gcsaネイティブ Zarr）は標準の zarr ライブラリ・汎用ツールで誰でも開ける。出力データを本アプリと sys_app（gcsa 経由）のみで開けるようにしたい。</p>
+        <p><strong>案の骨子：</strong>Zarr v2 のストア構造（partition 追記・atomic rename・自己記述 meta・4GB再アーム＝append）は D9 のまま変えず、<strong>配列チャンクのみ Blosc(lz4) 圧縮→AES-256-GCM 暗号化</strong>して書き、<code>.zarray</code> の compressor を独自 ID（例 <code>gcsa-aes</code>）にする。公開 numcodecs レジストリに存在しない ID のため、素の zarr / Python / 汎用ビューアでは「配列の形は見えるが中身は復号できない」状態になる。読取側は gcsa に numcodecs カスタムコーデックを登録する additive な小変更のみ（sys_app は gcsa 経由で読むため原則個別対応不要）。</p>
+        <ul>
+          <li><strong>鍵管理＝抑止レベル</strong>：難読化した共通鍵を本アプリ（C++コア）と gcsa に埋め込む。チャンクヘッダに <code>key_id</code>（1バイト）を持たせ将来の鍵替えに備える。<strong>バイナリ解析には耐えない</strong>（アプリが開ける以上、鍵は配布物内に存在する）ことを明記した上での採用となる。解析耐性が必要ならライセンスサーバ／ドングル等の外部鍵権威が要るが、運用コストが大きく現時点では対象外。</li>
+          <li><strong>平文のまま残すもの</strong>：<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準v1）。自己記述性・現場デバッグ性・サポート性を維持し、保護対象は測定配列本体（特徴量・波形）に限定する。</li>
+          <li><strong>副次効果</strong>：AES-GCM の認証タグでチャンク単位のサイレント破損を暗号学的に検知できる（「破損サイレント解消」への追加防御）。</li>
+          <li><strong>性能</strong>：暗号化は writer スレッド内（EP6 ホットパス外）。AES-NI で GB/s 級のため 200MB/s 経路に影響なし。圧縮→暗号化の順のため圧縮率も不変。</li>
+        </ul>
+        <p><strong>採用した場合の影響：</strong>① D12——acquire-zarr はカスタムコーデック段を挟めない可能性が高く、既承認フォールバックの <strong>c-blosc＋最小自作ライタが実質本命</strong>になる。フェーズ0 の gcsa 往復検証は暗号化込みで実施する。② gcsa——カスタムコーデック登録＋埋込鍵の追加を下流改変プランに G4 として追加（直接改変しない）。③ スコープ外——sys_app 取り込み後の内部 Parquet/DuckDB は平文のまま（保護対象は持ち出されるストアファイル。顧客環境内の常時保護まで求める場合は別途 S プロンプトが必要）。</p>
+        <p><strong>ステータス：2026-07-09 オーナー採用 → D19 として「確定した意思決定」節へ昇格済み。</strong>実装はフェーズ0の暗号化コーデック込み往復検証から着手する。下流波及は<strong>反映済み（2026-07-10）</strong>：下流改変プラン Draft 1.0 に G4（gcsa カスタム numcodecs コーデック登録＋埋込鍵。<code>GCSA_COMPRESSOR</code> env は allowlist のため <code>ZarrStoreConfig(compressor=...)</code> のプログラム的注入で対応）を追加し、gcsa 実装プラン（<code>gcsa/docs/plans/active/260710-analogboard-store-support-plan.html</code>）へ展開。</p>
+      </div>
 
       <h3>前提（Assumptions）</h3>
       <div class="callout callout-danger">
@@ -2194,11 +2241,11 @@ flowchart LR
       <h3>参照</h3>
       <ul>
         <li><code>docs/archive/2026-03-12-host-fpga-acquisition-reference.md</code> — レジスタ意味論（DDR_WR_END=ドレインヒント、DDR_RD_END=真の完了）</li>
-        <li><code>docs/2026-03-02-usb-acquisition-stability-field-reference.md</code> — Type A/B/C障害分類</li>
+        <li><code>docs/operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-field-reference.md</code> — Type A/B/C障害分類</li>
         <li><code>docs/troubleshooting/usb.md</code> — 負の知識（EP6スクラッチはCRT malloc/free、ホットパスlog禁止）</li>
-        <li><code>docs/baseline_next.md</code> — r18高密度テストrunbook</li>
-        <li><code>docs/driver_next.md</code> — <code>feature/win11-driver-compat</code> の状態</li>
-        <li><code>docs/SIMULATION.md</code> — SimRunner / フォールト注入プリセット</li>
+        <li><code>docs/operations/usb-acquisition-stability/baseline_next.md</code> — r18高密度テストrunbook</li>
+        <li><code>docs/operations/usb-acquisition-stability/driver_next.md</code> — <code>feature/win11-driver-compat</code> の状態</li>
+        <li><code>docs/guides/SIMULATION.md</code> — SimRunner / フォールト注入プリセット</li>
         <li><code>gcsa/</code> v0.4.1 — <code>constants.py</code>（チャンネル/特徴量定数）、<code>io/parsers/v1.py</code>（.bin/cfgパーサ）、<code>gating/definition.py</code>・<code>serialization.py</code>（gate正準v1）、<code>transform/pulse_features.py</code>（A/H/Wアルゴリズム）</li>
         <li><code>gcsa/store/zarr_store.py</code>・<code>store/_zarr_*.py</code>（ネイティブ Zarr ストア構造・パーティション追記・Blosc）、<code>io/measurement_store.py</code>（外部特徴量を権威として読む唯一の経路）、<code>transform/pulse_feature_extractor.py</code>（24特徴量の並び：ch毎に A→H→W）、<code>transform/pulse_feature_exporters.py</code>（Parquet エクスポータ）、<code>io/exporters.py</code>（FCS/CSV）</li>
         <li><code>apps/api/src</code>（sys_app）— <code>services/dataset_import_steps.py</code>（取り込み・無条件再計算 :239）、<code>integrations/gcsa_adapter.py</code>、<code>services/duckdb_feature_store.py</code>・<code>pulse_feature_parquet.py</code>（権威Parquet面）、<code>services/visualization_*</code>（scatter/binning・生ADC線形）、<code>services/gate_*</code>・<code>gate_io/canonical_build.py</code>・<code>schemas/gate_base.py</code>（gate 6種）、<code>compensation/*</code>（表示のみ変換）</li>
