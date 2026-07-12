@@ -738,9 +738,9 @@ pre {
   <p class="subtitle">高速多パラメータ計測アプリの刷新 — ストラングラー型リビルド／新UI／堅牢化／リアルタイム scatter・gating／4GB制限撤廃／自動再接続／診断ログ／実機エミュレーション</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実装プラン</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.3</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.4</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-12（<strong>Draft 2.3</strong>：D13 の gate 出力契約を正準v1 → <strong>canonical v2</strong>（構造化 boolean・schema マーカー・version 名前空間統一）へ改訂——gate 契約整合 phase の owner decision D-GA-11（2026-07-12）。差分と移行（reader-first 両読み・v2 書き）の正本は task_management の 260712 横断 plan。本文中の「正準v1」記述は「gcsa 互換契約」節の amendment 注記に従い読み替える。<strong>Draft 2.2</strong>：codex 再レビュー反映——D19 の AEAD 実装層を Store ラッパへ確定（numcodecs では座標 AAD 不可と実証）、判別子を producer/capability 字段へ、D12 表記を c-blosc 自作ライタ第一候補へ同期、gate 保存の原子性（正準 payload 固定パス＋コミットポインタ）、移送マニフェスト（GCM タグは欠落/余剰/平文改竄を検出しない）、.gcsa_store.json の位置と additive 字段。<strong>Draft 2.1</strong>：codex レビュー反映——FR-04 損失定義の再定義・暗号ワイヤ契約（nonce/AAD/tag/版）・D21 書込順序/クラッシュ回復・録画データ取扱い・背圧定量化/再接続再同期・UX-10/ロック整合・FR-12 レシピ全項目化・gate 保存権威と境界意味論の正準明記（sys_app 乖離は S7 で整合）・データ移送契約・軽微整合（footer 版数・モック 60Msps・FR/UX 範囲）。<strong>Draft 2.0</strong>：ファイル名を 260703→260710 へ更新。D20（別アプリ維持・一製品複数プロセス）／D21（ストア可視性契約＝finalization マーカ・write_generation・パーティションマニフェスト・min/max レンジ）／D22（sys_app ストア完全直読・射影廃止）を追加し、D11 の達成手段を直読へ改訂。C ABI 中立性ルール・フィード fan-out・finalize イベント・非WPF Tier1 適合テスト・共存 NFR・デプロイトポロジ節を追加。フェーズ0 に契約凍結＋シャーディング決着を明記（実機確認は 2026-07-13 週予定・完了後に実装着手）。根拠調査：docs/260709-analogboard-sysapp-integration-study.html。7-09：P1 採用→D19。7-06：FR-13/UX-20 追加ほか）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-12（<strong>Draft 2.4</strong>：codex cross-review 反映——gate 定義表・保存の権威・store 一覧・受け入れ表・フェーズ図の具体入力を canonical v2 へ直接更新（boolean は {op, operands}・NOT=1・AND/OR≥2、payload 例は schema マーカー付き v2、固定パスは gcsa 実装 layout 準拠へ。読み替え callout 依存を解消）。sys_app 乖離の記述に gate 契約整合 phase（GA-S2）への参照を追加。<strong>Draft 2.3</strong>：D13 の gate 出力契約を正準v1 → <strong>canonical v2</strong>（構造化 boolean・schema マーカー・version 名前空間統一）へ改訂——gate 契約整合 phase の owner decision D-GA-11（2026-07-12）。差分と移行（reader-first 両読み・v2 書き）の正本は task_management の 260712 横断 plan。本文中の「正準v1」記述は「gcsa 互換契約」節の amendment 注記に従い読み替える。<strong>Draft 2.2</strong>：codex 再レビュー反映——D19 の AEAD 実装層を Store ラッパへ確定（numcodecs では座標 AAD 不可と実証）、判別子を producer/capability 字段へ、D12 表記を c-blosc 自作ライタ第一候補へ同期、gate 保存の原子性（正準 payload 固定パス＋コミットポインタ）、移送マニフェスト（GCM タグは欠落/余剰/平文改竄を検出しない）、.gcsa_store.json の位置と additive 字段。<strong>Draft 2.1</strong>：codex レビュー反映——FR-04 損失定義の再定義・暗号ワイヤ契約（nonce/AAD/tag/版）・D21 書込順序/クラッシュ回復・録画データ取扱い・背圧定量化/再接続再同期・UX-10/ロック整合・FR-12 レシピ全項目化・gate 保存権威と境界意味論の正準明記（sys_app 乖離は S7 で整合）・データ移送契約・軽微整合（footer 版数・モック 60Msps・FR/UX 範囲）。<strong>Draft 2.0</strong>：ファイル名を 260703→260710 へ更新。D20（別アプリ維持・一製品複数プロセス）／D21（ストア可視性契約＝finalization マーカ・write_generation・パーティションマニフェスト・min/max レンジ）／D22（sys_app ストア完全直読・射影廃止）を追加し、D11 の達成手段を直読へ改訂。C ABI 中立性ルール・フィード fan-out・finalize イベント・非WPF Tier1 適合テスト・共存 NFR・デプロイトポロジ節を追加。フェーズ0 に契約凍結＋シャーディング決着を明記（実機確認は 2026-07-13 週予定・完了後に実装着手）。根拠調査：docs/260709-analogboard-sysapp-integration-study.html。7-09：P1 採用→D19。7-06：FR-13/UX-20 追加ほか）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> オーナー／開発チーム</span>
     <span class="doc-meta-item"><strong>Source:</strong> prompt.md ＋ 2件のコードベース調査</span>
   </div>
@@ -1633,15 +1633,15 @@ flowchart LR
           <tr><td><code>polygon</code></td><td><code>x</code>,<code>y</code></td><td><code>vertices</code>（≥3の[x,y]）</td><td>ray-casting</td></tr>
           <tr><td><code>threshold</code></td><td><code>channel</code></td><td><code>threshold</code>,<code>direction</code>(above/below)</td><td>above→<code>≥</code>、below→<code>&lt;</code></td></tr>
           <tr><td><code>quadrant</code></td><td><code>x</code>,<code>y</code></td><td><code>x_threshold,y_threshold,quadrant</code>(Q1..Q4)</td><td>Q1=左上…固定</td></tr>
-          <tr><td><code>boolean</code></td><td><code>{}</code></td><td><code>expression</code>,<code>operands</code>(gate_id列)</td><td>AND/OR/NOT・括弧</td></tr>
+          <tr><td><code>boolean</code></td><td><code>{}</code></td><td><code>op</code>(AND|OR|NOT 大文字),<code>operands</code>(gate_id列。NOT=1・AND/OR≥2・重複/自己参照不可)</td><td>構造化演算（canonical v2。入れ子は gate 参照。旧 v1 の <code>expression</code> 文字列は出力しない）</td></tr>
         </tbody>
       </table>
       <ul>
         <li><strong>ellipse は不可</strong>（gcsaが明示的に拒否）。UIの範囲選択は矩形・ポリゴン・閾値・象限に限定。</li>
         <li><code>transform_space</code>：既定 <code>pulse_features</code>（他に linear/embedding/gmi_waveform/vector）。<strong>gate座標にlog/biexp/arcsinh等のスケール変換は付かない</strong>＝生ADCカウントの線形値。</li>
         <li>階層：<code>parent_gate_id</code>（root <code>__all__</code> は正準payloadに出力しない）。<code>gate_id</code>は <code>^[A-Za-z0-9_-]+$</code>、<code>color</code>は <code>#RRGGBB</code>。FR-03 の「all」は<strong>UI 上の root 概念</strong>であり正準 payload の gate 型としては出力しない（この規則の具体化）。</li>
-        <li><strong>保存の権威と原子性（2026-07-10 追加・2026-07-10 詳細化）</strong>：交換・保存の権威は<strong>正準v1 payload</strong>（<code>{"version":"1.0","gates":[...]}</code>）。正準 payload の固定パスを <code>datasets/&lt;id&gt;/gates/canonical_v1.json</code> とし、<code>gates/&lt;gate_id&gt;.json</code> は payload から 1:1 導出される store-native 派生物とする。<strong>複数ファイルの原子性</strong>：gate 集合の更新は「新世代ディレクトリを書く → 正準 payload を temp→rename → コミットポインタ（<code>gate_generation</code>＋<code>payload_hash</code>）を meta に反映」の順で行い、途中状態が観測されないようにする。不一致時は payload が正。書き手は取得コアのみ（D21 単一書き手）。</li>
-        <li><strong>境界意味論はこの表が正準（2026-07-10 明記・gcsa 実装と一致確認済み）</strong>：rectangle は下限含む・上限除く（<code>x_min≤x&lt;x_max</code>）、threshold の below は <code>&lt;</code>、quadrant は Q1=左上から時計回り（gcsa <code>gating/apply.py</code> と一致）。<strong>既知の乖離：sys_app <code>gate_mask_service.py</code> は rectangle 上限包含・below <code>&lt;=</code>・quadrant Q1=右上（鏡像）</strong>——payload 往復では検出できない評価差のため、下流改変 S7 で sys_app 側を本表へ整合させ、受け入れに「共有フィクスチャでの mask/統計一致」を含める。</li>
+        <li><strong>保存の権威と原子性（2026-07-10 追加・2026-07-12 v2 改訂）</strong>：交換・保存の権威は<strong>正準 payload（canonical v2）</strong>（<code>{"schema":"gcsa.gating.canonical","version":"2.0","gates":[...]}</code>。判別表は中央契約）。store 内の固定パス・commit 方式は <strong>gcsa 実装 layout（<code>gates/_canonical/</code> 配下＋<code>_derived/</code> 世代）に従い</strong>、bundle の v2 化タイミングは Frozen v1 と協調する中央 decision に従う（それまで gcsa の dual-read が互換を保証）。<code>gates/&lt;gate_id&gt;.json</code> は payload から 1:1 導出される store-native 派生物とする。<strong>複数ファイルの原子性</strong>：gate 集合の更新は「新世代ディレクトリを書く → 正準 payload を temp→rename → コミットポインタ（<code>gate_generation</code>＋<code>payload_hash</code>）を meta に反映」の順で行い、途中状態が観測されないようにする。不一致時は payload が正。書き手は取得コアのみ（D21 単一書き手）。</li>
+        <li><strong>境界意味論はこの表が正準（2026-07-10 明記・gcsa 実装と一致確認済み）</strong>：rectangle は下限含む・上限除く（<code>x_min≤x&lt;x_max</code>）、threshold の below は <code>&lt;</code>、quadrant は Q1=左上から時計回り（gcsa <code>gating/apply.py</code> と一致）。<strong>既知の乖離：sys_app <code>gate_mask_service.py</code> は rectangle 上限包含・below <code>&lt;=</code>・quadrant Q1=右上（鏡像）</strong>——payload 往復では検出できない評価差のため、<strong>gate 契約整合 phase（task_management 260712 横断 plan の GA-S2。旧 S7 の該当 scope を吸収）</strong>で sys_app 側を本表へ整合させ、受け入れに「gcsa wheel 同梱 golden での mask/統計一致」を含める。</li>
         <li>gate軸は pulse特徴量カラム名を<strong>厳密一致</strong>で参照。scatter/gating UIが公開すべき軸は FL 8ch × {A,H,W} の24カラム。<strong>順序も pin</strong>：gcsa <code>extract_all</code> は<strong>チャンネルごとに A→H→W</strong>＝<code>FSC_A,FSC_H,FSC_W, SSC_A,SSC_H,SSC_W, …, FL6_A,FL6_H,FL6_W</code>（既定軸は Area）。この順序を <code>meta.json</code> に明記しビルド時にアサート（sys_appシームレス契約参照）。</li>
       </ul>
 
@@ -1665,7 +1665,7 @@ flowchart LR
           <tr><td><code>datasets/&lt;id&gt;/fl_waveform/partition_{p}.zarr</code><br>（既定ON・新規）</td><td>uint16 <code>(N,8,2400)</code>、生FL保全（再解析・特徴量再計算用）。容量重視ならOFF可（D10）。</td><td><span class="badge badge-must">要gcsa追加（未実装確認済・凍結前必須）</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/meta.json</code></td><td>channels・features・cfg_params・versions・provenance・D21 可視性字段を内包（自己記述・データセット毎）。</td><td><span class="badge badge-confirmed">native</span></td></tr>
           <tr><td><code>.gcsa_store.json</code>（<strong>ストア直下・store毎に1個</strong>）</td><td>ストア形式マーカ。位置は <code>datasets/</code> と同階層のストアルート（gcsa <code>zarr_store.py:39</code>）。<strong>D21 追加（2026-07-10・オーナー判断）</strong>：<code>store_format=1</code> は据え置き、additive に <code>producer</code>（例 <code>analogboard</code>）と <code>capabilities</code>（<code>encrypted_chunks</code>・<code>d21_visibility</code> 等）を追加する。現行 gcsa は <code>store_format&lt;=1</code> を一律受理するため<strong>版数だけでは新旧を判別できない</strong>——この字段の有無で strict（AnalogBoard 産・D21 字段必須）／legacy（旧 gcsa 産）バリデータを自動選択する。</td><td><span class="badge badge-confirmed">native＋additive</span></td></tr>
-          <tr><td><code>datasets/&lt;id&gt;/gates/&lt;gate_id&gt;.json</code></td><td>gate定義（別途 sys_app互換の正準v1 payload でもエクスポート）。</td><td><span class="badge badge-confirmed">native</span></td></tr>
+          <tr><td><code>datasets/&lt;id&gt;/gates/&lt;gate_id&gt;.json</code></td><td>gate定義（別途 正準 payload＝canonical v2 でもエクスポート）。</td><td><span class="badge badge-confirmed">native</span></td></tr>
         </tbody>
       </table>
       <ul>
@@ -2057,7 +2057,7 @@ stateDiagram-v2
 flowchart LR
   P0["フェーズ0\n地固め・実機まとめ\n・資産push/確保\n・実機セッション\n・録画コーパス初期化"]
   P1["フェーズ1\nネイティブコア\n・通信層 非同期/再接続\n・エンジン/再アーム(Zarr追記)\n・Decoder(A/H/W)/ZarrWriter\n・録画・ログ\n・Tier1/2 エミュ"]
-  P2["フェーズ2\nUI/描画\n・WPFシェル\n・1スライダーgain(自動求解)\n・scatter/histogram/GMI波形\n・マルチプロット/表示gate選択\n・gating(gcsa正準v1)"]
+  P2["フェーズ2\nUI/描画\n・WPFシェル\n・1スライダーgain(自動求解)\n・scatter/histogram/GMI波形\n・マルチプロット/表示gate選択\n・gating(gcsa正準 payload v2)"]
   P3["フェーズ3\n結合・HIL\n・Tier3(2枚目FX3)\n・接続ヘルスUI\n・デバッグパネル"]
   P4["フェーズ4\n受け入れ・移行\n・Win11実機ゲート\n・現場移行\n・(判断)FWフェーズ2"]
   P0 --> P1 --> P2 --> P3 --> P4
@@ -2122,7 +2122,7 @@ flowchart LR
           <tr><td>安全性</td><td>メモリ/リソース安全（リーク・UB排除）</td><td><code>RAII・スマートポインタ・境界検査</code></td><td><span class="badge badge-must">Must</span></td></tr>
           <tr><td>再現性</td><td>ビルド再現性（<code>CyAPI.lib</code>固定）</td><td><code>依存バイナリをリポジトリ/リリースに固定</code></td><td><span class="badge badge-should">Should</span></td></tr>
           <tr><td>互換性</td><td>主出力＝gcsaネイティブ Zarr ストア（pulse_features/gmi_waveform/meta）</td><td><code>gcsa が改変なしでロード</code></td><td><span class="badge badge-must">Must</span></td></tr>
-          <tr><td>互換性</td><td>gate 正準v1 payload（sys_app互換）</td><td><code>gate往復一致</code></td><td><span class="badge badge-must">Must</span></td></tr>
+          <tr><td>互換性</td><td>gate 正準 payload（canonical v2・schema マーカー付き）</td><td><code>gate往復一致</code></td><td><span class="badge badge-must">Must</span></td></tr>
           <tr><td>互換性</td><td>移行互換 .bin＋_cfg.txt（既定OFF・明示エクスポート時のみ。ヘッダレス<code>&lt;u2</code>・FL8/FH5・exact-multiple）</td><td><code>gcsa v1パーサ通過</code></td><td><span class="badge badge-could">Could</span></td></tr>
           <tr><td>テスト</td><td>実機なしの回帰</td><td><code>Tier1/2でCI緑・障害注入</code></td><td><span class="badge badge-should">Should</span></td></tr>
           <tr><td>テスト</td><td>C ABI のフロントエンド中立性（設計の要点参照）</td><td><code>非WPF最小ホストでの全周 Tier1 適合テスト</code></td><td><span class="badge badge-should">Should</span></td></tr>
