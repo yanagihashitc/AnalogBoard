@@ -593,9 +593,9 @@ pre {
   <p class="subtitle">AnalogBoard 再構築に伴う下流アプリの改変 — <strong>ストア完全直読（direct read）方式</strong>の改変プロンプト集（D22・2026-07-10 転換。旧：射影方式）。<strong>暫定・書き換え前提</strong>：AnalogBoard 側の出力契約凍結後に実行する。</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 改変プロンプト集（実行前提）</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.2（直読版・暫定）</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.3（直読版・暫定）</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（Draft 1.2：G4 を AEAD Store ラッパ方式へ変更（numcodecs では座標 AAD 不可と実証）、G1 に producer/capability 判別子を確定、ストア形式表を wire-exact 化。Draft 1.1：codex レビュー反映——凍結の3段階化（RC→joint validation→Frozen v1）・S7 に gate 評価意味論の整合を追加（sys_app の quadrant 鏡像等・実コード検証済み）・S2 廃止註に fail-loud 要件（fail-open フォールバック実在の実証込み）・S1 登録ライフサイクル・S4 プレビュー/export 分離・S9 キー明確化（行列ハッシュ・行順結合の整合検証）・G4 暗号契約詳細化・受け入れマトリクス追加。Draft 1.0：S1 直読再設計・S2/S5 廃止・S9〜S11・G4/G5 追加）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-12（Draft 1.3：親プラン D13 の canonical v2 改訂（D-GA-11・2026-07-12）へ追随し、histogram-range 下map（S7/G3 該当部分）を superseded 化（2026-07-11 の gcsa first-class 化 owner decision による。正本＝task_management 260712 横断 plan）。Draft 1.2：G4 を AEAD Store ラッパ方式へ変更（numcodecs では座標 AAD 不可と実証）、G1 に producer/capability 判別子を確定、ストア形式表を wire-exact 化。Draft 1.1：codex レビュー反映——凍結の3段階化（RC→joint validation→Frozen v1）・S7 に gate 評価意味論の整合を追加（sys_app の quadrant 鏡像等・実コード検証済み）・S2 廃止註に fail-loud 要件（fail-open フォールバック実在の実証込み）・S1 登録ライフサイクル・S4 プレビュー/export 分離・S9 キー明確化（行列ハッシュ・行順結合の整合検証）・G4 暗号契約詳細化・受け入れマトリクス追加。Draft 1.0：S1 直読再設計・S2/S5 廃止・S9〜S11・G4/G5 追加）</span>
     <span class="doc-meta-item"><strong>Status:</strong> 実行保留（AnalogBoard 出力契約凍結後）</span>
     <span class="doc-meta-item"><strong>親:</strong> 260710-analogboard-rebuild-plan.html（Draft 2.0）</span>
     <span class="doc-meta-item"><strong>実装展開:</strong> gcsa/docs/plans/active/260710-analogboard-store-support-plan.html・sys_app/docs/plans/260710-analogboard-store-and-desktop-plan.html</span>
@@ -700,7 +700,7 @@ flowchart LR
           <tr><td>パーティションシャーディング</td><td>round-robin（<code>e % n_partitions</code>）維持＋per-partition <code>sealed</code> か、append-sequential＋seal か——<strong>フェーズ0で決着</strong>（G5 バリデータ改修と同一契約変更）</td><td><span class="badge badge-open">フェーズ0決定待ち</span></td></tr>
           <tr><td>精度</td><td>ストアは float64。sys_app Parquet も float64 化し <code>round(6)</code> を除去（親プラン D15・S6 で確定、往復判定は bit 一致）</td><td><span class="badge badge-confirmed">高</span></td></tr>
           <tr><td>特徴量アルゴリズム版</td><td>整数版 <code>feature_schema_version=1</code>（gcsa v1 準拠）から開始、算出値が変わる改訂で +1。<code>meta.versions</code> にアプリ/FW/アルゴ版を記録、同一データセット内の版混在禁止（親プラン D14 で確定）</td><td><span class="badge badge-confirmed">高</span></td></tr>
-          <tr><td>gate 交換形式</td><td>確定（親プラン D13）：AnalogBoard は gate を<strong>出力する</strong>。形式は正準v1 payload（gcsa v1互換）のみ、sys_app v2.0 拡張は出さない（Part C）</td><td><span class="badge badge-confirmed">高</span></td></tr>
+          <tr><td>gate 交換形式</td><td>確定（親プラン D13。2026-07-12 に canonical v2 へ改訂＝D-GA-11）：AnalogBoard は gate を<strong>出力する</strong>。形式は正準 payload（canonical v2：構造化 boolean・schema マーカー）のみ、旧 sys_app v2.0 envelope 拡張は出さない（Part C）</td><td><span class="badge badge-confirmed">高</span></td></tr>
         </tbody>
       </table>
     </section>
@@ -862,7 +862,7 @@ flowchart LR
       </table>
       <div class="callout callout-info">
         <div class="callout-title">前提の確認</div>
-        <p><strong>確定（親プラン D13）</strong>：AnalogBoard は gate を正準v1のみで出力する。したがって本対応表を確定し、gate 往復テストを受け入れに組み込む。なお親プラン UX-03（gate作図時の互換フィードバック）により、AnalogBoard の作図UIは正準v1で表現できる gate 種のみ提示する方針（本表「ellipse を出さない」の一般化）。sys_app 側で生成される <code>histogram-range</code> の下map（S7/G3）は引き続き必要。</p>
+        <p><strong>確定（親プラン D13。2026-07-12 に canonical v2 へ改訂＝D-GA-11）</strong>：AnalogBoard は gate を正準 payload（canonical v2）のみで出力する。したがって本対応表を確定し、gate 往復テストを受け入れに組み込む。なお親プラン UX-03（gate作図時の互換フィードバック）により、AnalogBoard の作図UIは正準で表現できる gate 種のみ提示する方針（本表「ellipse を出さない」の一般化）。<strong>Superseded（2026-07-12 注記）</strong>：「sys_app 側で生成される <code>histogram-range</code> の下map（S7/G3）は引き続き必要」という旧記述は、2026-07-11 の owner decision（gcsa が <code>histogram-range</code> を first-class 型として実装・PR #32 merged）により<strong>不要となった</strong>。gate 意味論整合の現行 scope は task_management の 260712 横断 plan（GA-S2 ほか）が正。</p>
       </div>
     </section>
 
@@ -907,7 +907,7 @@ flowchart LR
           <tr><td>パーティションシャーディング方式（フェーズ0決定）</td><td>G5・S1b</td><td>決定に合わせてバリデータ/直読リーダの partition 連結を確定</td></tr>
           <tr><td>暗号コーデックのワイヤ形式（nonce/tag/key_id 配置）</td><td>G4・S1b</td><td>フェーズ0往復プロトタイプで C++ ライタと突き合わせて凍結</td></tr>
           <tr><td>精度ポリシー</td><td>S6</td><td>float64 で確定（D15）。変更時のみ再確認</td></tr>
-          <tr><td>gate 出力有無・形式</td><td>S7・G3・Part C</td><td>正準v1出力で確定（D13）。形式変更時のみ再確認</td></tr>
+          <tr><td>gate 出力有無・形式</td><td>S7・G3・Part C</td><td>正準 payload 出力で確定（D13。2026-07-12 に canonical v2 へ改訂＝D-GA-11）。形式変更時のみ再確認</td></tr>
           <tr><td>特徴量アルゴリズム版</td><td>G1・G2</td><td>整数版＋versions 記録で確定（D14）。運用変更時のみ再確認</td></tr>
           <tr><td>生FL保全の既定（D10 再判断）</td><td>G3</td><td>OFF でも fl_waveform 配列型自体は実装する（書かない選択が可能なだけ）</td></tr>
         </tbody>
