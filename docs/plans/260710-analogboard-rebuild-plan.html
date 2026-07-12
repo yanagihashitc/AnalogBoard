@@ -738,9 +738,9 @@ pre {
   <p class="subtitle">高速多パラメータ計測アプリの刷新 — ストラングラー型リビルド／新UI／堅牢化／リアルタイム scatter・gating／4GB制限撤廃／自動再接続／診断ログ／実機エミュレーション</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実装プラン</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.0</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.2</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（<strong>Draft 2.0</strong>：ファイル名を 260703→260710 へ更新。D20（別アプリ維持・一製品複数プロセス）／D21（ストア可視性契約＝finalization マーカ・write_generation・パーティションマニフェスト・min/max レンジ）／D22（sys_app ストア完全直読・射影廃止）を追加し、D11 の達成手段を直読へ改訂。C ABI 中立性ルール・フィード fan-out・finalize イベント・非WPF Tier1 適合テスト・共存 NFR・デプロイトポロジ節を追加。フェーズ0 に契約凍結＋シャーディング決着を明記（実機確認は 2026-07-13 週予定・完了後に実装着手）。根拠調査：docs/260709-analogboard-sysapp-integration-study.html。7-09：P1 採用→D19。7-06：FR-13/UX-20 追加ほか）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（<strong>Draft 2.2</strong>：codex 再レビュー反映——D19 の AEAD 実装層を Store ラッパへ確定（numcodecs では座標 AAD 不可と実証）、判別子を producer/capability 字段へ、D12 表記を c-blosc 自作ライタ第一候補へ同期、gate 保存の原子性（正準 payload 固定パス＋コミットポインタ）、移送マニフェスト（GCM タグは欠落/余剰/平文改竄を検出しない）、.gcsa_store.json の位置と additive 字段。<strong>Draft 2.1</strong>：codex レビュー反映——FR-04 損失定義の再定義・暗号ワイヤ契約（nonce/AAD/tag/版）・D21 書込順序/クラッシュ回復・録画データ取扱い・背圧定量化/再接続再同期・UX-10/ロック整合・FR-12 レシピ全項目化・gate 保存権威と境界意味論の正準明記（sys_app 乖離は S7 で整合）・データ移送契約・軽微整合（footer 版数・モック 60Msps・FR/UX 範囲）。<strong>Draft 2.0</strong>：ファイル名を 260703→260710 へ更新。D20（別アプリ維持・一製品複数プロセス）／D21（ストア可視性契約＝finalization マーカ・write_generation・パーティションマニフェスト・min/max レンジ）／D22（sys_app ストア完全直読・射影廃止）を追加し、D11 の達成手段を直読へ改訂。C ABI 中立性ルール・フィード fan-out・finalize イベント・非WPF Tier1 適合テスト・共存 NFR・デプロイトポロジ節を追加。フェーズ0 に契約凍結＋シャーディング決着を明記（実機確認は 2026-07-13 週予定・完了後に実装着手）。根拠調査：docs/260709-analogboard-sysapp-integration-study.html。7-09：P1 採用→D19。7-06：FR-13/UX-20 追加ほか）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> オーナー／開発チーム</span>
     <span class="doc-meta-item"><strong>Source:</strong> prompt.md ＋ 2件のコードベース調査</span>
   </div>
@@ -832,14 +832,14 @@ pre {
           <tr><td>D9</td><td>主出力形式</td><td><strong>gcsaネイティブ Zarr ストア</strong></td><td>特徴量(float64)＋生FH(uint16)＋生FL(uint16)。追記対応・圧縮・atomic。fl/fh生binは移行互換のみ。</td></tr>
           <tr><td>D10</td><td>生FL波形の保全</td><td><strong>既定で残す（後日再判断）</strong></td><td>再解析・特徴量再計算の余地を確保。容量都合で後日OFF切替できるオプションとして設計。採用に伴い gcsa に <code>fl_waveform</code> リーダ追加（改変プロンプト）。</td></tr>
           <tr><td>D11</td><td>下流シームレス</td><td><strong>gcsa と sys_app の両方でシームレス</strong></td><td>gcsaは構造上シームレス。sys_app の達成手段は当初「射影」方式だったが、<strong>2026-07-10 に D22（ストア完全直読）へ改訂</strong>——要件（デュアル・シームレス）自体は不変。改変プロンプトは下流改変プラン Draft 1.0（直読版）参照。要件でありハード依存。</td></tr>
-          <tr><td>D12</td><td>Zarr C++ライタ</td><td><strong>acquire-zarr 第一候補</strong></td><td>取得機器向けストリーミング書込特化・Windowsバイナリ・Apache-2.0。フェーズ0で gcsa 往復検証し、レイアウト非互換なら c-blosc＋最小自作へフォールバック。ZarrWriter インターフェースで隔離し差替可能に。商用搭載の SBOM/保守観点で軽量既製品を優先。</td></tr>
+          <tr><td>D12</td><td>Zarr C++ライタ</td><td><strong>c-blosc＋最小自作ライタが実質第一候補（D19 で昇格）</strong></td><td>当初は acquire-zarr を第一候補としたが、<strong>D19（チャンク保護）採用により acquire-zarr では保護段を挟めない見込みが高く、c-blosc＋最小自作ライタへ実質昇格</strong>（2026-07-10 表記同期）。フェーズ0で gcsa 往復検証（保護込み）を行い確定する。ZarrWriter インターフェースで隔離し差替可能に。writer スレッド（EP6 ホットパス外）に置く。</td></tr>
           <tr><td>D13</td><td>gate の下流出力</td><td><strong>出力する（正準v1のみ）</strong></td><td>ストアの gates/ ＋ sys_app互換 正準v1 payload で出力。v2.0拡張（fill_*・階層root）は出さない。UIは正準v1で表現できる gate 種のみ提示（UX-03）。</td></tr>
           <tr><td>D14</td><td>特徴量の版管理</td><td><strong>整数版＋meta.versions</strong></td><td>feature_schema_version=1（gcsa v1 準拠）から開始、算出値が変わる改訂で+1。versions にアプリ/FW/アルゴ版を記録。同一データセット内の版混在禁止。下流は記録値権威・版は表示のみ（UX-12）。</td></tr>
           <tr><td>D15</td><td>sys_app Parquet 精度</td><td><strong>float64化＋round除去</strong></td><td>下流プラン S6 を確定。往復テストの合格判定を bit 一致に単純化。</td></tr>
           <tr><td>D16</td><td>切替スイッチ</td><td><strong>除去を標準化</strong></td><td>機械から出る固定ケーブルは交換不可のため、管理対象は先端の<strong>スイッチ区間（メス—スイッチ—オス・着脱可能）</strong>。直結（区間除去）を標準とし、外した区間をラベル保管、対照実験（#1）でのみ再装着。</td></tr>
           <tr><td>D17</td><td>物理ch順の前提</td><td><strong>gcsa想定順で先行実装</strong></td><td><code>FSC,SSC,FL1..FL6</code>／<code>fsGMI..bfGMI</code> 前提で Decoder/Writer を実装し、実機#7の実サンプル照合で凍結。差異は ch-mapping 表1枚で吸収できる設計にする。</td></tr>
           <tr><td>D18</td><td>UI仕様の突き合わせ</td><td><strong>現行設定項目の完全継承＋ダイアログ集約</strong></td><td>現行アプリの全設定項目（「UI仕様」節の一覧）を新アプリでも設定可能にする。チャンネル毎設定（ゲイン段・Offset・Ext Ctrl・有効）はモーダルダイアログに集約（UX-18）。開始/停止ボタンは Manual Get ON のときのみ表示（UX-19）。</td></tr>
-          <tr><td>D19</td><td>ストア暗号化</td><td><strong>チャンク暗号化を採用（抑止レベル）</strong></td><td>測定配列チャンクのみ Blosc(lz4)圧縮→AES-256-GCM 暗号化し、<code>.zarray</code> compressor を独自ID（例 <code>gcsa-aes</code>）に。鍵は難読化した共通鍵をアプリ（C++コア）と gcsa に埋込、チャンクヘッダの <code>key_id</code>（1バイト）で将来の鍵替えに備える。<strong>バイナリ解析には耐えない抑止レベルであることを明記した上での採用</strong>。<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準v1）は平文維持。帰結：c-blosc＋最小自作ライタが実質第一候補（D12 のフォールバック昇格）、フェーズ0往復検証は暗号化コーデック込み、gcsa へ G4（カスタム numcodecs コーデック登録＋埋込鍵）。GCM 認証タグによりチャンク単位のサイレント破損検知が付随。詳細は「リスクと未決事項」節の提案 P1 参照。2026-07-09 採用。</td></tr>
+          <tr><td>D19</td><td>ストア暗号化</td><td><strong>チャンク暗号化を採用（抑止レベル）。AEAD は Store 層で実施（2026-07-10 方式確定）</strong></td><td>測定配列チャンクのみ Blosc(lz4)圧縮→AES-256-GCM で保護。鍵はアプリ（C++コア）と gcsa が共有する埋込鍵、チャンクヘッダの <code>key_id</code>（1バイト）で将来の鍵替えに備える。<strong>抑止レベル（配布物内に鍵が存在する以上、解析には耐えない）と明記した上での採用</strong>。<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準v1）は平文維持。<strong>実装層（2026-07-10 オーナー判断・codex レビュー起点）</strong>：numcodecs の <code>Codec</code> は <code>encode(buf)</code>/<code>decode(buf)</code> のみでチャンク座標を受け取らない（numcodecs 0.13.1 <code>abc.py</code>・zarr 2.18.3 <code>core.py</code> で実証）。よって当初案の「カスタム numcodecs コーデック」では座標を AAD に束縛できず、<strong>読取側の AEAD は zarr の Store ラッパ層</strong>（<code>__getitem__</code> がチャンクキーを受け取る）で行い、<code>.zarray</code> の compressor には<strong>内側の Blosc を宣言</strong>する。zarr v2 の DirectoryStore ではチャンクキー＝ファイル名のため、C++ ライタ（直接ファイル書込）と gcsa の Store ラッパは同一の AAD を計算でき相互運用が成立する。帰結：c-blosc＋最小自作ライタが実質第一候補（D12 のフォールバック昇格）、フェーズ0往復検証は保護込み、gcsa へ G4（Store ラッパ＋鍵管理）。GCM 認証タグによりチャンク単位のサイレント破損検知が付随する。同一座標への旧チャンク差し戻しは AAD では防げないため D21 マニフェスト（<code>write_generation</code>）で担保する。詳細は「リスクと未決事項」節の提案 P1 参照。2026-07-09 採用／2026-07-10 実装層を確定。</td></tr>
           <tr><td>D20</td><td>アプリ統合方針</td><td><strong>AnalogBoard と sys_app は別アプリ維持</strong></td><td>コードベース統合はしない（3視点独立調査で一致・<code>docs/260709-analogboard-sysapp-integration-study.html</code>）。到達形は「一製品・複数プロセス」——同梱配布＋自動ハンドオフ（近期）、必要なら WPF シェルへの WebView2 埋込（将来アドオン）。根拠：sys_app は ML 追加で頻繁更新（リリースサイクル非対称）、取得側は常駐ネイティブ必須（FR-11）＋障害ドメイン隔離、解析数値核は gcsa（Python+Rust）。sys_app は ML/DR 実装後に Tauri デスクトップ化を計画。2026-07-09 決定。</td></tr>
           <tr><td>D21</td><td>ストア可視性契約</td><td><strong>finalization マーカ＋パーティションマニフェスト導入</strong></td><td>meta.json に additive：<code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・特徴量毎 min/max レンジ。単一書き手規則（<code>datasets/&lt;id&gt;/</code> の書き手は取得コアのみ）＋「ストア＋meta.json＝唯一のクロスアプリレジストリ」。取得中 import のサイレント切詰め防止・再アーム append と gcsa の meta.json-last 慣習の非両立を解消・クラッシュ回復に単独価値。出力契約凍結前に確定、フェーズ0往復で gcsa 許容を検証。2026-07-09 決定。</td></tr>
           <tr><td>D22</td><td>sys_app 読取方式</td><td><strong>ストア完全直読（registration-only import）</strong></td><td>射影コピー（旧 S1）を廃し、sys_app は登録のみの import＋gcsa 経由のストア直読へ。根拠（実コード調査 2026-07-10）：旧射影はピーク RAM≒生データサイズで大データセット不可・読者不在の全波形コピー・D19 暗号化を平文コピーが無効化。読取 seam は狭く（DuckDBFeatureStore 1箇所・波形チェーン1本）差替えは S/M、唯一の設計変更は補償列の sidecar 化。D11 の達成手段変更であり要件は不変。2026-07-10 決定。</td></tr>
@@ -1009,7 +1009,7 @@ flowchart TB
 
       <h3>設計の要点</h3>
       <ul>
-        <li><strong>プロセス/スレッド分離</strong>：取得の読取スレッド、デコード、ファイル書込を分離し、<code>BlockingQueue</code>で背圧をかける。UIのハングやログ出力が取得ホットパスを乱さない（過去の「計装が取得を壊した」失敗を構造的に防ぐ）。必要なら取得コアを別プロセス化してUIハングと完全隔離。</li>
+        <li><strong>プロセス/スレッド分離</strong>：取得の読取スレッド、デコード、ファイル書込を分離し、<code>BlockingQueue</code>で背圧をかける。UIのハングやログ出力が取得ホットパスを乱さない（過去の「計装が取得を壊した」失敗を構造的に防ぐ）。必要なら取得コアを別プロセス化してUIハングと完全隔離。<strong>背圧の定量規定（2026-07-10 追加）</strong>：キュー容量はバイト上限＋high/low watermark で定義し、満杯時の動作＝<strong>EP6 読取スレッドをブロック</strong>（DDR がバッファするため安全。drop はしない）＋UX-11 警告＋必要なら先行再アームのトリガ。数値はフェーズ1で確定し Tier1/2 で検証する。</li>
         <li><strong>生データは越境させない</strong>：C ABI を渡るのは密度ビニング済みscatter・ヒストグラム・カウンタ・イベント特徴量、および<strong>固定上限のサンプリング済みGMI波形スナップショット</strong>（FR-13。既定〜100波形×2400サンプル、コア側でサンプリング／必要ならデシメーション済み——生ストリームの転送ではない）のみ。GCが200MB/sの経路に触れない設計ルールを初日から強制（WPF採用時）。</li>
         <li><strong>通信層の刷新点</strong>：エンドポイント毎の明示的タイムアウト、<code>Abort()/Reset()→ReConnect()</code>による回復、<code>BeginDataXfer/FinishDataXfer</code>のキュー型非同期転送、EP6バルク読取に直列化されない独立したEP4ステータスチャネル、<code>UsbdStatus/NtStatus/LastError</code>のログ化。</li>
         <li><strong>C ABI 中立性ルール（2026-07-10 追加）</strong>：C ABI を越えるのは<strong>版付き POD／シリアライズ可能構造体のみ</strong>。コマンド（start/stop・一括設定適用・レシピ読込）とフィードフレーム（ビニング済み scatter・histogram・カウンタ・GMI スナップショット ≤100×2400・リンクヘルス）を列挙型で定義し、.NET/WPF/COM 型・コールバックのオブジェクトグラフを禁止。コールバックは frame-ready 通知＋pull か polled event queue に限定。これにより同一コアを in-proc（WPF・フェーズ1〜4）／常駐サービス／将来の別フロントエンドから無改修でホスト可能にする。フェーズ1のテスト計画に<strong>非WPF最小ホスト（素の C/C++ or コンソール）で start→取得（エミュ）→再アーム→stop→ストア書込の全周を駆動する Tier1 適合テスト</strong>を置き、規則をコンパイル／テストで機械的に強制する。</li>
@@ -1045,14 +1045,14 @@ flowchart TB
             <td>取得中の範囲選択による gating。gate定義は <code>../sys_app</code> / <code>gcsa</code> 互換フォーマットで入出力。</td>
             <td><span class="badge badge-must">Must</span></td>
             <td><span class="badge badge-confirmed">確定</span></td>
-            <td>gcsa v0.4.1 ソースから互換契約を抽出済み（下記「gcsa 互換契約」節）。gateは <strong>sys_app互換の正準v1ストラテジ payload <code>{"version":"1.0","gates":[...]}</code></strong> で入出力。gate種は all/polygon/rectangle/threshold/quadrant/boolean（ellipse不可）。軸は pulse特徴量カラム名（例 <code>FSC_A</code>）を直接参照、<strong>座標は生ADCカウントの線形空間</strong>。<strong>gcsa自体は直接改変しない</strong>（改変プロンプト方式）。残る実行時確認は未決事項に記載。</td>
+            <td>gcsa v0.4.1 ソースから互換契約を抽出済み（下記「gcsa 互換契約」節）。gateは <strong>sys_app互換の正準v1ストラテジ payload <code>{"version":"1.0","gates":[...]}</code></strong> で入出力。gate種は polygon/rectangle/threshold/quadrant/boolean（ellipse不可。「all」は UI 上の root 概念で正準 payload には出力しない——「gcsa 互換契約」節の階層規則参照）。軸は pulse特徴量カラム名（例 <code>FSC_A</code>）を直接参照、<strong>座標は生ADCカウントの線形空間</strong>。<strong>gcsa自体は直接改変しない</strong>（改変プロンプト方式）。残る実行時確認は未決事項に記載。</td>
           </tr>
           <tr>
             <td><code>FR-04</code></td>
-            <td>4GB到達後もデータ破棄せず取得を継続（再アーム）。</td>
-            <td><span class="badge badge-must">Must</span></td>
+            <td>4GB到達で取得を止めない（自動再アームで継続）。<strong>破棄は再アーム窓に限定し、損失量・区間・原因を計測・記録する</strong>（2026-07-10 改訂：旧文言「データ破棄せず」は D2/フェーズ1 の残留損失と矛盾していたため再定義）。真のゼロロスはフェーズ2 FPGA リングバッファのオプション（要否は D2 実測で判断）。</td>
+            <td><span class="badge badge-must">Must</span>（継続取得＋損失記録）<br><span class="badge badge-could">Could</span>（ゼロロス＝フェーズ2）</td>
             <td><span class="badge badge-confirmed">確定</span></td>
-            <td>ホスト側再アーム（後述フェーズ1）で破棄を再アーム窓に限定。ゼロロスはFPGAリングバッファ化（フェーズ2）が必要。</td>
+            <td>ホスト側再アーム（後述フェーズ1）で破棄を再アーム窓に限定。損失カウンタ（イベント数推定・時間区間・原因）を meta.json に記録し、受け入れ基準に含める。ゼロロスはFPGAリングバッファ化（フェーズ2）が必要。</td>
           </tr>
           <tr>
             <td><code>FR-05</code></td>
@@ -1105,7 +1105,7 @@ flowchart TB
           </tr>
           <tr>
             <td><code>FR-12</code></td>
-            <td>計測レシピ（名前付きプリセット）：gain・offset・trigger・サンプルレート・保存先・軸/gate構成の一括保存・呼び出し。</td>
+            <td>計測レシピ（名前付きプリセット）：<strong>D18 対応表の全設定項目</strong>（gain・offset・trigger・サンプルレート・Manual Get・チャンネル有効・Ext Ctrl・Waveforms/File 系・保存先を含む）＋軸/gate構成の一括保存・呼び出し。レシピは版付きスキーマとし cfg_params と対応（2026-07-10 明確化：例示列挙が D18 完全継承と矛盾していたため全項目対象と明記）。</td>
             <td><span class="badge badge-must">Must</span></td>
             <td><span class="badge badge-confirmed">確定</span></td>
             <td>2026-07-03 オーナー確定。破棄する位置依存CSV config（行番号ハードコード・終了時サイレント上書き）のUX代替。<code>_cfg.txt</code> 出力契約とは独立の「ユーザー資産」として設計。</td>
@@ -1129,7 +1129,7 @@ flowchart TB
     <section id="ux">
       <h2>UX／オペレータ体験要件</h2>
       <p>
-        機能要件（FR-01〜FR-12）が「何ができるか」を定めるのに対し、本節はそれらを繋ぐ<strong>操作体験の要件</strong>を定める（2026-07-03 UXレビューで追加）。多くは新規機能ではなく既存FRの「体験層」の具体化であり、対象列で紐づける。2026-07-03 に項目別の採否をオーナー確定（ステータス列）：UX-05・UX-16 は保留、UX-15 は却下、UX-14 は実装規約のみ採用、UX-11 は残容量しきい値警告に限定。UX-17（サンプル名・コメント）はオーナー要望により追加・確定。UX-18/19 は現行UI仕様との突き合わせ（次節「UI仕様」）により追加・確定（D18）。UX-20（マルチプロット＋表示gate選択）は 2026-07-06 オーナー要望により追加・確定——sys_app の可視化UI（タイルグリッド・タイル毎gateセレクタ）を先行例として参照する。
+        機能要件（FR-01〜FR-13）が「何ができるか」を定めるのに対し、本節はそれらを繋ぐ<strong>操作体験の要件</strong>を定める（2026-07-03 UXレビューで追加）。多くは新規機能ではなく既存FRの「体験層」の具体化であり、対象列で紐づける。2026-07-03 に項目別の採否をオーナー確定（ステータス列）：UX-05・UX-16 は保留、UX-15 は却下、UX-14 は実装規約のみ採用、UX-11 は残容量しきい値警告に限定。UX-17（サンプル名・コメント）はオーナー要望により追加・確定。UX-18/19 は現行UI仕様との突き合わせ（次節「UI仕様」）により追加・確定（D18）。UX-20（マルチプロット＋表示gate選択）は 2026-07-06 オーナー要望により追加・確定——sys_app の可視化UI（タイルグリッド・タイル毎gateセレクタ）を先行例として参照する。
       </p>
       <table class="spec-table">
         <thead><tr><th>ID</th><th>対象</th><th>要件</th><th>優先度</th><th>コスト</th><th>ステータス</th></tr></thead>
@@ -1190,7 +1190,7 @@ flowchart TB
           </tr>
           <tr>
             <td><code>UX-10</code></td><td>FR-07</td>
-            <td><strong>危険操作の確認・取り消し</strong>：(a)同名保存先上書き（別名提案）、(b)取得中stop（保存/破棄/続行の3択）、(c)取得中の設定変更（均質性警告＋meta記録）。「終了時サイレント上書き」の根絶。undo は復元可能な設定系のみ、データ削除系は確認で守る。</td>
+            <td><strong>危険操作の確認・取り消し</strong>：(a)同名保存先上書き（別名提案）、(b)取得中stop（保存/破棄/続行の3択）、(c)取得中の設定変更——<strong>ハード影響設定（gain/offset/trigger/レート/チャンネル構成等）は取得中ロックが正</strong>（UI仕様「取得中の設定ロック」row と一致）。取得中に変更可能なのは表示系・非ハード項目のみで、変更時は均質性警告＋meta記録（2026-07-10 明確化：旧文言はロック行と矛盾して読めた）。「終了時サイレント上書き」の根絶。undo は復元可能な設定系のみ、データ削除系は確認で守る。</td>
             <td><span class="badge badge-should">Should</span></td><td>低</td>
             <td><span class="badge badge-confirmed">確定</span></td>
           </tr>
@@ -1232,7 +1232,7 @@ flowchart TB
           </tr>
           <tr>
             <td><code>UX-17</code></td><td>FR-10/11</td>
-            <td><strong>サンプル名・コメント</strong>：ラン開始時に任意のサンプル名を付与。<strong>未入力時の既定は連番 <code>tube_1</code>, <code>tube_2</code>…</strong>（タイムスタンプは使わない）。連番はセッション/日単位でインクリメントし、次番号はレシピ等と共に永続化して再起動後も継続、既存名と衝突する番号はスキップ。計測後もデータセット管理画面（UX-12）から表示名の変更・コメント（自由記述メモ）・タグの追記/編集が可能。保存は <code>meta.json</code> の追加フィールド（<code>display_name</code>/<code>comment</code>/<code>tags</code>、additive で下流は無視しても壊れない）。フォルダ名は<strong>サニタイズ済みサンプル名そのもの</strong>（例 <code>tube_1/</code>）を採用し、衝突時のみ短い曖昧回避サフィックス（<code>_2</code> 等）を付す。<strong>後からのリネームは表示名のみ</strong>——フォルダ名・dataset id（内部で安定なユニークID）は変えず参照を壊さない。sys_app は登録（registration-only import）時に表示名を Dataset 名として採用（S1）。</td>
+            <td><strong>サンプル名・コメント</strong>：ラン開始時に任意のサンプル名を付与。<strong>未入力時の既定は連番 <code>tube_1</code>, <code>tube_2</code>…</strong>（タイムスタンプは使わない）。連番はセッション/日単位でインクリメントし、次番号はレシピ等と共に永続化して再起動後も継続、既存名と衝突する番号はスキップ。計測後もデータセット管理画面（UX-12）から表示名の変更・コメント（自由記述メモ）・タグの追記/編集が可能。保存は <code>meta.json</code> の追加フィールド（<code>display_name</code>/<code>comment</code>/<code>tags</code>、additive で下流は無視しても壊れない）。<strong>D21 との整合（2026-07-10 追加）</strong>：finalize 後のメタ編集も<strong>本アプリ（＝単一書き手）経由に一本化</strong>し temp→rename で原子的に行う。これら表示系フィールドは<strong>コンテンツ世代（<code>write_generation</code>）を上げない</strong>——別の <code>meta_generation</code> を刻む（下流キャッシュの無用な無効化を防ぎ、単調性の意味論を守る。字段の最終名はフェーズ0凍結時に確定）。フォルダ名は<strong>サニタイズ済みサンプル名そのもの</strong>（例 <code>tube_1/</code>）を採用し、衝突時のみ短い曖昧回避サフィックス（<code>_2</code> 等）を付す。<strong>後からのリネームは表示名のみ</strong>——フォルダ名・dataset id（内部で安定なユニークID）は変えず参照を壊さない。sys_app は登録（registration-only import）時に表示名を Dataset 名として採用（S1）。</td>
             <td><span class="badge badge-must">Must</span></td><td>低</td>
             <td><span class="badge badge-confirmed">確定</span></td>
           </tr>
@@ -1345,7 +1345,7 @@ flowchart TB
           <tr>
             <td><strong>取得中の設定ロック</strong></td>
             <td>取得中は設定コントロールを無効化（<code>SamplingUISet</code>、<code>Dialog1_Main.cpp:3812-3842</code>）</td>
-            <td>継承：取得中・外部開始待機中はチャンネル設定ダイアログと適用を無効化（UX-10 の取得中設定変更警告と整合）</td>
+            <td>継承：取得中・外部開始待機中は<strong>ハード影響設定（チャンネル設定ダイアログ・適用）を無効化＝ロックが正</strong>。UX-10(c) の「取得中の設定変更警告＋meta記録」は表示系・非ハード項目に限定される（2026-07-10 整合化）</td>
           </tr>
           <tr>
             <td><strong>接続</strong></td>
@@ -1374,7 +1374,7 @@ flowchart TB
     <section id="mockup">
       <h2>UI モック（ターゲット画面）</h2>
       <p>
-        確定した機能要件（FR-01〜12）と UX 要件（UX-01〜17）を1画面に落とした<strong>ワイヤーフレーム</strong>。実装確定物ではなく、要素の配置・情報密度・トレーサビリティ（各領域がどの要件に対応するか）を共有するためのもの。各領域に対応する FR/UX ID を <span class="mk-tag" style="margin:0;">ID</span> で付す。
+        確定した機能要件（FR-01〜13）と UX 要件（UX-01〜20）を1画面に落とした<strong>ワイヤーフレーム</strong>。実装確定物ではなく、要素の配置・情報密度・トレーサビリティ（各領域がどの要件に対応するか）を共有するためのもの。各領域に対応する FR/UX ID を <span class="mk-tag" style="margin:0;">ID</span> で付す。
       </p>
 
       <figure class="mk-wrap">
@@ -1402,7 +1402,7 @@ flowchart TB
               <span class="mk-stat"><b>01:24</b><span>経過</span></span>
               <span class="mk-stat"><b>1.82 M</b><span>イベント</span></span>
               <span class="mk-stat"><b>3.1 GB</b><span>書込</span></span>
-              <span class="mk-stat"><b>62 Msps</b><span>レート</span></span>
+              <span class="mk-stat"><b>60 Msps</b><span>レート</span></span>
             </span>
           </div>
 
@@ -1635,7 +1635,9 @@ flowchart LR
       <ul>
         <li><strong>ellipse は不可</strong>（gcsaが明示的に拒否）。UIの範囲選択は矩形・ポリゴン・閾値・象限に限定。</li>
         <li><code>transform_space</code>：既定 <code>pulse_features</code>（他に linear/embedding/gmi_waveform/vector）。<strong>gate座標にlog/biexp/arcsinh等のスケール変換は付かない</strong>＝生ADCカウントの線形値。</li>
-        <li>階層：<code>parent_gate_id</code>（root <code>__all__</code> は正準payloadに出力しない）。<code>gate_id</code>は <code>^[A-Za-z0-9_-]+$</code>、<code>color</code>は <code>#RRGGBB</code>。</li>
+        <li>階層：<code>parent_gate_id</code>（root <code>__all__</code> は正準payloadに出力しない）。<code>gate_id</code>は <code>^[A-Za-z0-9_-]+$</code>、<code>color</code>は <code>#RRGGBB</code>。FR-03 の「all」は<strong>UI 上の root 概念</strong>であり正準 payload の gate 型としては出力しない（この規則の具体化）。</li>
+        <li><strong>保存の権威と原子性（2026-07-10 追加・2026-07-10 詳細化）</strong>：交換・保存の権威は<strong>正準v1 payload</strong>（<code>{"version":"1.0","gates":[...]}</code>）。正準 payload の固定パスを <code>datasets/&lt;id&gt;/gates/canonical_v1.json</code> とし、<code>gates/&lt;gate_id&gt;.json</code> は payload から 1:1 導出される store-native 派生物とする。<strong>複数ファイルの原子性</strong>：gate 集合の更新は「新世代ディレクトリを書く → 正準 payload を temp→rename → コミットポインタ（<code>gate_generation</code>＋<code>payload_hash</code>）を meta に反映」の順で行い、途中状態が観測されないようにする。不一致時は payload が正。書き手は取得コアのみ（D21 単一書き手）。</li>
+        <li><strong>境界意味論はこの表が正準（2026-07-10 明記・gcsa 実装と一致確認済み）</strong>：rectangle は下限含む・上限除く（<code>x_min≤x&lt;x_max</code>）、threshold の below は <code>&lt;</code>、quadrant は Q1=左上から時計回り（gcsa <code>gating/apply.py</code> と一致）。<strong>既知の乖離：sys_app <code>gate_mask_service.py</code> は rectangle 上限包含・below <code>&lt;=</code>・quadrant Q1=右上（鏡像）</strong>——payload 往復では検出できない評価差のため、下流改変 S7 で sys_app 側を本表へ整合させ、受け入れに「共有フィクスチャでの mask/統計一致」を含める。</li>
         <li>gate軸は pulse特徴量カラム名を<strong>厳密一致</strong>で参照。scatter/gating UIが公開すべき軸は FL 8ch × {A,H,W} の24カラム。<strong>順序も pin</strong>：gcsa <code>extract_all</code> は<strong>チャンネルごとに A→H→W</strong>＝<code>FSC_A,FSC_H,FSC_W, SSC_A,SSC_H,SSC_W, …, FL6_A,FL6_H,FL6_W</code>（既定軸は Area）。この順序を <code>meta.json</code> に明記しビルド時にアサート（sys_appシームレス契約参照）。</li>
       </ul>
 
@@ -1657,14 +1659,17 @@ flowchart LR
           <tr><td><code>datasets/&lt;id&gt;/pulse_features/partition_{p}.zarr</code></td><td>float64 <code>(N,24)</code>、アプリ算出A/H/W。<strong>権威・下流は再計算なし</strong>。chunk <code>(10000,None)</code>。</td><td><span class="badge badge-confirmed">native</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/gmi_waveform/partition_{p}.zarr</code></td><td>uint16 <code>(N,5,2400)</code>、生FH(GMI)。ML/DR用。chunk <code>(2000,None,None)</code>。</td><td><span class="badge badge-confirmed">native</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/fl_waveform/partition_{p}.zarr</code><br>（既定ON・新規）</td><td>uint16 <code>(N,8,2400)</code>、生FL保全（再解析・特徴量再計算用）。容量重視ならOFF可（D10）。</td><td><span class="badge badge-must">要gcsa追加（未実装確認済・凍結前必須）</span></td></tr>
-          <tr><td><code>datasets/&lt;id&gt;/meta.json</code> ＋ <code>.gcsa_store.json</code></td><td>channels・features・cfg_params・versions・provenance を内包（自己記述）。<code>store_format=1</code>。</td><td><span class="badge badge-confirmed">native</span></td></tr>
+          <tr><td><code>datasets/&lt;id&gt;/meta.json</code></td><td>channels・features・cfg_params・versions・provenance・D21 可視性字段を内包（自己記述・データセット毎）。</td><td><span class="badge badge-confirmed">native</span></td></tr>
+          <tr><td><code>.gcsa_store.json</code>（<strong>ストア直下・store毎に1個</strong>）</td><td>ストア形式マーカ。位置は <code>datasets/</code> と同階層のストアルート（gcsa <code>zarr_store.py:39</code>）。<strong>D21 追加（2026-07-10・オーナー判断）</strong>：<code>store_format=1</code> は据え置き、additive に <code>producer</code>（例 <code>analogboard</code>）と <code>capabilities</code>（<code>encrypted_chunks</code>・<code>d21_visibility</code> 等）を追加する。現行 gcsa は <code>store_format&lt;=1</code> を一律受理するため<strong>版数だけでは新旧を判別できない</strong>——この字段の有無で strict（AnalogBoard 産・D21 字段必須）／legacy（旧 gcsa 産）バリデータを自動選択する。</td><td><span class="badge badge-confirmed">native＋additive</span></td></tr>
           <tr><td><code>datasets/&lt;id&gt;/gates/&lt;gate_id&gt;.json</code></td><td>gate定義（別途 sys_app互換の正準v1 payload でもエクスポート）。</td><td><span class="badge badge-confirmed">native</span></td></tr>
         </tbody>
       </table>
       <ul>
         <li>Zarr v2 ＋ Blosc(lz4,clevel5,shuffle)、書込は temp→atomic rename。破損サイレントや巨大ファイルを解消。<strong>D19 採用により測定配列チャンクは Blosc 圧縮後に AES-256-GCM で暗号化</strong>（独自 codec ID・<code>key_id</code> 1バイト・meta/gate は平文。GCM 認証タグがチャンク単位の破損検知を兼ねる）。</li>
+        <li><strong>保護ワイヤ契約（2026-07-10 改訂・フェーズ0で機械可読仕様として凍結）</strong>：<strong>AEAD は Store ラッパ層</strong>で行う（numcodecs コーデックはチャンク座標を受け取れないため。D19 参照）。チャンクファイル形式＝<code>magic｜format_version｜key_id(1B)｜nonce(96bit)｜AES-256-GCM(Blosc(data))｜tag(128bit)</code>。<code>.zarray</code> の compressor は<strong>内側の Blosc</strong>を宣言し、暗号化されるのは<strong>チャンクキーに一致するファイルのみ</strong>（<code>.zarray</code>/<code>.zattrs</code>・meta・gate は平文）。<strong>AAD = <code>dataset_id \0 array_rel_path \0 chunk_key</code></strong>（UTF-8・区切りとバイト表現を KAT で固定）——パーティション配列があるため array 識別子は<strong>データセット相対パス</strong>を用いる。<code>dimension_separator</code> は <code>&quot;.&quot;</code> を .zarray に明示。<strong>nonce は 96-bit で一意性を構成で保証</strong>（ランダム per-chunk またはライタインスタンス接頭辞＋カウンタ。再起動・再アーム追記を跨いで一意）。鍵ローテーションは <code>key_id</code> 毎の鍵表（データセット内混在禁止）。<strong>C++／Python の KAT（既知解ベクタ）を Must</strong>とし、negative test（wrong key／tag 改竄／チャンクファイル入替え／未知 <code>key_id</code>／切詰め）をフェーズ0往復と CI に必須化（G4 と対）。注：同一座標への旧チャンク差し戻しは AAD の対象外——D21 の <code>write_generation</code>／マニフェストで検出する。zarr の blosc partial-decompress 経路は本契約では禁止（全チャンク復号を前提とする）。</li>
         <li><strong>パーティション追記対応</strong>＝取得中ストリーミング／4GB再アームは「番号Nのペアbin juggling」から「ストアへ append」へ単純化（fl/fhロックステップ制約が消える）。シャーディングは <code>e % n_partitions</code> の round-robin を踏襲予定だが、<strong>方式はフェーズ0で決着（未決事項参照）</strong>——round-robin は全パーティションが同時成長し sealed prefix が存在しないため、維持する場合はマニフェストの per-partition <code>sealed</code> で外部リーダの追従安全性を担保する。gcsa のリーダ検証は分配式そのものを検証しており、決定はリポジトリ横断契約（gcsa バリデータ改修とセット）。</li>
-        <li><strong>可視性契約（D21・2026-07-10 追加）</strong>：meta.json に additive で <code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・特徴量毎 min/max レンジを記録する。gcsa の従来慣習（meta.json 最終書込＝暗黙のコミットポイント）は再アーム append のため meta.json を先に書く本アプリと両立しない——明示マーカが代替となる。<strong>単一書き手規則</strong>：<code>datasets/&lt;id&gt;/</code> 内の書き手は取得コアのみ（下流の派生物はデータセットフォルダ外に置く）。<strong>ストアフォルダ＋meta.json が唯一のクロスアプリレジストリ</strong>であり、下流の派生面は (dataset_id, feature_schema_version, write_generation) をキーとするキャッシュと位置づける。</li>
+        <li><strong>可視性契約（D21・2026-07-10 追加）</strong>：meta.json に additive で <code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・特徴量毎 min/max レンジを記録する。gcsa の従来慣習（meta.json 最終書込＝暗黙のコミットポイント）は再アーム append のため meta.json を先に書く本アプリと両立しない——明示マーカが代替となる。<strong>単一書き手規則</strong>：<code>datasets/&lt;id&gt;/</code> 内の書き手は取得コアのみ（下流の派生物はデータセットフォルダ外に置く）。<strong>ストアフォルダ＋meta.json が唯一のクロスアプリレジストリ</strong>であり、下流の派生面は (dataset_id, feature_schema_version, write_generation) をキーとするキャッシュと位置づける。
+        <strong>書込順序・クラッシュ回復プロトコル（2026-07-10 追加・フェーズ0で凍結）</strong>：不変条件＝「マニフェストの行数は永続化済み配列行数を超えない」。更新順序＝チャンク書込（durable）→ マニフェスト更新 → <code>write_generation</code> インクリメント → （終了時のみ）<code>status=finalized</code>＋<code>finalized_at</code> → finalize イベント発火。meta.json の再書込は毎回 temp→atomic rename。起動時回復＝<code>status=open</code> のデータセットは取得コアのみが処理し、配列をマニフェスト行数へ切詰めて再開するか隔離（quarantine）する——下流は open を読まないため誤読は構造的に発生しない。各段階での power-fail 試験を Tier1/2 に追加。</li>
         <li><strong>finalize イベント（2026-07-10 追加）</strong>：atomic finalize 時に writer スレッドで発火する完了フック（dataset id＋ストア絶対パス。transport 中立——特定サービスへの HTTP 直結はしない）。UX-16（下流ハンドオフ）の enabling primitive であり、EP6 ホットパス外で完結する。</li>
         <li>実装コスト：C++ の Zarr v2 ライタは <strong>c-blosc＋最小自作ライタを実質第一候補</strong>とする（D19 採用の帰結。acquire-zarr はカスタム暗号コーデック段を挟めない可能性が高い——D12 のフォールバック昇格）。フェーズ0の gcsa 往復検証は<strong>暗号化コーデック込み</strong>で実施。ZarrWriterモジュールに隔離しEP6ホットパス外（writerスレッド）。</li>
       </ul>
@@ -1755,7 +1760,7 @@ flowchart LR
         <li><strong>G1</strong>：本アプリが書き sys_app が<strong>直読</strong>する<strong>正準ストアスキーマを凍結・公開</strong>（順序付き特徴量名・GMI名順・dtype/shape・min/max を返す小API）＋<strong>D21 可視性マーカの意味論</strong>（<code>status=open</code> は既定拒否。字段は DatasetMeta の first-class フィールドとしてモデル化——gcsa の meta round-trip は未知キーを落とすため）。</li>
         <li><strong>G2</strong>：ストア読取・解析が<strong>記録済み <code>pulse_features</code> を権威として返し、既存時に黙って再計算しない</strong>（再計算は明示opt-in）。</li>
         <li><strong>G3</strong>：生FL <code>fl_waveform</code> 配列型の追加（<strong>未実装確認済み・凍結前必須</strong>）。加えて gate モデルのすり合わせ（<code>all</code>/root、<code>histogram-range</code>、余剰キー許容、色正規化）。</li>
-        <li><strong>G4【新規】</strong>：AES-256-GCM チャンク暗号コーデック（D19。<code>gcsa-aes</code>・<code>key_id</code>・import 時自動登録・ワイヤ形式を C++ ライタと凍結）。</li>
+        <li><strong>G4【新規・2026-07-10 方式変更】</strong>：チャンク保護の <strong>AEAD Store ラッパ</strong>（D19。numcodecs の <code>Codec</code> はチャンク座標を受け取らないため独自コーデック ID は使わない。<code>.zarray</code> は内側 Blosc を宣言・AAD にチャンクキーを束縛・ワイヤ形式と KAT を C++ ライタと凍結）。</li>
         <li><strong>G5【新規】</strong>：リーダ堅牢化（シャーディング決定へのバリデータ追従・スライス読み検証の穴をマニフェストで閉じる・読取並行性指針・CI コーパス）。</li>
       </ul>
 
@@ -1771,6 +1776,10 @@ flowchart LR
       <p>
         エミュレータの価値は、パラメータから波形を合成することではなく、<strong>実機セッションで生の通信を丸ごと録画し、決定論的に再生する</strong>ことにある。特に<strong>失敗したセッションのトレース</strong>（タイムアウト・切断・ショートリードが起きた実ログ）を再生できると、ケーブルを抜き差しせずに自動再接続ロジックを開発・テストできる。録画は通信層に初日から組み込み、<strong>以後すべての実機セッションが自動的にコーパスを育てる</strong>。
       </p>
+      <div class="callout callout-warning">
+        <div class="callout-title">録画データの取扱い（2026-07-10 追加・D19 との整合）</div>
+        <p>EP6 生録画は<strong>ストアが暗号化する測定データそのもの</strong>（~200MB/s）であり、無制限の平文録画は D19 の保護を迂回し、ディスクを高速に消費する。規定：(1) <strong>製品/現場ビルドの既定＝メタデータ・障害チャネル（EP2/EP4・タイミング・障害トレース）のみ常時ON、EP6 生ペイロード全録画は明示 opt-in</strong>＋直近Nの リングバッファ。(2) 容量上限とローテーションを設定化し、ディスク枯渇時は録画を先に止める（取得を止めない。UX-11 監視対象に録画を含める）。(3) 保存時保護はストアと同等（D19 コーデックの流用可）とし、コーパスの持出し（開発/CIへの搬送）は finalize 済み・匿名化判断を経たものに限る（運用の所有者はオーナー確認事項）。(4) recorder ON での 200MB/s soak をフェーズ1受け入れに含める（記録が取得を乱さない実証）。</p>
+      </div>
 
       <h3>録画コーパスに含めるもの</h3>
       <ul>
@@ -1923,6 +1932,7 @@ stateDiagram-v2
       <div class="callout callout-danger">
         <div class="callout-title">既知の上限</div>
         <p>完全なホスト側再接続でも、FPGAがドレイン中にRD_WAITで固着した場合は回復不能（FWにabortレジスタが無い）。USB回復後は必ずドレインを完了する設計にし、恒久解はFWのabortレジスタ（4GB戦略フェーズ2）。また、FX3 FWがUSBサスペンド/LPMを扱わない場合、NoDfxは回避策でなく恒久的な出荷要件になる可能性がある。</p>
+        <p><strong>再接続後のバイトストリーム再同期（2026-07-10 追加）</strong>：EP6 はフレーミング無しのフラットな生バイト列（固定 <code>bytes_per_cell</code>）のため、切断時に転送途中のイベントが発生しうる。規定：デコーダは <code>bytes_per_cell</code> 単位でストリームオフセットを追跡し、<strong>Abort/ReConnect 時は転送中バッファを破棄して次のイベント境界（bytes_per_cell 整列位置）から再開</strong>する。部分イベントは損失としてカウント（FR-04 の損失記録に計上）。切断位置を変えた障害注入（イベント境界上・中間・ヘッダ相当位置）を Tier2 回帰に追加する。</p>
       </div>
     </section>
 
@@ -2124,6 +2134,9 @@ flowchart LR
         不変条件：<strong>いかなるパッケージ形態でも、解析ランタイムを取得コアの障害ドメインに入れない</strong>（上表「UIハングが取得ホットパスを乱さない」の一般化）。
         P1/D19 注記：同居構成では暗号化ストアと同じ筐体に sys_app の内部データが置かれる——D22（直読・複製なし）によりバルクの平文コピーは発生しないが、補償 sidecar 等の派生物は平文である。
       </p>
+      <p>
+        <strong>データ移送契約（2026-07-10 追加・案(B) 分離構成の前提）</strong>：D22 が禁じるのは<strong>下流アプリによる射影コピー（第2の権威面の生成）</strong>であり、<strong>finalized データセットのストア全体の移送・複製（バックアップ・解析機への配送）は正当な運用</strong>——両者を区別する。規定：(1) 移送対象は <code>status=finalized</code> のデータセットのみ。(2) copy-complete の判定＝一時名コピー→rename＋<strong>移送マニフェスト</strong>による検証。<strong>GCM 認証タグは「存在する暗号チャンクの中身」しか認証せず、チャンクの欠落・余剰や平文ファイル（meta.json・.zarray・gates）の欠落/改竄は検出しない</strong>（2026-07-10 是正）。よって finalized スナップショットの<strong>全相対パス＋サイズ＋SHA-256</strong>（または Merkle ルート）を移送マニフェストとして作成し、欠落・余剰・平文改竄を negative test で検証する。(3) sys_app の登録はパス参照のため、移送後は<strong>再登録（パス更新）</strong>で追従する——dataset_id は安定なので同一データセットとして扱える。(4) 分離構成のパス表現（UNC/SMB・Windows／WSL／Docker マッピング）の対応表を sys_app 側 S1 の登録仕様に含める。
+      </p>
       <div class="pyramid">
         <div class="pyramid-level">
           <div class="pyramid-bar" style="width:34%;background:#e03131;">実機受け入れ <span class="count">(希少・Win11)</span></div>
@@ -2257,7 +2270,7 @@ flowchart LR
 </div>
 
 <footer class="doc-footer">
-  <p>Generated 2026-07-03 — <strong>AnalogBoard 再構築プラン Draft 1.8</strong>。prompt.md ＋ 2件のコードベース調査 ＋ オーナー追加情報より作成。</p>
+  <p>Generated 2026-07-03 / Last updated 2026-07-10 — <strong>AnalogBoard 再構築プラン Draft 2.0</strong>。prompt.md ＋ 2件のコードベース調査 ＋ オーナー追加情報より作成。</p>
   <p>本ドキュメントは意思決定用の要約・再編である。規範的な仕様は各参照元を参照。図はMermaidをCDNから読み込む（オフライン閲覧時は描画に外部接続が必要）。</p>
 </footer>
 

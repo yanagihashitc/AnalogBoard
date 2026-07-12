@@ -593,9 +593,9 @@ pre {
   <p class="subtitle">AnalogBoard 再構築に伴う下流アプリの改変 — <strong>ストア完全直読（direct read）方式</strong>の改変プロンプト集（D22・2026-07-10 転換。旧：射影方式）。<strong>暫定・書き換え前提</strong>：AnalogBoard 側の出力契約凍結後に実行する。</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 改変プロンプト集（実行前提）</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.0（直読版・暫定）</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.2（直読版・暫定）</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（D19/D20/D21/D22 反映：S1 を registration-only＋直読へ再設計、S2/S5 廃止、S9〜S11 追加、G4/G5 追加、受け入れを直読往復へ改訂）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-10（Draft 1.2：G4 を AEAD Store ラッパ方式へ変更（numcodecs では座標 AAD 不可と実証）、G1 に producer/capability 判別子を確定、ストア形式表を wire-exact 化。Draft 1.1：codex レビュー反映——凍結の3段階化（RC→joint validation→Frozen v1）・S7 に gate 評価意味論の整合を追加（sys_app の quadrant 鏡像等・実コード検証済み）・S2 廃止註に fail-loud 要件（fail-open フォールバック実在の実証込み）・S1 登録ライフサイクル・S4 プレビュー/export 分離・S9 キー明確化（行列ハッシュ・行順結合の整合検証）・G4 暗号契約詳細化・受け入れマトリクス追加。Draft 1.0：S1 直読再設計・S2/S5 廃止・S9〜S11・G4/G5 追加）</span>
     <span class="doc-meta-item"><strong>Status:</strong> 実行保留（AnalogBoard 出力契約凍結後）</span>
     <span class="doc-meta-item"><strong>親:</strong> 260710-analogboard-rebuild-plan.html（Draft 2.0）</span>
     <span class="doc-meta-item"><strong>実装展開:</strong> gcsa/docs/plans/active/260710-analogboard-store-support-plan.html・sys_app/docs/plans/260710-analogboard-store-and-desktop-plan.html</span>
@@ -678,8 +678,8 @@ flowchart LR
         <figcaption>図1. 実行順序（直読版）。AnalogBoard 側実装 → 出力契約凍結 → gcsa 改変（sys_app 直読リーダの前提）→ sys_app 改変 → 直読往復受け入れ。G4（暗号コーデック）と fl_waveform はフェーズ0の往復プロトタイプで先行検証されるため、実質は契約凍結と並行して着手可能。</figcaption>
       </figure>
       <div class="callout callout-warning">
-        <div class="callout-title">依存</div>
-        <p>「固定入力契約」（次節）が凍結されるまで S/G は着手しない。凍結前に着手すると、契約変更のたびに手戻りが発生する。</p>
+        <div class="callout-title">依存（2026-07-10 改訂：凍結の3段階化と着手可能範囲の明確化）</div>
+        <p>契約確定は3段階で扱う：<strong>① Contract RC</strong>（本プランの固定入力契約表＝設計意図。現状）→ <strong>② joint validation</strong>（フェーズ0：C++ライタ×gcsa リーダの暗号化込み往復プロトタイプで RC を実証）→ <strong>③ Frozen v1</strong>（合流点1。以降の変更は版上げ＋変更管理）。着手規則：<strong>G1/G3/G4（契約凍結前必須と記した項目）は RC に対して先行着手してよい</strong>——これらは②の前提であり、②で判明した差分は③前に吸収する。<strong>それ以外の S/G は③（Frozen v1）後に着手</strong>する。旧文言「凍結されるまで S/G は着手しない」は G1/G3/G4 の先行必須と矛盾していたため上記に置換。スキーマ変更が③後に発生した場合の<strong>再凍結フロー</strong>（版上げ→コーパス更新→両リーダ再検証）は変更管理節と gcsa プラン C-9 に従う。</p>
       </div>
     </section>
 
@@ -690,13 +690,13 @@ flowchart LR
       <table class="spec-table">
         <thead><tr><th>項目</th><th>契約（現設計）</th><th>安定度</th></tr></thead>
         <tbody>
-          <tr><td>ストア形式</td><td>gcsaネイティブ Zarr：<code>pulse_features</code> float64 (N,24)、<code>gmi_waveform</code> uint16 (N,5,2400)、<code>fl_waveform</code> uint16 (N,8,2400)、<code>meta.json</code>＋<code>.gcsa_store.json</code></td><td><span class="badge badge-confirmed">高</span></td></tr>
+          <tr><td>ストア形式</td><td>gcsaネイティブ Zarr：<code>pulse_features</code> float64 (N,24)、<code>gmi_waveform</code> uint16 (N,5,2400)、<code>fl_waveform</code> uint16 (N,8,2400)、<code>meta.json</code>（データセット毎）＋<code>.gcsa_store.json</code>（<strong>ストアルート・store毎1個</strong>）。<strong>wire-exact 仕様（G1/A-4 で凍結）</strong>：実整数 chunks（(10000,None) 等はポリシー表記——実 <code>.zarray</code> は正規化済み整数列）・dtype エンディアン（<code>&lt;f8</code>/<code>&lt;u2</code>）・<code>order='C'</code>・<code>fill_value=0</code>・<code>dimension_separator='.'</code>・compressor JSON を明示固定（現 gcsa は zarr 既定に暗黙依存）</td><td><span class="badge badge-confirmed">高</span></td></tr>
           <tr><td>特徴量順（pin）</td><td>ch毎に A→H→W：<code>FSC_A,FSC_H,FSC_W, SSC_A,…, FL6_A,FL6_H,FL6_W</code>（gcsa <code>extract_all</code> と一致）</td><td><span class="badge badge-confirmed">高</span></td></tr>
           <tr><td>GMI 順</td><td><code>fsGMI,ssGMI,flGMI,dGMI,bfGMI</code></td><td><span class="badge badge-confirmed">高</span></td></tr>
           <tr><td>座標空間</td><td>生ADC線形（log/biexp を焼き込まない）</td><td><span class="badge badge-confirmed">高</span></td></tr>
           <tr><td>meta.json</td><td>順序付き24特徴量名・空間トークン <code>pulse_features</code>・順序付き5 GMI名・イベント数・per-event event index・安定 dataset id。任意（additive）：<code>display_name</code>/<code>comment</code>/<code>tags</code>（親プラン UX-17。無視しても壊れない）</td><td><span class="badge badge-assumption">中</span></td></tr>
           <tr><td>可視性契約（D21・additive）</td><td><code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・<strong>特徴量毎 min/max レンジ</strong>。単一書き手規則：<code>datasets/&lt;id&gt;/</code> の書き手は取得コアのみ。下流は <code>status=finalized</code> のみ import/読取対象とし、派生物は (dataset_id, feature_schema_version, write_generation) キーのキャッシュと位置づける</td><td><span class="badge badge-confirmed">高（決定済・字段詳細はフェーズ0凍結）</span></td></tr>
-          <tr><td>チャンク暗号化（D19）</td><td>測定配列（pulse_features/gmi_waveform/fl_waveform）のチャンクは Blosc(lz4) 圧縮後 AES-256-GCM 暗号化。<code>.zarray</code> compressor は独自 numcodecs ID（例 <code>gcsa-aes</code>）＋チャンクヘッダ <code>key_id</code> 1バイト。meta.json・<code>.gcsa_store.json</code>・gates は平文。読取には G4 コーデック登録済み gcsa が必須</td><td><span class="badge badge-confirmed">高（採用済・codec 詳細はフェーズ0凍結）</span></td></tr>
+          <tr><td>チャンク保護（D19）</td><td>測定配列チャンクは Blosc(lz4) 圧縮後 AES-256-GCM。<strong>AEAD は Store ラッパ層</strong>（numcodecs コーデックでは座標 AAD 不可と実証）。チャンクファイル＝<code>magic｜version｜key_id｜nonce｜暗号文｜tag</code>、<strong>AAD=<code>dataset_id \0 array_rel_path \0 chunk_key</code></strong>。<code>.zarray</code> は内側 Blosc を宣言し <code>dimension_separator=&quot;.&quot;</code> を明示。meta.json・<code>.gcsa_store.json</code>・gates は平文。読取には AEAD ラッパ実装済み gcsa が必須</td><td><span class="badge badge-confirmed">高（方式確定・ワイヤ詳細はフェーズ0凍結）</span></td></tr>
           <tr><td>パーティションシャーディング</td><td>round-robin（<code>e % n_partitions</code>）維持＋per-partition <code>sealed</code> か、append-sequential＋seal か——<strong>フェーズ0で決着</strong>（G5 バリデータ改修と同一契約変更）</td><td><span class="badge badge-open">フェーズ0決定待ち</span></td></tr>
           <tr><td>精度</td><td>ストアは float64。sys_app Parquet も float64 化し <code>round(6)</code> を除去（親プラン D15・S6 で確定、往復判定は bit 一致）</td><td><span class="badge badge-confirmed">高</span></td></tr>
           <tr><td>特徴量アルゴリズム版</td><td>整数版 <code>feature_schema_version=1</code>（gcsa v1 準拠）から開始、算出値が変わる改訂で +1。<code>meta.versions</code> にアプリ/FW/アルゴ版を記録、同一データセット内の版混在禁止（親プラン D14 で確定）</td><td><span class="badge badge-confirmed">高</span></td></tr>
@@ -714,7 +714,8 @@ flowchart LR
       <table class="spec-table"><tbody>
         <tr><td><strong>What</strong></td><td>(a) <strong>registration-only import</strong>：ストアの meta.json＋配列形状から Dataset 行（event_count・channels_json・store パス）を登録するだけにする——データ複製なし・<code>status=finalized</code> のみ対象。(b) <strong>直読リーダ</strong>：特徴量読取を <code>DuckDBFeatureStore</code>（Parquet）から gcsa 経由の ZarrFeatureStore（復号・パーティション連結・<code>event_idx</code> 合成、返り値 <code>dict[str, np.ndarray]</code> 互換）へ差替える。bin 取り込みは互換で残す。</td></tr>
         <tr><td><strong>Why</strong></td><td>D22。旧射影は①全計測 RAM ロード（ピーク RAM≒生データサイズ、1M イベント≒62GB で import 不可）②読者不在の全波形コピー（<code>data.zarr</code>、<code>dataset_import_steps.py:787-822</code> に書くが読むコード無し）③D19 暗号化を平文コピーが無効化、の3問題。sys_app の特徴量読取は <code>DuckDBFeatureStore</code> 1箇所（<code>duckdb_feature_store.py:100-148</code>・呼出毎 in-memory 接続・<code>read_parquet(path)</code>）にチョークしており、コンシューマは gate（<code>gate_mask_operations_mixin.py:112</code>）と可視化（<code>visualization_pulse_event_source.py:375</code>）の2モジュールのみ——同型 dict を返せば上位は無改修。</td></tr>
-        <tr><td><strong>How</strong></td><td>import：<code>import_from_path</code> で store 判定（<code>.gcsa_store.json</code>/<code>meta.json</code> 有）→登録専用ステップへ分岐（既存 <code>build_importing_dataset</code>/<code>run_pipeline_in_transaction</code>/メタ読取パターン <code>dataset_import_persistence_service.py:271-284</code> を再利用）。リクエストスキーマはストアパス指定・スキャン/発見はストアベース・idempotency はストア指紋（meta.json の dataset id＋write_generation）。channels_json のレンジは <strong>meta の min/max（D21）</strong>から取得（全行スキャン不要）。<code>display_name</code>/<code>comment</code>/<code>tags</code> は表示名に採用。読取：<code>DuckDBFeatureStore</code> と同一シグネチャの ZarrFeatureStore を実装し2箇所の生成部で差替え（gcsa の <code>get_pulse_features(features=[...])</code>・列指定読取を使用）。<strong><code>extract_pulse_features</code> は一切呼ばない</strong>。</td></tr>
+        <tr><td><strong>How</strong></td><td>import：<code>import_from_path</code> で store 判定（<code>.gcsa_store.json</code>/<code>meta.json</code> 有）→登録専用ステップへ分岐（既存 <code>build_importing_dataset</code>/<code>run_pipeline_in_transaction</code>/メタ読取パターン <code>dataset_import_persistence_service.py:271-284</code> を再利用）。リクエストスキーマはストアパス指定・スキャン/発見はストアベース・idempotency はストア指紋（meta.json の dataset id＋write_generation。<strong>現行の全ファイル内容 SHA-256 方式（<code>dataset_import_input_service.py:185-189</code>）は数十GB級ストアで非現実的なため置換</strong>）。channels_json のレンジは <strong>meta の min/max（D21）</strong>から取得（全行スキャン不要）。<code>display_name</code>/<code>comment</code>/<code>tags</code> は表示名に採用。読取：<code>DuckDBFeatureStore</code> と同一シグネチャの ZarrFeatureStore を実装し2箇所の生成部で差替え（gcsa の <code>get_pulse_features(features=[...])</code>・列指定読取を使用）。<strong><code>extract_pulse_features</code> は一切呼ばない</strong>。
+        <strong>登録ライフサイクル（2026-07-10 追加）</strong>：(a) 同一 dataset_id の再登録は<strong>冪等 upsert</strong>（write_generation が進んでいれば更新・派生キャッシュ無効化。DB に source_kind／source_dataset_id／store_path／store_format／feature_schema_version／write_generation 列＋一意制約を追加——Idempotency-Key 任意設定だけでは二重登録を防げない）。(b) パス検証は既存の <code>DATA_DIR</code> 制約（<code>validate_path_within_data_dir</code>）を継承し allowed roots を設定化、symlink/UNC/コンテナパスの正規化規則を明記（親プラン「データ移送契約」の対応表と対）。(c) ストアの移動・削除・オフライン時＝該当データセットを <code>unavailable</code> 表示にし fail-loud（自動削除しない）、再登録（パス更新）で復帰。(d) meta.json のマニフェストと実配列 shape の不一致＝登録拒否（明示エラー。切詰め読みで隠さない）。(e) <strong>登録はソースへ一切書かない</strong>——現行 import ルートは <code>bootstrap_sys_app_directories()</code> で source 直下に <code>sys_app/{store,artifacts,gates}/</code> を作成する（<code>routers/datasets.py:407-409</code>・export 経路 <code>export_tasks.py:419-423</code> にも同型）ため、store 経路では呼出し禁止。派生物は app 管理の derived root へ（S9 参照）。(f) 既存 endpoint は <code>cfg_path</code> 必須（<code>datasets_import_helpers.py:63-78</code>）のため、store 登録は <strong>tagged union か別 endpoint</strong> とする。</td></tr>
         <tr><td><strong>Verify</strong></td><td>store のみのディレクトリの import が<strong>秒未満</strong>で完了し Dataset 行が正しい（event_count==N・channels_json レンジ==meta の min/max）。<code>PulseFeatureExtractor.extract_all</code> 不呼出（spy）。scatter/gate クエリ値がストアの <code>pulse_features</code> と bit 一致。<code>status=open</code> のストアは import 拒否（明示エラー）。バルクコピー（parquet/data.zarr/waveforms.json）が生成されないこと。</td></tr>
       </tbody></table>
 
@@ -722,6 +723,7 @@ flowchart LR
       <div class="callout callout-info">
         <div class="callout-title">廃止の経緯</div>
         <p>旧 S2「特徴量算出を記録済みが無い時のみに条件化」は、import が何もデコードしなくなる registration-only 化（S1）で対象コードパス自体が消えるため廃止。<strong>不変条件（D5：記録済み A/H/W を黙って上書きしない）は直読リーダ（S1b）に内在化</strong>され、受け入れテストの再計算スパイ（0回）で検証する。レガシー bin import 経路の無条件再計算（<code>dataset_import_steps.py:239</code>）は互換経路として残るが、ストア経路とは独立。gcsa 側の同じ不変条件は G2 が担う。</p>
+        <p><strong>fail-loud 要件（2026-07-10 追加・実コード検証で確定）</strong>：現行 sys_app には<strong>読取失敗→gcsa 再抽出→Parquet 永続化の fail-open フォールバック</strong>が実在する（<code>visualization_event_source.py:144-151</code> → <code>visualization_pulse_event_source.py:287-361</code> の <code>recover_events_from_gcsa</code> が <code>extract_pulse_features</code> を呼び <code>:355-360</code> で永続化。読取例外 <code>FileNotFoundError/ValueError</code> は <code>:377-379</code> で黙って None 化。<strong>波形にも同型のフォールバックあり</strong>：<code>visualization_waveform_source.py:170-190</code>）。ストア由来データセット（storage=gcsa_store）ではこの経路を<strong>構造的に無効化し、読取失敗は明示エラー（fail-loud）</strong>とする——復号失敗・パーティション不整合を黙って再計算で覆い隠すのは D5/D19 の同時違反。受け入れに「<code>extract_pulse_features</code>／recovery 永続化／波形再生成 fallback の呼出し 0 回」の spy を含める（S10 の CI でも常時検証）。</p>
       </div>
 
       <h3>S3. channels_json の名前・順序・レンジを meta.json から決める（直読版に改訂）</h3>
@@ -734,7 +736,7 @@ flowchart LR
 
       <h3>S4. GMI 波形の直読化（旧：waveforms.json 生成 → 2026-07-10 再設計）</h3>
       <table class="spec-table"><tbody>
-        <tr><td><strong>What</strong></td><td>波形表示・export をストアの <code>gmi_waveform</code>(N,5,2400) の<strong>直接スライス</strong>（gcsa <code>get_gmi_waveform(event_indices=...)</code>）に切替え、import 時の <code>waveforms.json</code> 生成を廃止。プレビュー上限（<code>GMI_WAVEFORM_MAX_COUNT=128</code>、<code>dataset_import_steps.py:47</code>）は維持。</td></tr>
+        <tr><td><strong>What</strong></td><td>波形表示・export をストアの <code>gmi_waveform</code>(N,5,2400) の<strong>直接スライス</strong>（gcsa <code>get_gmi_waveform(event_indices=...)</code>）に切替え、import 時の <code>waveforms.json</code> 生成を廃止。<strong>プレビューと export を分離（2026-07-10 追加）</strong>：<strong>UI プレビューのみ</strong> 128 イベント上限（<code>GMI_WAVEFORM_MAX_COUNT=128</code>）を維持し、<strong>export／API は全イベント範囲をチャンク順に直読</strong>する（ストリーミング/ページング）。注：現行実装は export も同じ 128 上限チェーンを通っており（<code>export_tasks.py:166-171</code> → <code>resolve_waveform_source</code> の3ソース全てが 128 cap——既存の実質バグ）、直読化はこの混同を<strong>解消する機会</strong>であって固定化してはならない。</td></tr>
         <tr><td><strong>Why</strong></td><td>現行 <code>waveforms.json</code> は 128 イベント上限の JSON プレビューで、生成には全計測ロードが要る（registration-only と非両立）。読取チェーンは1本（<code>resolve_waveform_source</code>、<code>visualization_waveform_source.py:193-220</code>）・コンシューマ2箇所（波形エンドポイント・export）で差替えは小さい。誤順は GMI プロットを黙って取り違える。</td></tr>
         <tr><td><strong>How</strong></td><td><code>resolve_waveform_source</code> にストア直読分岐を追加し、取得した配列を既存 <code>build_multi_channel_waveform_payload</code>（<code>waveform_payload.py:141-215</code>・array-like を受ける）へ渡す。<code>resolve_waveform_store_dir</code> の <code>dataset.zarr_path</code> 依存（<code>visualization_waveform_helpers.py:26-34</code>）をストアパス項目に置換。meta の GMI 順 == <code>FH_CHANNEL_NAMES</code> をアサート。</td></tr>
         <tr><td><strong>Verify</strong></td><td>波形エンドポイントが 5 ch を返し、既知イベントの各サンプルがストアの <code>gmi_waveform</code> と一致（復号込み）。import 後に <code>waveforms.json</code> が存在しない。</td></tr>
@@ -755,9 +757,9 @@ flowchart LR
         <tr><td><strong>Verify</strong></td><td>抜取値がストアと選定精度で一致。読取が float coerce でエラー無し（<code>duckdb_feature_store.py:67</code>）。</td></tr>
       </tbody></table>
 
-      <h3>S7. gate 種の整合＋ gcsa-clean v1 エクスポート派生</h3>
+      <h3>S7. gate 種の整合＋ gcsa-clean v1 エクスポート派生＋<strong>評価意味論の整合（2026-07-10 追加）</strong></h3>
       <table class="spec-table"><tbody>
-        <tr><td><strong>What</strong></td><td>gcsa <code>all</code> を sys_app 仮想 root にマップ、sys_app <code>histogram-range</code> の下map、gcsa-clean v1 エクスポート派生を追加。</td></tr>
+        <tr><td><strong>What</strong></td><td>gcsa <code>all</code> を sys_app 仮想 root にマップ、sys_app <code>histogram-range</code> の下map、gcsa-clean v1 エクスポート派生を追加。<strong>加えて（Critical・2026-07-10 検証で確定）：sys_app の gate 評価意味論を正準（=gcsa 実装）へ整合</strong>——<code>gate_mask_service.py</code> の rectangle を半開区間（上限排他）へ、threshold below を <code>&lt;</code> へ、quadrant の命名を Q1=左上・時計回りへ再マップ（現状 Q1=右上で<strong>同一 payload が鏡像領域を選択する</strong>）。既存 sys_app データセットの quadrant gate は移行時に名称再マップが必要。</td></tr>
         <tr><td><strong>Why</strong></td><td>gcsa v1 の <code>all</code> は import で <code>GateInvalidTypeError</code>（<code>import_mapping.py:100-106</code>）；sys_app <code>histogram-range</code> は gcsa v1 に無い；既定 export は v2.0＋<code>fill_enabled</code>/<code>fill_order</code>＋トップ階層（<code>export_service.py:64-100</code>）で strict gcsa v1 と不一致。</td></tr>
         <tr><td><strong>How</strong></td><td>import で <code>all</code> → <code>FALLBACK_GATE_ID</code>（<code>gate-root</code>）にマップ（例外にしない）。<code>{version:'1.0', gates:[gate_id,display_name,color,type,axes,transform_space,params,parent_gate_id]}</code> のみを出す export 派生を追加（<code>fill_*</code>/階層を除去）。</td></tr>
         <tr><td><strong>Verify</strong></td><td><code>all</code> を含む gcsa v1 ファイルが例外なく import。gcsa-clean export が gcsa へ無改変で再 import。</td></tr>
@@ -775,7 +777,7 @@ flowchart LR
       <table class="spec-table"><tbody>
         <tr><td><strong>What</strong></td><td><code>Comp-</code> 補償列を、特徴量ファイルへの上書き追記から <strong>sys_app 内部の sidecar ストア＋読取時の合成ビュー</strong>へ分離する。</td></tr>
         <tr><td><strong>Why</strong></td><td>現行 CompensationService は特徴量 parquet を pyarrow で読み、<code>Comp-</code> 列を追記して<strong>同じファイルを原子的に書き直す</strong>（<code>compensation/service.py:278-333,507</code>・<code>parquet_io.py:138-204</code>・除去は列 drop＋rewrite）。読み取り専用の暗号化ストア（D19/D21 単一書き手規則）とは構造的に両立しない。直読転換で唯一「リーフ差替えでなく設計変更」が要る箇所。</td></tr>
-        <tr><td><strong>How</strong></td><td>補償列を (dataset_id, feature_schema_version, write_generation, 行列ハッシュ) キーの sidecar（parquet 等・<code>{source_dir}/sys_app/store/</code> 配下）へ書き、ZarrFeatureStore（S1b）と補償自身の読取パスで「ストア直読列＋sidecar 列」の合成 dict を返す。適用/再適用/除去のライフサイクルは sidecar の生成/差替え/削除として再実装。補償対象が <code>_A/_H</code> のみである既存規約は維持。</td></tr>
+        <tr><td><strong>How</strong></td><td>補償列を (dataset_id, feature_schema_version, write_generation, <strong>補償行列ハッシュ</strong>) キーの sidecar（parquet 等・<strong>app 管理の明示的 derived root＝Windows <code>%LOCALAPPDATA%</code> 等・設定可能。<code>{source_dir}/sys_app/</code> 配下ではない——read-only マウントされたストア共有でも動作するため。2026-07-10 改訂</strong>）へ書き、<strong>dtype は float64</strong>（現行の <code>pa.float32</code> 書込は bit 一致方針と矛盾——S6 と対）で、ZarrFeatureStore（S1b）と補償自身の読取パスで「ストア直読列＋sidecar 列」の合成 dict を返す。<strong>キー明確化（2026-07-10）</strong>：ハッシュは<strong>補償行列（係数）のハッシュ</strong>であり全行スキャンは不要——追記・再アームによる行の変化は write_generation が捕捉する。<strong>行整合の保証</strong>：現行実装は event_idx 結合ではなく<strong>行順結合</strong>（<code>compensation/service.py:276-286</code>・event_idx 参照ゼロ確認済み）のため、sidecar には行数＋<code>write_generation</code> を記録し、合成時に一致検証（不一致＝sidecar 無効化・fail-loud）。書込は temp→atomic rename、クラッシュ時は部分 sidecar を無効として破棄。適用/再適用/除去のライフサイクルは sidecar の生成/差替え/削除として再実装（除去＝ファイル削除でストア本体は不変）。補償対象が <code>_A/_H</code> のみである既存規約は維持。</td></tr>
         <tr><td><strong>Verify</strong></td><td>補償適用→scatter/統計に <code>Comp-</code> 列が現れ、除去→消える（ストア本体のファイルは<strong>一切変更されない</strong>——mtime/ハッシュ監視）。補償値が旧実装と数値一致。write_generation が変わった（再アーム追記等）データセットで sidecar が無効化される。</td></tr>
       </tbody></table>
 
@@ -805,7 +807,7 @@ flowchart LR
       <table class="spec-table"><tbody>
         <tr><td><strong>What</strong></td><td>AnalogBoard が書き sys_app が直読する正準ストアスキーマを凍結し公開する。<strong>拡張（D21）</strong>：可視性マーカの additive 字段（<code>status</code>/<code>finalized_at</code>/<code>write_generation</code>/パーティションマニフェスト/特徴量毎 min/max）を許容し、リーダ意味論を定義する——<code>status=open</code> のデータセットは既定で読取拒否（明示エラー）、opt-in で sealed prefix のみ読む。</td></tr>
         <tr><td><strong>Why</strong></td><td>両側が同じ契約を参照する単一の真ソースが必要（順序名・GMI名順・dtype/shape）。gcsa の従来慣習（meta.json 最終書込＝暗黙のコミット・<code>pipeline/measurement_streaming.py:136-138</code> の <code>save_meta</code>）は AnalogBoard の再アーム append（meta.json を先に書く）と両立しない——明示マーカが代替。<strong>要注意（2026-07-10 検証）：gcsa の <code>DatasetMeta.from_dict/to_dict</code> は未知トップレベルキーを round-trip で黙って落とす</strong>——「additive だから無視されるだけ」は成立せず、gcsa が <code>save_meta</code> を呼ぶ経路でマーカ字段が消失する。</td></tr>
-        <tr><td><strong>How</strong></td><td>版付きスキーマ文書＋、正準の順序特徴量名（== <code>PulseFeatureExtractor.extract_all</code> の 8ch×{_A,_H,_W}）・GMI 名順（== <code>FH_CHANNEL_NAMES</code>）・配列 dtype/shape・min/max を返す小 API を追加。マーカ字段は<strong>DatasetMeta の first-class フィールドとしてモデル化</strong>（未知キー透過に頼らない）したうえで意味論を実装。</td></tr>
+        <tr><td><strong>How</strong></td><td>版付きスキーマ文書＋、正準の順序特徴量名（== <code>PulseFeatureExtractor.extract_all</code> の 8ch×{_A,_H,_W}）・GMI 名順（== <code>FH_CHANNEL_NAMES</code>）・配列 dtype/shape・min/max を返す小 API を追加。マーカ字段は<strong>DatasetMeta の first-class フィールドとしてモデル化</strong>（未知キー透過に頼らない）したうえで意味論を実装。<strong>バリデータ分離（2026-07-10 追加）</strong>：<code>status</code> 欠落を一律 legacy-finalized 扱いにすると壊れた新ストアを受理するため、store_format/capability で判別し AnalogBoard 産ストアには <strong>strict validator</strong>（D21 字段必須・欠落＝拒否）、旧 gcsa ストアには legacy validator を適用する。スキーマは <strong>wire-exact</strong>（実整数 chunks・エンディアン・order/fill_value/dimension_separator・compressor JSON・<code>.gcsa_store.json</code> はストアルート）で固定する。加えて <strong>read-only モード</strong>を gcsa に新設（現 <code>ZarrStore.__init__</code> は開くだけで <code>datasets/</code>・<code>cache/</code> を mkdir——read-only open は書込ゼロ・mutator 全拒否・キャッシュ外置き。D21/D22 の強制機構）。</td></tr><strong>判別子（2026-07-10 オーナー確定）</strong>：<code>.gcsa_store.json</code> に additive で <code>producer</code>（例 <code>analogboard</code>）と <code>capabilities</code>（<code>encrypted_chunks</code>／<code>d21_visibility</code> 等）を追加する（<code>store_format</code> は 1 のまま——現行 gcsa は <code>&lt;=1</code> を一律受理するため版数では新旧を判別できないことを実証済み）。この字段の有無で strict／legacy を自動選択し、未知 capability は明示エラー、旧リーダは additive 字段を無視して従来通り読める。
         <tr><td><strong>Verify</strong></td><td>API 出力が実 <code>extract_all</code> の並びと一致。マーカ字段付きストアが既存フローで無改変ロードし、<strong>gcsa 経由の meta round-trip（load→save）で字段が保存される</strong>。<code>status=open</code> の全読みが明示エラー。文書の版が meta.json <code>versions</code> と対応。</td></tr>
       </tbody></table>
 
@@ -825,12 +827,12 @@ flowchart LR
         <tr><td><strong>Verify</strong></td><td><code>fl_waveform</code> 有りのストアが既存フローで無改変ロード、<code>get_fl_waveform</code> が (N,8,2400) uint16・FL 順 <code>FSC,SSC,FL1..FL6</code> で往復。</td></tr>
       </tbody></table>
 
-      <h3>G4. AES-256-GCM チャンク暗号コーデック【新規 2026-07-10・D19・契約凍結前必須】</h3>
+      <h3>G4. チャンク保護（AEAD Store ラッパ）【新規 2026-07-10・D19・契約凍結前必須。2026-07-10 方式変更】</h3>
       <table class="spec-table"><tbody>
-        <tr><td><strong>What</strong></td><td>独自 numcodecs コーデック（ID 例 <code>gcsa-aes</code>・Zarr v2 用）を実装・登録する：Blosc 圧縮済みチャンクの AES-256-GCM 暗号化/復号、チャンクヘッダに <code>key_id</code>（1バイト）、難読化した共通鍵の埋込。</td></tr>
+        <tr><td><strong>What</strong></td><td><strong>方式変更（2026-07-10・実証済み）</strong>：numcodecs の <code>Codec</code> は <code>encode(buf)</code>/<code>decode(buf)</code> のみでチャンク座標を受け取らない（numcodecs 0.13.1 <code>abc.py:41-59</code>／zarr 2.18.3 <code>core.py</code> の <code>_encode_chunk</code>/<code>_decode_chunk</code>）。したがって当初案「カスタム numcodecs コーデック <code>gcsa-aes</code>」では座標を AAD に束縛できず、チャンクファイルの入替えを検知できない。<strong>読取側の AEAD を zarr の Store ラッパ層</strong>（<code>BaseStore.__getitem__</code>／<code>__setitem__</code> がチャンクキーを受け取る）に移す。<code>.zarray</code> の compressor は<strong>内側の Blosc</strong>を宣言する。</td></tr>
         <tr><td><strong>Why</strong></td><td>D19。AnalogBoard の C++ ライタが書く暗号化チャンクを gcsa（＝sys_app の直読層）が復号できる必要がある。抑止レベル（バイナリ解析には耐えない）を明記した設計。GCM 認証タグはチャンク単位の破損検知を兼ねる。</td></tr>
-        <tr><td><strong>How</strong></td><td>numcodecs <code>Codec</code> 実装＋<code>numcodecs.register_codec</code> を <code>import gcsa</code> 時に自動実行。書込側の選択は <code>ZarrStoreConfig(compressor=...)</code> のプログラム的注入（<code>GCSA_COMPRESSOR</code> env allowlist {zstd,lz4} は変更しない）。読取側は <code>.zarray</code> の codec ID からレジストリ解決されるため ZarrStore 読取路の変更は不要。鍵は難読化定数＋<code>key_id</code> 引きの key provider に隔離（将来の鍵替え・外部鍵化の差替え点）。C++ ライタ側と<strong>ワイヤ形式（nonce/tag/key_id の配置）を仕様書で固定</strong>し、フェーズ0往復の合格条件とする。</td></tr>
-        <tr><td><strong>Verify</strong></td><td>C++ ライタ産の暗号化ストアが <code>import gcsa</code> 済み環境で無改変ロード（フェーズ0往復）。改竄チャンクが GCM 認証エラーで fail-loud。コーデック未登録環境では「未知コーデック」の明示エラー（黙って生バイトを返さない）。</td></tr>
+        <tr><td><strong>How</strong></td><td>gcsa の配列 open（<code>_zarr_atomic.py</code> の <code>open_zarr_v2_array</code>／<code>open_existing_zarr_v2_array</code>）が生パスの代わりに<strong>AEAD Store ラッパ</strong>を構築するよう変更する。ラッパはルートパスから <code>dataset_id</code>／配列相対パスを、キーからチャンク座標を得て AAD を組み立て、<code>.zarray</code>/<code>.zattrs</code> 等の非チャンクキーは素通しする。C++ ライタは従来どおりチャンクキー＝ファイル名で直接書くため、両者は同一の AAD を計算でき相互運用する（DirectoryStore のキー↔ファイル名対応で実証）。鍵は <code>key_id</code> 引きの key provider に隔離（将来の外部鍵化の差替え点）。<strong>ワイヤ形式・AAD のバイト表現・nonce 一意性方式を C++ 側と機械可読仕様で固定し、C++／Python の KAT を Must</strong>。zarr の blosc partial-decompress は禁止（全チャンク復号前提）。<code>numcodecs.register_codec</code> による独自 ID 方式は採らない。</td></tr>
+        <tr><td><strong>Verify</strong></td><td>C++ ライタ産の保護済みストアが、AEAD ラッパ経由の gcsa で無改変ロード（フェーズ0往復）。<strong>実 zarr 上で2座標のチャンクファイルを丸ごと入替えると必ず失敗する</strong>テストを RC ゲートに含める（AAD 座標束縛の実証）。tag 改竄・wrong key・未知 <code>key_id</code>・切詰めチャンクはすべて fail-loud。ラッパ非経由の素の <code>zarr.open_array</code> では Blosc 復号が失敗し、平文が得られないこと。AAD のバイト表現（区切り・座標整数表現・エンディアン）を C++／Python の KAT で byte-exact に固定。</td></tr>
       </tbody></table>
 
       <h3>G5. リーダ堅牢化：バリデータ・並行性・CI コーパス【新規 2026-07-10】</h3>
@@ -849,7 +851,8 @@ flowchart LR
       <table class="spec-table">
         <thead><tr><th>種別</th><th>gcsa v1</th><th>sys_app</th><th>合意方針（案）</th></tr></thead>
         <tbody>
-          <tr><td><code>polygon</code>/<code>rectangle</code>/<code>threshold</code>/<code>quadrant</code>/<code>boolean</code></td><td>あり</td><td>あり</td><td>そのまま往復可</td></tr>
+          <tr><td><code>polygon</code>/<code>rectangle</code>/<code>threshold</code>/<code>quadrant</code>/<code>boolean</code></td><td>あり</td><td>あり</td><td><strong>payload はそのまま往復可</strong>。ただし<strong>評価意味論に既知の乖離あり（下記・2026-07-10 検証）</strong>——payload 一致だけでは母集団がずれる</td></tr>
+          <tr><td><strong>境界・象限の評価意味論</strong></td><td>rectangle 上限<strong>排他</strong>（<code>x_min≤x&lt;x_max</code>）・below <code>&lt;</code>・<strong>Q1=左上</strong>から時計回り（<code>gating/apply.py</code> 実装確認済み・親プラン正準表と一致）</td><td>rectangle 上限<strong>包含</strong>・below <code>&lt;=</code>・<strong>Q1=右上</strong>（<code>gate_mask_service.py</code> 実装確認済み——quadrant は<strong>領域が鏡像反転</strong>）</td><td><strong>gcsa/親プラン正準表を正とし sys_app の評価を整合させる（S7 に追加済み）</strong>。境界上イベント＋全象限のフィクスチャで mask/統計一致を受け入れに含める</td></tr>
           <tr><td><code>all</code>（root）</td><td>あり</td><td>無（仮想 root <code>gate-root</code>）</td><td>import 時 <code>all</code> → 仮想 root にマップ、正準 export では root を出さない</td></tr>
           <tr><td><code>histogram-range</code></td><td>無</td><td>あり</td><td>gcsa に受理 or range/threshold へ下map を合意（S7/G3）</td></tr>
           <tr><td><code>ellipse</code></td><td>不可（拒否）</td><td>不可</td><td>UI の範囲選択に ellipse を出さない</td></tr>
@@ -878,6 +881,18 @@ flowchart LR
         <div class="callout-title">合格基準</div>
         <p>再計算スパイ 0 回、登録がデータ複製ゼロ・秒未満、scatter/gate 値がストアと bit 一致、<code>status=open</code> の import が明示拒否、gate 往復が無損失、ストア本体が下流から一切書き換えられない。これが満たされれば「gcsa と sys_app でシームレス」を担保する。本テストは S10/G5 により CI コーパスとして常設化する。</p>
       </div>
+      <h3>受け入れマトリクス（2026-07-10 追加・「各1件」からの拡張）</h3>
+      <p>上記の基本往復に加え、コーパスと受け入れは次の軸を掛け合わせてカバーする（S10/G5-c の CI マトリクス）：</p>
+      <ul>
+        <li><strong>ストア形態</strong>：fl_waveform ON／OFF・単一パーティション／複数パーティション（再アーム追記済み）・部分チャンク（端数行）</li>
+        <li><strong>状態</strong>：<code>status=open</code>（拒否）／finalized・マニフェスト欠損／shape 不一致（登録拒否）</li>
+        <li><strong>暗号 negative</strong>：wrong key・タグ改竄・チャンク swap・未知 <code>key_id</code>・コーデック未登録環境（すべて fail-loud）</li>
+        <li><strong>fail-open 防止</strong>：extract／recovery 永続化／波形 fallback の呼出し 0 回（spy）</li>
+        <li><strong>gate 意味論</strong>：全 gate 型×境界上イベント＋全象限のフィクスチャで gcsa／sys_app の mask・統計が一致</li>
+        <li><strong>補償 sidecar</strong>：適用→表示→除去→再適用のライフサイクル・write_generation 変化時の無効化・ストア本体不変（mtime/ハッシュ）</li>
+        <li><strong>スケール</strong>：大規模データセット（目安 1M イベント）で登録が秒未満・scatter 初回描画が実用時間内・export 全件が完走</li>
+        <li><strong>レガシー互換</strong>：既存 bin import データセットの表示・gate・export に退行がない</li>
+      </ul>
     </section>
 
     <!-- CHANGE MGMT -->

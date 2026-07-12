@@ -6,7 +6,7 @@
 
 - [AnalogBoard rebuild plan](plans/260710-analogboard-rebuild-plan.html)
 - [Downstream modification plan](plans/260703-downstream-modification-plan.html)
-- [Cross-repo execution roadmap](plans/260710-cross-repo-execution-roadmap.html) — AnalogBoard / gcsa / sys_app 4プランの推奨実行順・依存関係・同期点
+- [Cross-repo execution roadmap](../../task_management/260710-cross-repo-execution-roadmap.html) — AnalogBoard / gcsa / sys_app / gain_scope の中央実行・進捗ロードマップ
 
 ## Current Operations
 
