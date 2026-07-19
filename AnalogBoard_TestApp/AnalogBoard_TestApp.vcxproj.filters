@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AcquisitionShutdownCoordinator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="AnalogBoard_TestApp.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -19,6 +19,7 @@ namespace AcquisitionCompletionLogic
     {
         bool activeCycleObserved = false;
         bool drainingHintSeen = false;
+        bool ddrRdEndSeen = false;
         std::size_t readableUpperBoundBytes = 0;
 
         void Reset()
@@ -33,6 +34,8 @@ namespace AcquisitionCompletionLogic
         std::size_t unreadBytes = 0;
         bool shouldRead = false;
         bool enteredDraining = false;
+        bool ddrRdEndConfirmed = false;
+        bool enteredDdrRdEnd = false;
         bool acquisitionComplete = false;
         bool activeCycleObserved = false;
         bool drainingHintSeen = false;
@@ -91,9 +94,18 @@ namespace AcquisitionCompletionLogic
             decision.unreadBytes = decision.readableUpperBoundBytes - savedBytes;
         }
         decision.shouldRead = (decision.unreadBytes != 0u);
-        decision.acquisitionComplete =
+        decision.ddrRdEndConfirmed =
             (snapshot.ddrRdEnd == 1) &&
-            state->activeCycleObserved &&
+            state->activeCycleObserved;
+        decision.enteredDdrRdEnd =
+            decision.ddrRdEndConfirmed &&
+            !state->ddrRdEndSeen;
+        if (decision.ddrRdEndConfirmed)
+        {
+            state->ddrRdEndSeen = true;
+        }
+        decision.acquisitionComplete =
+            decision.ddrRdEndConfirmed &&
             !decision.shouldRead;
         decision.activeCycleObserved = state->activeCycleObserved;
         decision.drainingHintSeen = state->drainingHintSeen;

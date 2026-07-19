@@ -16,7 +16,9 @@
 #include <winioctl.h>
 #include <tchar.h>
 #include <new>
+#include <cstdint>
 #include "Ep6TransferRetryPolicy.h"
+#include "UsbEndpointDiscoveryPolicy.h"
 #include "AnalogBoard_Dll.h"
 #include "..\CyLib\header\CyAPI.h"
 
@@ -40,6 +42,7 @@ static CCyUSBDevice* m_pUSBDevice;
 static CCyUSBEndPoint* m_pOutEndpt2;
 static CCyUSBEndPoint* m_pInEndpt4;
 static CCyUSBEndPoint* m_pInEndpt6;
+static Ep4FailureDiagnostic::SingleRecordBuffer g_ep4FailureDiagnostic;
 
 /* EP2/4 Mutec */
 HANDLE m_hEP2EP4Mutex;
@@ -53,6 +56,43 @@ static void ResetEp6DiagnosticCounters()
 	::InterlockedExchange(&g_ep6CallCount, 0);
 	::InterlockedExchange(&g_ep6TimeoutCount, 0);
 	::InterlockedExchange(&g_ep6RetryCount, 0);
+}
+
+static void LogUsbConnectDiagnostic(
+	const char* event,
+	INT deviceIndex,
+	INT altIndex,
+	INT endpointIndex,
+	UCHAR address,
+	UCHAR attributes,
+	const UsbEndpointDiscoveryPolicy::EndpointDiscoveryState* endpoints,
+	INT result,
+	DWORD win32LastError)
+{
+	UsbEndpointDiscoveryPolicy::ConnectDiagnostic diagnostic;
+	diagnostic.event = event;
+	diagnostic.deviceIndex = deviceIndex;
+	diagnostic.altIndex = altIndex;
+	diagnostic.endpointIndex = endpointIndex;
+	diagnostic.address = address;
+	diagnostic.attributes = attributes;
+	diagnostic.hasEp2 = endpoints != nullptr && endpoints->HasEp2();
+	diagnostic.hasEp4 = endpoints != nullptr && endpoints->HasEp4();
+	diagnostic.hasEp6 = endpoints != nullptr && endpoints->HasEp6();
+	diagnostic.result = result;
+	if (m_pUSBDevice != nullptr)
+	{
+		diagnostic.usbdStatus = static_cast<std::uint32_t>(m_pUSBDevice->UsbdStatus);
+		diagnostic.ntStatus = static_cast<std::uint32_t>(m_pUSBDevice->NtStatus);
+		diagnostic.lastError = static_cast<std::uint32_t>(m_pUSBDevice->LastError);
+	}
+	diagnostic.win32LastError = static_cast<std::uint32_t>(win32LastError);
+
+	char line[512] = { 0 };
+	if (UsbEndpointDiscoveryPolicy::FormatConnectDiagnostic(diagnostic, line, sizeof(line)))
+	{
+		::OutputDebugStringA(line);
+	}
 }
 
 /*******************************************************************************
@@ -120,9 +160,10 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 	INT iEptCount = 0;		//The EndPoint number
 	INT iDevIndex = 0;		//The device index 
 	INT iIntfcIndex = 0;	//The interface index 
-	INT iEndPointIndex = 0;	//The EndPoint index 
+	INT iEndPointIndex = 0;	//The EndPoint index
 	INT iDevNum = 0;		//The device num
 	CCyUSBEndPoint* pEpt = NULL;
+	bool endpointResolved = false;
 
 	if (!Hwd)
 	{
@@ -189,12 +230,24 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 		/* Returns the number of alternate interfaces exposed by the device */
 		iIntfcCount = m_pUSBDevice->AltIntfcCount() + 1;
+		UsbEndpointDiscoveryPolicy::AltEndpointSelectionState endpointSelection;
 
 		for (iIntfcIndex = 0; iIntfcIndex < iIntfcCount; iIntfcIndex++)
 		{
 			/* Set the active interface of the device to alt */
 			if (m_pUSBDevice->SetAltIntfc(iIntfcIndex) != TRUE)
 			{
+				const DWORD setAltLastError = ::GetLastError();
+				LogUsbConnectDiagnostic(
+					"set_alt_failed",
+					i,
+					iIntfcIndex,
+					-1,
+					0u,
+					0u,
+					nullptr,
+					USB_ERR_SETINTERFACE_FAILED,
+					setAltLastError);
 				if (iIntfcIndex + 1 == iIntfcCount)
 				{
 					return USB_ERR_SETINTERFACE_FAILED;
@@ -204,6 +257,7 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 			/* Returns the number of endpoints exposed by the currently selected interface (or Alternate Interface) plus 1 */
 			iEptCount = m_pUSBDevice->EndPointCount();
+			UsbEndpointDiscoveryPolicy::EndpointDiscoveryState endpointState;
 
 			/* Fill the EndPointsBox */
 			for (iEndPointIndex = 1; iEndPointIndex < iEptCount; iEndPointIndex++)
@@ -213,40 +267,139 @@ INT USB_Lib_Info::USBBoard_Connect(HWND Hwd)
 
 				if (!pEpt)
 				{
-					if (iEndPointIndex + 1 == iEptCount)
-					{
-						return USB_ERR_INVALID_ENDPOINTER;
-					}
 					continue;
 				}
 
-				if (pEpt->Attributes == 3)//Interrupt type
-				{
-					/* Set the In/Out Endpoint. Must Correspond with Firm Set */
-					switch (pEpt->Address)
-					{
-					case 0x02:
-						m_pOutEndpt2 = pEpt;
-						break;
-					case 0x84:
-						m_pInEndpt4 = pEpt;
-						break;
-					default:
-						return USB_ERR_INVALID_ENDPOINTER;
-					}
-				}
-				else if ((pEpt->Attributes == 2) && (pEpt->Address == 0x86))
-				{
-					m_pInEndpt6 = pEpt;
-				}
-				else
-				{
-					//do nothing
-				}
+				endpointState.VisitEndpoint(
+					reinterpret_cast<std::uintptr_t>(pEpt),
+					static_cast<std::uint8_t>(pEpt->Address),
+					static_cast<std::uint8_t>(pEpt->Attributes));
+				LogUsbConnectDiagnostic(
+					"endpoint",
+					i,
+					iIntfcIndex,
+					iEndPointIndex,
+					pEpt->Address,
+					pEpt->Attributes,
+					&endpointState,
+					USB_SUCCESS,
+					ERROR_SUCCESS);
 			}
+
+			LogUsbConnectDiagnostic(
+				"alt_rollup",
+				i,
+				iIntfcIndex,
+				-1,
+				0u,
+				0u,
+				&endpointState,
+				endpointState.IsComplete() ? USB_SUCCESS : USB_ERR_INVALID_ENDPOINTER,
+				ERROR_SUCCESS);
+
+			if (endpointState.IsComplete())
+			{
+				endpointSelection.ConsiderAlt(iIntfcIndex, endpointState);
+			}
+		}
+
+		if (endpointSelection.HasSelection())
+		{
+			if (m_pUSBDevice->SetAltIntfc(endpointSelection.SelectedAltIndex()) != TRUE)
+			{
+				const DWORD setSelectedAltLastError = ::GetLastError();
+				LogUsbConnectDiagnostic(
+					"set_selected_alt_failed",
+					i,
+					endpointSelection.SelectedAltIndex(),
+					-1,
+					0u,
+					0u,
+					nullptr,
+					USB_ERR_SETINTERFACE_FAILED,
+					setSelectedAltLastError);
+				return USB_ERR_SETINTERFACE_FAILED;
+			}
+
+			UsbEndpointDiscoveryPolicy::EndpointDiscoveryState selectedEndpointState;
+			iEptCount = m_pUSBDevice->EndPointCount();
+			for (iEndPointIndex = 1; iEndPointIndex < iEptCount; iEndPointIndex++)
+			{
+				pEpt = m_pUSBDevice->EndPoints[iEndPointIndex];
+
+				if (!pEpt)
+				{
+					continue;
+				}
+
+				selectedEndpointState.VisitEndpoint(
+					reinterpret_cast<std::uintptr_t>(pEpt),
+					static_cast<std::uint8_t>(pEpt->Address),
+					static_cast<std::uint8_t>(pEpt->Attributes));
+				LogUsbConnectDiagnostic(
+					"selected_endpoint",
+					i,
+					endpointSelection.SelectedAltIndex(),
+					iEndPointIndex,
+					pEpt->Address,
+					pEpt->Attributes,
+					&selectedEndpointState,
+					USB_SUCCESS,
+					ERROR_SUCCESS);
+			}
+
+			if (!selectedEndpointState.IsComplete())
+			{
+				LogUsbConnectDiagnostic(
+					"selected_alt_incomplete",
+					i,
+					endpointSelection.SelectedAltIndex(),
+					-1,
+					0u,
+					0u,
+					&selectedEndpointState,
+					USB_ERR_INVALID_ENDPOINTER,
+					ERROR_SUCCESS);
+				return USB_ERR_INVALID_ENDPOINTER;
+			}
+
+			m_pOutEndpt2 = reinterpret_cast<CCyUSBEndPoint*>(selectedEndpointState.Ep2Token());
+			m_pInEndpt4 = reinterpret_cast<CCyUSBEndPoint*>(selectedEndpointState.Ep4Token());
+			m_pInEndpt6 = reinterpret_cast<CCyUSBEndPoint*>(selectedEndpointState.Ep6Token());
+			LogUsbConnectDiagnostic(
+				"connect_success",
+				i,
+				endpointSelection.SelectedAltIndex(),
+				-1,
+				0u,
+				0u,
+				&selectedEndpointState,
+				USB_SUCCESS,
+				ERROR_SUCCESS);
+			endpointResolved = true;
+			break;
 		}
 	}
 
+	if (!endpointResolved)
+	{
+		LogUsbConnectDiagnostic(
+			"no_complete_alt",
+			iDevNum - 1,
+			-1,
+			-1,
+			0u,
+			0u,
+			nullptr,
+			USB_ERR_INVALID_ENDPOINTER,
+			ERROR_SUCCESS);
+		m_pOutEndpt2 = NULL;
+		m_pInEndpt4 = NULL;
+		m_pInEndpt6 = NULL;
+		return USB_ERR_INVALID_ENDPOINTER;
+	}
+
+	g_ep4FailureDiagnostic.Reset();
 	isConnected = TRUE;
 	ResetEp6DiagnosticCounters();
 
@@ -360,6 +513,7 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 {
 	INT		iRet = USB_SUCCESS;
 	LONG	lOneTimeSize = EP4_DATA_BUFF_SIZE;//EP4 receive size
+	const LONG requestedLength = lOneTimeSize;
 	PBYTE	pOneTimeBuffer = NULL;//Pointer to the return packet
 	OVERLAPPED inOvLap;//The structure contains information used in asynchronous input and output (I/O)
 
@@ -401,6 +555,17 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 	}
 	else
 	{
+		const DWORD win32LastError = ::GetLastError();
+		Ep4FailureDiagnostic::Record diagnostic;
+		diagnostic.monotonicMs = static_cast<std::uint64_t>(::GetTickCount64());
+		diagnostic.endpoint = static_cast<std::uint8_t>(m_pInEndpt4->Address);
+		diagnostic.requestedLength = static_cast<std::int32_t>(requestedLength);
+		diagnostic.returnedLength = static_cast<std::int32_t>(lOneTimeSize);
+		diagnostic.usbdStatus = static_cast<std::uint32_t>(m_pInEndpt4->UsbdStatus);
+		diagnostic.ntStatus = static_cast<std::uint32_t>(m_pInEndpt4->NtStatus);
+		diagnostic.cypressLastError = static_cast<std::uint32_t>(m_pInEndpt4->LastError);
+		diagnostic.win32LastError = static_cast<std::uint32_t>(win32LastError);
+		g_ep4FailureDiagnostic.Capture(diagnostic);
 		iRet = USB_ERR_TRANSFER_TIMEOUT;
 	}
 
@@ -410,6 +575,23 @@ INT USB_Lib_Info::EP4_GetData(BYTE* pRevData)
 	ReleaseMutex(m_hEP2EP4Mutex);
 
 	return iRet;
+}
+
+BOOL USB_Lib_Info::EP4_TakeFailureDiagnostic(Ep4FailureDiagnostic::Record* pRecord)
+{
+	if (pRecord == nullptr)
+	{
+		return FALSE;
+	}
+
+	if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEP2EP4Mutex, INFINITE))
+	{
+		return FALSE;
+	}
+
+	const bool consumed = g_ep4FailureDiagnostic.Consume(pRecord);
+	ReleaseMutex(m_hEP2EP4Mutex);
+	return consumed ? TRUE : FALSE;
 }
 
 /*******************************************************************************

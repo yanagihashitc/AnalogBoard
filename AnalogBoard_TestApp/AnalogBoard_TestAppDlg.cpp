@@ -111,10 +111,12 @@ BOOL CAnalogBoardTestAppDlg::OnInitDialog()
 
 	// TODO: Add extra initialization here
 	m_tab_main.InsertItem(0, _T("Data Get"));
-	//m_tab_main.InsertItem(1, _T("FPGA Debug"));
+	m_tab_main.InsertItem(1, _T("FPGA Debug"));
 
+	m_tabpage2_FpgaDbg.m_pMainDlg = this;
+	m_tabpage1_DataGet.m_pMainDlg = this;
 	m_tabpage1_DataGet.Create(IDD_DIALOG1_MAIN, &m_tab_main);
-	//m_tabpage2_FpgaDbg.Create(IDD_DIALOG2_DEBUG, &m_tab_main);
+	m_tabpage2_FpgaDbg.Create(IDD_DIALOG2_DEBUG, &m_tab_main);
 
 	CRect rTab, rItem;
 	m_tab_main.GetItemRect(0, &rItem);
@@ -125,7 +127,7 @@ BOOL CAnalogBoardTestAppDlg::OnInitDialog()
 	int cy = rTab.bottom - y - 2;
 
 	m_tabpage1_DataGet.SetWindowPos(NULL, x, y, cx, cy, SWP_HIDEWINDOW);
-	//m_tabpage2_FpgaDbg.SetWindowPos(NULL, x, y, cx, cy, SWP_HIDEWINDOW);
+	m_tabpage2_FpgaDbg.SetWindowPos(NULL, x, y, cx, cy, SWP_HIDEWINDOW);
 
 	int tab = m_tab_main.GetCurSel();
 	switch (tab)
@@ -273,6 +275,11 @@ void CAnalogBoardTestAppDlg::FlushLog()
 
 void CAnalogBoardTestAppDlg::OnClose()
 {
+	if (!m_tabpage1_DataGet.PrepareForApplicationClose())
+	{
+		return;
+	}
+
 	UpdateData(TRUE);
 
 	/* Export default config*/

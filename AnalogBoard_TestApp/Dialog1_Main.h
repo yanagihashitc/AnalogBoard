@@ -223,6 +223,7 @@ public:
 	bool RegGet_SampleStartSt(PBYTE Ep4DataBuffer);
 	void EditCtrl_HighLight(CColorEdit* EditCtrl, BOOL HLFlag);
 	bool ValidateSavePathUI(bool showDialog, CString* outNormalizedPath = nullptr);
+	bool PrepareForApplicationClose();
 	void SaveCfgParametersToFile(CString FilePath, FPGAConfigI_REGMAP* packetConfig, BOOL totalGainValue);
 	void UpdateRangeDisplay(FPGAConfigI_REGMAP* CfgStruct);
 	void SamplingUISet(bool OpenFlag, bool samplingmode);

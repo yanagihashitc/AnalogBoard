@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "Ep4FailureDiagnostic.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,6 +58,7 @@ public:
 	void USBBoard_Disconnect(void);
 	INT EP2_SendData(BYTE* pSendData);
 	INT EP4_GetData(BYTE* pRevData);
+	BOOL EP4_TakeFailureDiagnostic(Ep4FailureDiagnostic::Record* pRecord);
 	INT EP6_GetData(BYTE* pRevData, UINT  DataSizeCount);
 	const char* DllVersion_Get(void);
 };

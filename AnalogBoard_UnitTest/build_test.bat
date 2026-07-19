@@ -13,7 +13,15 @@ if not exist "%RUN_WITH_VSDEVCMD%" (
 
 cd /d "%SCRIPT_DIR%"
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." UsbEndpointDiscoveryPolicy_test.cpp /Fe:UsbEndpointDiscoveryPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(UsbEndpointDiscoveryPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." FpgaRegisterLogic_test.cpp /Fe:FpgaRegisterLogic_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FpgaRegisterLogic_test^) ===
@@ -21,7 +29,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." WaveDataFileIO_test.cpp /Fe:WaveDataFileIO_test.exe /link /DEBUG bcrypt.lib
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." WaveDataFileIO_test.cpp /Fe:WaveDataFileIO_test.exe /link /DEBUG bcrypt.lib
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WaveDataFileIO_test^) ===
@@ -29,7 +37,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." SavePathValidation_test.cpp /Fe:SavePathValidation_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(SavePathValidation_test^) ===
@@ -37,7 +45,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." AcquisitionPerfMetrics_test.cpp /Fe:AcquisitionPerfMetrics_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." AcquisitionPerfMetrics_test.cpp /Fe:AcquisitionPerfMetrics_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionPerfMetrics_test^) ===
@@ -45,7 +53,23 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." AcquisitionCompletionLogic_test.cpp /Fe:AcquisitionCompletionLogic_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." RearmTelemetry_test.cpp /Fe:RearmTelemetry_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(RearmTelemetry_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." RearmTelemetryReplay_test.cpp /Fe:RearmTelemetryReplay_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(RearmTelemetryReplay_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." AcquisitionCompletionLogic_test.cpp /Fe:AcquisitionCompletionLogic_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(AcquisitionCompletionLogic_test^) ===
@@ -53,7 +77,31 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." AcquisitionShutdownCoordinator_test.cpp /Fe:AcquisitionShutdownCoordinator_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(AcquisitionShutdownCoordinator_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." ExternalTriggerPollingPolicy_test.cpp /Fe:ExternalTriggerPollingPolicy_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(ExternalTriggerPollingPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." Ep4FailureDiagnostic_test.cpp /Fe:Ep4FailureDiagnostic_test.exe /link /DEBUG
+if errorlevel 1 (
+    echo.
+    echo === Build FAILED ^(Ep4FailureDiagnostic_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." Ep6TransferRetryPolicy_test.cpp /Fe:Ep6TransferRetryPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(Ep6TransferRetryPolicy_test^) ===
@@ -61,7 +109,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." ReadRequestBurstPolicy_test.cpp /Fe:ReadRequestBurstPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." ReadRequestBurstPolicy_test.cpp /Fe:ReadRequestBurstPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(ReadRequestBurstPolicy_test^) ===
@@ -69,7 +117,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /DUNICODE /D_UNICODE /I".." FileLogger_test.cpp /Fe:FileLogger_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileLogger_test^) ===
@@ -77,7 +125,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." FileIoLoggingPolicy_test.cpp /Fe:FileIoLoggingPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." FileIoLoggingPolicy_test.cpp /Fe:FileIoLoggingPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(FileIoLoggingPolicy_test^) ===
@@ -85,7 +133,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /I".." WavePairPublishPolicy_test.cpp /Fe:WavePairPublishPolicy_test.exe /link /DEBUG
+call "%RUN_WITH_VSDEVCMD%" cl /EHsc /W4 /Zi /std:c++17 /utf-8 /I".." WavePairPublishPolicy_test.cpp /Fe:WavePairPublishPolicy_test.exe /link /DEBUG
 if errorlevel 1 (
     echo.
     echo === Build FAILED ^(WavePairPublishPolicy_test^) ===
@@ -103,18 +151,34 @@ if exist "%SCRIPT_DIR%FpgaRegisterLogic_test.pdb" copy /Y "%SCRIPT_DIR%FpgaRegis
 echo.
 echo === Build succeeded. Running tests... ===
 echo.
-"%SCRIPT_DIR%FpgaRegisterLogic_test.exe"
+"%SCRIPT_DIR%UsbEndpointDiscoveryPolicy_test.exe"
 if errorlevel 1 (
     echo.
-    echo === Tests FAILED ^(FpgaRegisterLogic_test^) ===
+    echo === Tests FAILED ^(UsbEndpointDiscoveryPolicy_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
 
-"%SCRIPT_DIR%WaveDataFileIO_test.exe"
+"%SCRIPT_DIR%RearmTelemetry_test.exe"
 if errorlevel 1 (
     echo.
-    echo === Tests FAILED ^(WaveDataFileIO_test^) ===
+    echo === Tests FAILED ^(RearmTelemetry_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%RearmTelemetryReplay_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(RearmTelemetryReplay_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%FpgaRegisterLogic_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(FpgaRegisterLogic_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
@@ -139,6 +203,30 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(AcquisitionCompletionLogic_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%AcquisitionShutdownCoordinator_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(AcquisitionShutdownCoordinator_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%ExternalTriggerPollingPolicy_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(ExternalTriggerPollingPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+"%SCRIPT_DIR%Ep4FailureDiagnostic_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(Ep4FailureDiagnostic_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )
@@ -179,6 +267,16 @@ if errorlevel 1 (
 if errorlevel 1 (
     echo.
     echo === Tests FAILED ^(WavePairPublishPolicy_test^) ===
+    call :CleanupIntermediate
+    exit /b 1
+)
+
+rem Run the known fixture-dependent suite last so every deterministic regression
+rem still executes when the external ReadBuf corpus is unavailable.
+"%SCRIPT_DIR%WaveDataFileIO_test.exe"
+if errorlevel 1 (
+    echo.
+    echo === Tests FAILED ^(WaveDataFileIO_test^) ===
     call :CleanupIntermediate
     exit /b 1
 )

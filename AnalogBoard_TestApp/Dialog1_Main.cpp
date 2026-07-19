@@ -9,11 +9,14 @@
 #include "locale.h"
 #include "afxwin.h"
 #include "../AnalogBoard_Dll/AnalogBoard_Dll.h"
+#include "AcquisitionShutdownCoordinator.h"
 #include "AcquisitionCompletionLogic.h"
 #include "AcquisitionPerfMetrics.h"
 #include "FileIoLoggingPolicy.h"
+#include "ExternalTriggerPollingPolicy.h"
 #include "FpgaRegisterLogic.h"
 #include "ReadRequestBurstPolicy.h"
+#include "RearmTelemetry.h"
 #include "SavePathValidation.h"
 #include "WaveDataFileIO.h"
 #include "WavePairPublishPolicy.h"
@@ -50,10 +53,167 @@ INT CreateWaveDataFile(
 
 namespace
 {
+	AcquisitionShutdownCoordinator g_acquisitionShutdownCoordinator;
+
 	// Timing-isolation switch for investigating the current-version EP6 issue.
 	// Keep high-frequency EP6 logs off to reduce UI/file I/O interference.
 	constexpr bool kEnableEp6HotPathLogs = false;
 	constexpr bool kEnablePhase0CycleSummaryLog = true;
+	using ValidationRearmTelemetry = RearmTelemetry::Buffer<RearmTelemetry::kValidationCapacity>;
+
+	CString FormatOptionalTimestamp(bool available, std::uint64_t timestampMs)
+	{
+		CString value;
+		if (available)
+		{
+			value.Format(_T("%I64u"), timestampMs);
+		}
+		return value;
+	}
+
+	CString BuildUniqueRearmTelemetryPath(const CString& savePath, const SYSTEMTIME& startedAt)
+	{
+		CString basePath;
+		basePath.Format(
+			_T("%s\\%02d%02d%02d_%02d%02d%02d_rearm_telemetry.csv"),
+			static_cast<LPCTSTR>(savePath),
+			startedAt.wYear % 100,
+			startedAt.wMonth,
+			startedAt.wDay,
+			startedAt.wHour,
+			startedAt.wMinute,
+			startedAt.wSecond);
+
+		CFileStatus status;
+		if (!CFile::GetStatus(basePath, status))
+		{
+			return basePath;
+		}
+
+		for (int suffix = 1; suffix <= 999; ++suffix)
+		{
+			CString candidate;
+			candidate.Format(
+				_T("%s\\%02d%02d%02d_%02d%02d%02d_rearm_telemetry_%d.csv"),
+				static_cast<LPCTSTR>(savePath),
+				startedAt.wYear % 100,
+				startedAt.wMonth,
+				startedAt.wDay,
+				startedAt.wHour,
+				startedAt.wMinute,
+				startedAt.wSecond,
+				suffix);
+			if (!CFile::GetStatus(candidate, status))
+			{
+				return candidate;
+			}
+		}
+
+		return CString();
+	}
+
+	bool WriteRearmTelemetryCsv(
+		const CString& csvPath,
+		const ValidationRearmTelemetry& telemetry,
+		DWORD* outLastError)
+	{
+		if (outLastError != nullptr)
+		{
+			*outLastError = ERROR_SUCCESS;
+		}
+		if (csvPath.IsEmpty())
+		{
+			if (outLastError != nullptr)
+			{
+				*outLastError = ERROR_FILE_EXISTS;
+			}
+			return false;
+		}
+
+		CFile file;
+		CFileException openException;
+		if (!file.Open(csvPath, CFile::modeCreate | CFile::modeWrite | CFile::shareDenyWrite, &openException))
+		{
+			if (outLastError != nullptr)
+			{
+				*outLastError = static_cast<DWORD>(openException.m_lOsError);
+			}
+			return false;
+		}
+
+		try
+		{
+			static const char kHeader[] =
+				"cycle_id,trigger_source,trigger_detected_monotonic_ms,"
+				"ddr_rd_end_confirmed_monotonic_ms,host_drain_complete_monotonic_ms,"
+				"publish_cleanup_complete_monotonic_ms,"
+				"host_ready_monotonic_ms,next_external_trigger_detected_monotonic_ms,"
+				"rearm_ms,external_trigger_wait_ms\r\n";
+			file.Write(kHeader, static_cast<UINT>(sizeof(kHeader) - 1));
+
+			for (std::size_t index = 0; index < telemetry.Count(); ++index)
+			{
+				const RearmTelemetry::CycleRecord& record = telemetry.At(index);
+				const CString ddrRdEndConfirmed = FormatOptionalTimestamp(
+					record.hasDdrRdEndConfirmed,
+					record.ddrRdEndConfirmedMs);
+				const CString hostDrainComplete = FormatOptionalTimestamp(
+					record.hasHostDrainComplete,
+					record.hostDrainCompleteMs);
+				const CString publishCleanupComplete = FormatOptionalTimestamp(
+					record.hasPublishCleanupComplete,
+					record.publishCleanupCompleteMs);
+				const CString hostReady = FormatOptionalTimestamp(record.hasHostReady, record.hostReadyMs);
+				const CString nextTrigger = FormatOptionalTimestamp(
+					record.hasNextExternalTriggerDetected,
+					record.nextExternalTriggerDetectedMs);
+
+				const RearmTelemetry::DurationValue rearmValue = RearmTelemetry::ReadRearmMs(record);
+				const RearmTelemetry::DurationValue externalWaitValue = RearmTelemetry::ReadExternalWaitMs(record);
+				const CString rearm = FormatOptionalTimestamp(rearmValue.available, rearmValue.milliseconds);
+				const CString externalWait = FormatOptionalTimestamp(
+					externalWaitValue.available,
+					externalWaitValue.milliseconds);
+
+				CString row;
+				row.Format(
+					_T("%I64u,%s,%I64u,%s,%s,%s,%s,%s,%s,%s\r\n"),
+					record.cycleId,
+					record.externalTrigger ? _T("external") : _T("manual"),
+					record.triggerDetectedMs,
+					static_cast<LPCTSTR>(ddrRdEndConfirmed),
+					static_cast<LPCTSTR>(hostDrainComplete),
+					static_cast<LPCTSTR>(publishCleanupComplete),
+					static_cast<LPCTSTR>(hostReady),
+					static_cast<LPCTSTR>(nextTrigger),
+					static_cast<LPCTSTR>(rearm),
+					static_cast<LPCTSTR>(externalWait));
+				const CStringA asciiRow(row);
+				file.Write(asciiRow.GetString(), static_cast<UINT>(asciiRow.GetLength()));
+			}
+
+			file.Flush();
+			file.Close();
+			return true;
+		}
+		catch (CFileException* exception)
+		{
+			if (outLastError != nullptr)
+			{
+				*outLastError = static_cast<DWORD>(exception->m_lOsError);
+			}
+			exception->Delete();
+			try
+			{
+				file.Close();
+			}
+			catch (CFileException* closeException)
+			{
+				closeException->Delete();
+			}
+			return false;
+		}
+	}
 
 	enum CreateWaveDataFileResult
 	{
@@ -520,6 +680,28 @@ Dialog1_Main::~Dialog1_Main()
 	pEp4DataBuf = NULL;
 	//free(pEp6DataBuf);
 	//pEp6DataBuf = NULL;
+}
+
+bool Dialog1_Main::PrepareForApplicationClose()
+{
+	const AcquisitionShutdownCoordinator::CloseDecision decision =
+		g_acquisitionShutdownCoordinator.RequestClose();
+	if (decision == AcquisitionShutdownCoordinator::CloseDecision::kCloseNow)
+	{
+		return true;
+	}
+
+	g_bStartSampling = 0;
+	if (m_pMainDlg != nullptr)
+	{
+		const TCHAR* closeMessage =
+			decision == AcquisitionShutdownCoordinator::CloseDecision::kRequestStop
+			? _T("[REARM][CLOSE] Waiting for telemetry CSV and log finalization.")
+			: _T("[REARM][CLOSE] Telemetry CSV and log finalization are still in progress.");
+		m_pMainDlg->PrintLog(closeMessage);
+		m_pMainDlg->FlushLog();
+	}
+	return false;
 }
 
 
@@ -1268,6 +1450,13 @@ void Dialog1_Main::OnBnClickedButtonParset()
 #endif
 		if (g_bEP6ThreadFlag == 0)
 		{
+			if (!g_acquisitionShutdownCoordinator.TryBeginThread())
+			{
+				m_pMainDlg->PrintLog(_T("EP6 thread is running."));
+				return;
+			}
+			g_bStartSampling = 1;
+
 			/* Create get waveform data thread */
 			pLpTestThread_EP6_GetData = AfxBeginThread((AFX_THREADPROC)LoopTestProcessThread_EP6_GetData,
 				(LPVOID)this,
@@ -1277,6 +1466,8 @@ void Dialog1_Main::OnBnClickedButtonParset()
 				NULL);
 			if (NULL == pLpTestThread_EP6_GetData)
 			{
+				g_bStartSampling = 0;
+				g_acquisitionShutdownCoordinator.ThreadStartFailed();
 				MessageBox(_T("Failed to create thread2"));
 				return;
 			}
@@ -1320,6 +1511,13 @@ void Dialog1_Main::OnBnClickedButtonGetstart()
 		}
 #endif
 
+		if (!g_acquisitionShutdownCoordinator.TryBeginThread())
+		{
+			m_pMainDlg->PrintLog(_T("EP6 thread is running."));
+			return;
+		}
+		g_bStartSampling = 1;
+
 		/* Create get waveform data thread */
 		pLpTestThread_EP6_GetData = AfxBeginThread((AFX_THREADPROC)LoopTestProcessThread_EP6_GetData,
 			(LPVOID)this,
@@ -1329,6 +1527,8 @@ void Dialog1_Main::OnBnClickedButtonGetstart()
 			NULL);
 		if (NULL == pLpTestThread_EP6_GetData)
 		{
+			g_bStartSampling = 0;
+			g_acquisitionShutdownCoordinator.ThreadStartFailed();
 			MessageBox(_T("Failed to create thread2"));
 			return;
 		}
@@ -1446,6 +1646,9 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 	CFileStatus fileStatus;
 	AcquisitionPerfMetrics::CycleMetrics cycleMetrics;
 	AcquisitionCompletionLogic::Ep4CompletionState completionState;
+	ValidationRearmTelemetry rearmTelemetry;
+	SYSTEMTIME telemetrySessionStart = {};
+	GetLocalTime(&telemetrySessionStart);
 	CurObject->m_pMainDlg->PrintLog(_T("Start EP6 get data thread."));
 
 	const SavePathValidation::Result savePathValidation =
@@ -1572,8 +1775,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 		bool runtime = CurObject->m_bManualMode ? FALSE : TRUE;
 		bool LastModeSave = CurObject->m_bManualMode;
 		bool ErrExit = FALSE;
-		g_bStartSampling = 1;
 		g_bEP6ThreadFlag = 1;
+		if (!g_acquisitionShutdownCoordinator.ShouldRunThread() || g_bStartSampling == 0)
+		{
+			break;
+		}
 		
 		do 
 		{
@@ -1597,29 +1803,49 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				Sleep(5);
 			}	
 
-			/* Check FPGA sampling start */		
+			/* Check FPGA sampling start */
+			bool ep4WaitTransferFailed = false;
 			while(TRUE)
 			{
-				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf) != USB_SUCCESS)
+				iRet = CurObject->m_pMainDlg->UsbLibInfo.EP4_GetData(pEp4DataBuf);
+				const bool ep4TransferSucceeded = iRet == USB_SUCCESS;
+				const bool applicationShutdownRequested =
+					!g_acquisitionShutdownCoordinator.ShouldRunThread();
+				const bool samplingRequested =
+					!applicationShutdownRequested && g_bStartSampling != 0;
+				const bool triggerDetected = ep4TransferSucceeded
+					&& CurObject->RegGet_SampleStartSt(pEp4DataBuf) == TRUE;
+				const ExternalTriggerPollingPolicy::Decision pollDecision =
+					ExternalTriggerPollingPolicy::Evaluate(
+						ep4TransferSucceeded,
+						triggerDetected,
+						CurObject->m_bManualMode != LastModeSave,
+						samplingRequested,
+						applicationShutdownRequested);
+
+				if (pollDecision.action == ExternalTriggerPollingPolicy::Action::kTransferFailed)
 				{
-					CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
+					ep4WaitTransferFailed = true;
 					ErrExit = TRUE;
 					break;
 				}
 
-				if (CurObject->RegGet_SampleStartSt(pEp4DataBuf) == TRUE)
+				if (pollDecision.action == ExternalTriggerPollingPolicy::Action::kTriggered)
 				{
+					rearmTelemetry.StartCycle(
+						::GetTickCount64(),
+						CurObject->m_bManualMode == FALSE);
 					CurObject->m_pMainDlg->PrintLog(_T("FPGA start sampling."));
 					break;
 				}
-				
-				if (CurObject->m_bManualMode != LastModeSave)
+
+				if (pollDecision.action == ExternalTriggerPollingPolicy::Action::kModeChanged)
 				{
-					CurObject->m_pMainDlg->PrintLog(_T("Manual get mode on.")); 
+					CurObject->m_pMainDlg->PrintLog(_T("Manual get mode on."));
 					ErrExit = TRUE;
 					break;
 				}
-				else if (g_bStartSampling == 0)
+				else if (pollDecision.action == ExternalTriggerPollingPolicy::Action::kCancelled)
 				{
 					CurObject->m_pMainDlg->PrintLog(_T("Sampling is not start."));
 					ErrExit = TRUE;
@@ -1628,7 +1854,24 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				else
 				{
 					LastModeSave = CurObject->m_bManualMode;
-				}				
+					Sleep(pollDecision.delayMs);
+				}
+			}
+
+			if (ep4WaitTransferFailed)
+			{
+				CurObject->m_pMainDlg->PrintLog(_T("Get ep4 register data failed."));
+				CurObject->m_pMainDlg->PrintLog(CurObject->m_pMainDlg->strUSBLibError(iRet));
+
+				Ep4FailureDiagnostic::Record diagnostic;
+				if (CurObject->m_pMainDlg->UsbLibInfo.EP4_TakeFailureDiagnostic(&diagnostic))
+				{
+					char diagnosticText[512] = { 0 };
+					if (Ep4FailureDiagnostic::FormatRecord(diagnostic, diagnosticText, sizeof(diagnosticText)))
+					{
+						CurObject->m_pMainDlg->PrintLog(CString(diagnosticText));
+					}
+				}
 			}
 
 			if (ErrExit == TRUE)
@@ -1755,6 +1998,18 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 				DDRWrCompleted = completionDecision.drainingHintSeen ? TRUE : FALSE;
 				PcReadCompleted = completionDecision.acquisitionComplete ? TRUE : FALSE;
 				DDRWaveBytes = completionDecision.readableUpperBoundBytes;
+				if (completionDecision.enteredDdrRdEnd || completionDecision.acquisitionComplete)
+				{
+					const ULONGLONG boundaryMs = ::GetTickCount64();
+					if (completionDecision.enteredDdrRdEnd)
+					{
+						rearmTelemetry.MarkDdrRdEndConfirmed(boundaryMs);
+					}
+					if (completionDecision.acquisitionComplete)
+					{
+						rearmTelemetry.MarkHostDrainComplete(boundaryMs);
+					}
+				}
 
 				if (completionDecision.enteredDraining)
 				{
@@ -1801,6 +2056,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 				if (ulOneTimeSize == 0)
 				{
+					if (!g_acquisitionShutdownCoordinator.ShouldRunThread())
+					{
+						ErrExit = TRUE;
+						break;
+					}
 					continue;
 				}
 
@@ -2158,19 +2418,26 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 			/* Close any remaining handles (error path / safety). */
 			DWORD closeLastErrorLow = ERROR_SUCCESS;
 			DWORD closeLastErrorHigh = ERROR_SUCCESS;
-			if (!FlushAndCloseFile(&File_Low, &closeLastErrorLow))
+			const bool lowFileClosed = FlushAndCloseFile(&File_Low, &closeLastErrorLow);
+			if (!lowFileClosed)
 			{
 				LogFileIoEvent(CurObject, _T("Close"), iIndex, currentTmpPathLow, currentFinalPathLow, closeLastErrorLow, _T("close low failed at loop end"));
 			}
-			if (!FlushAndCloseFile(&File_High, &closeLastErrorHigh))
+			const bool highFileClosed = FlushAndCloseFile(&File_High, &closeLastErrorHigh);
+			if (!highFileClosed)
 			{
 				LogFileIoEvent(CurObject, _T("Close"), iIndex, currentTmpPathHigh, currentFinalPathHigh, closeLastErrorHigh, _T("close high failed at loop end"));
+			}
+			if (ErrExit == FALSE && lowFileClosed && highFileClosed)
+			{
+				rearmTelemetry.MarkPublishCleanupComplete(::GetTickCount64());
 			}
 			
 			/* Disenable start button */
 			CurObject->m_CtrlBtnDataGetStart.EnableWindow(FALSE);
 
-			if (PcReadCompleted == FALSE)
+			if (PcReadCompleted == FALSE
+				&& g_acquisitionShutdownCoordinator.ShouldRunThread())
 			{
 				/* Wait acquisition completed... */
 				INT timeout = 0;
@@ -2200,6 +2467,18 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 							SaveDDRBytes);
 
 					PcReadCompleted = completionDecision.acquisitionComplete ? TRUE : FALSE;
+					if (completionDecision.enteredDdrRdEnd || completionDecision.acquisitionComplete)
+					{
+						const ULONGLONG boundaryMs = ::GetTickCount64();
+						if (completionDecision.enteredDdrRdEnd)
+						{
+							rearmTelemetry.MarkDdrRdEndConfirmed(boundaryMs);
+						}
+						if (completionDecision.acquisitionComplete)
+						{
+							rearmTelemetry.MarkHostDrainComplete(boundaryMs);
+						}
+					}
 					if (PcReadCompleted)
 					{
 						break;
@@ -2212,6 +2491,10 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 						break;
 					}
 				}
+			}
+			if (ErrExit == FALSE && PcReadCompleted && lowFileClosed && highFileClosed)
+			{
+				rearmTelemetry.MarkPublishCleanupComplete(::GetTickCount64());
 			}
 
 			const ULONGLONG ep6AvgElapsedMs = cycleMetrics.GetEp6AverageElapsedMs();
@@ -2268,7 +2551,11 @@ void LoopTestProcessThread_EP6_GetData(LPVOID lpParam)
 
 			/* Flush log file after each measurement cycle */
 			CurObject->m_pMainDlg->FlushLog();
-		} while (runtime);
+			if (ErrExit == FALSE && runtime)
+			{
+				rearmTelemetry.MarkHostReady(::GetTickCount64());
+			}
+		} while (runtime && g_acquisitionShutdownCoordinator.ShouldRunThread());
 	} while (0);
 
 FINALIZE_THREAD:
@@ -2293,8 +2580,50 @@ FINALIZE_THREAD:
 	g_bEP24LoopFlag = 0;
 	g_bStartSampling = 0;
 
+	if (rearmTelemetry.Count() > 0 || rearmTelemetry.DroppedCount() > 0)
+	{
+		const CString telemetryCsvPath = BuildUniqueRearmTelemetryPath(
+			normalizedSavePath,
+			telemetrySessionStart);
+		DWORD telemetryLastError = ERROR_SUCCESS;
+		const bool telemetryWritten = WriteRearmTelemetryCsv(
+			telemetryCsvPath,
+			rearmTelemetry,
+			&telemetryLastError);
+		const RearmTelemetry::DurationSummary rearmSummary = rearmTelemetry.SummarizeRearm();
+		const RearmTelemetry::DurationSummary externalWaitSummary = rearmTelemetry.SummarizeExternalWait();
+
+		strTmp.Format(
+			_T("[REARM][SUMMARY] csvWrite=%d csv=%s cycles=%zu dropped=%zu rearmSamples=%zu rearmP50Ms=%I64u rearmP95Ms=%I64u rearmP99Ms=%I64u rearmMaxMs=%I64u externalWaitSamples=%zu externalWaitP50Ms=%I64u externalWaitP95Ms=%I64u externalWaitP99Ms=%I64u externalWaitMaxMs=%I64u lastError=%lu"),
+			telemetryWritten ? 1 : 0,
+			static_cast<LPCTSTR>(telemetryCsvPath),
+			rearmTelemetry.Count(),
+			rearmTelemetry.DroppedCount(),
+			rearmSummary.sampleCount,
+			rearmSummary.p50Ms,
+			rearmSummary.p95Ms,
+			rearmSummary.p99Ms,
+			rearmSummary.maxMs,
+			externalWaitSummary.sampleCount,
+			externalWaitSummary.p50Ms,
+			externalWaitSummary.p95Ms,
+			externalWaitSummary.p99Ms,
+			externalWaitSummary.maxMs,
+			telemetryLastError);
+		CurObject->m_pMainDlg->PrintLog(strTmp);
+	}
+
 	CurObject->m_pMainDlg->PrintLog(_T("Exit EP6 get data thread."));
 	CurObject->m_pMainDlg->FlushLog();
+
+	if (g_acquisitionShutdownCoordinator.ThreadFinalized())
+	{
+		CWnd* mainWindow = AfxGetMainWnd();
+		if (mainWindow != nullptr && ::IsWindow(mainWindow->GetSafeHwnd()))
+		{
+			mainWindow->PostMessage(WM_CLOSE);
+		}
+	}
 }
 
 INT CreateWaveDataFile(

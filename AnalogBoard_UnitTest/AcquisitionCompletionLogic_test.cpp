@@ -126,6 +126,39 @@ void Test_TC_R_05_StartupStaleWaveWrCnt_IsIgnoredUntilClear()
     TEST_ASSERT(measuring.readableUpperBoundBytes == 288u, "TC-R-05 first real measuring poll must expose the new upper bound");
 }
 
+void Test_TC_R_06_DdrRdEndBoundary_IsConfirmedBeforeHostDrainCompletes()
+{
+    // Given: An active cycle still has unread bytes in the host-visible upper bound.
+    AcquisitionCompletionLogic::Ep4CompletionState state;
+    const auto measuring = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 16384u, 0u, 0, 0 },
+        0u);
+    TEST_ASSERT(measuring.shouldRead, "TC-R-06 active cycle must expose unread bytes");
+
+    // When: DDR_RD_END becomes active before the host has consumed every byte.
+    const auto rdEndWithUnreadBytes = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 16384u, 16384u, 1, 1 },
+        0u);
+
+    // Then: The RD_END boundary is confirmed, but acquisition completion remains locked.
+    TEST_ASSERT(rdEndWithUnreadBytes.ddrRdEndConfirmed,
+        "TC-R-06 active DDR_RD_END must expose the telemetry boundary");
+    TEST_ASSERT(rdEndWithUnreadBytes.enteredDdrRdEnd,
+        "TC-R-06 first active DDR_RD_END must enter the boundary once");
+    TEST_ASSERT(!rdEndWithUnreadBytes.acquisitionComplete,
+        "TC-R-06 unread bytes must keep acquisition incomplete");
+
+    const auto drained = AcquisitionCompletionLogic::ObserveEp4Completion(
+        &state,
+        { 16384u, 16384u, 1, 1 },
+        AcquisitionCompletionLogic::ToReadableUpperBoundBytes(16384u));
+    TEST_ASSERT(drained.ddrRdEndConfirmed, "TC-R-06 current RD_END remains confirmed");
+    TEST_ASSERT(!drained.enteredDdrRdEnd, "TC-R-06 repeated RD_END must not re-enter the boundary");
+    TEST_ASSERT(drained.acquisitionComplete, "TC-R-06 drained bytes must complete acquisition");
+}
+
 int main()
 {
     std::printf("=== AcquisitionCompletionLogic Unit Tests ===\n\n");
@@ -135,6 +168,7 @@ int main()
     RUN_TEST(Test_TC_R_03_DdrRdEnd_IsFinalCompletionSignal);
     RUN_TEST(Test_TC_R_04_ReadableUpperBound_CanGrowAfterDdrWrEnd);
     RUN_TEST(Test_TC_R_05_StartupStaleWaveWrCnt_IsIgnoredUntilClear);
+    RUN_TEST(Test_TC_R_06_DdrRdEndBoundary_IsConfirmedBeforeHostDrainCompletes);
 
     std::printf("\n=== Summary ===\n");
     std::printf("Total: %d\n", g_TestCount);
