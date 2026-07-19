@@ -86,6 +86,10 @@ prompt.md
 # Coverage artifacts
 coverage/
 
+# Local field-session payloads (raw captures, portable packages, build artifacts)
+/artifacts/*
+!/artifacts/README.md
+
 # log file
 *.log
 

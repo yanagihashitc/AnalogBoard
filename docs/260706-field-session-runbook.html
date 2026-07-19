@@ -587,15 +587,15 @@ pre {
 <body>
 
 <header class="doc-header">
-  <h1>まとめ実機セッション手順書</h1>
-  <p class="subtitle">AnalogBoard 再構築フェーズ0 — 実験1〜7（5bは条件付き分岐）を1セッションで流し切るための実施手順・判定基準・回収物チェックリスト</p>
+  <h1>実機確認 runbook</h1>
+  <p class="subtitle">AnalogBoard 再構築フェーズ0 — DFX A-B-A確定とD23（NoDfx採用）を受けた、telemetry対応buildによる新driver（NoDfx）→旧driver両legの本測定手順</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実機セッション手順書（runbook）</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 1.3</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.6（完了済み履歴）</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-06</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-08（ステップ0を r7 / r18 直結 A/B に変更し、採用候補を決めてから実験1以降へ進む運用へ更新）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-19（Draft 2.6を完了済み履歴へ移行。NoDfx dual-driver sessionは2026-07-16〜17実施済み、Gate Bは条件付きPass、D4はr7移植例外でowner gate通過）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> セッション実施者（オーナー／開発チーム）</span>
-    <span class="doc-meta-item"><strong>Source:</strong> 親プラン「まとめ実機セッション」節・baseline_next.md・driver_next.md・field-reference</span>
+    <span class="doc-meta-item"><strong>Source:</strong> 親プラン（Draft 3.5・D23）・2026-07-15返却package・DFX A-B-A <code>SESSION_REPORT.md</code>・telemetry graceful-stop build・D23 session <code>20260716_2</code></span>
   </div>
 </header>
 
@@ -604,27 +604,437 @@ pre {
   <nav class="toc" aria-label="Table of contents">
     <div class="toc-title">Contents</div>
     <ol>
-      <li><a href="#summary">概要</a></li>
-      <li><a href="#principles">前提と原則</a></li>
-      <li><a href="#prep">事前準備（前日まで）</a></li>
-      <li><a href="#flow">セッション全体フロー</a></li>
-      <li><a href="#smoke">ステップ0：r7 / r18 直結A/B</a></li>
-      <li><a href="#exp1">実験1：スイッチ区間A/B</a></li>
-      <li><a href="#exp2">実験2：選定候補 高密度ラダー</a></li>
-      <li><a href="#exp3">実験3：再アームギャップ計測</a></li>
-      <li><a href="#exp4">実験4：gcsa照合サンプル</a></li>
-      <li><a href="#driverswap">ドライバ入替・ロールバック手順</a></li>
-      <li><a href="#exp5">実験5：SDK1.3バイナリ</a></li>
-      <li><a href="#exp5b">実験5b：DFX A/B（条件付き）</a></li>
-      <li><a href="#exp6">実験6：録画キャプチャ</a></li>
-      <li><a href="#exp7">実験7：回収物チェック</a></li>
-      <li><a href="#sheet">判定シート</a></li>
-      <li><a href="#risks">注意事項</a></li>
-      <li><a href="#appendix">付録（トレーサビリティ）</a></li>
+      <li><a href="#revision-summary">目的と最終判断</a></li>
+      <li><a href="#revision-status">確定済み事実と残課題</a></li>
+      <li><a href="#revision-common">共通条件・判定語彙</a></li>
+      <li><a href="#revision-flow">実行順（履歴）</a></li>
+      <li><a href="#gate-a">Gate A：既存high×3の証跡閉鎖</a></li>
+      <li><a href="#field-evidence">現地データ完全性集計</a></li>
+      <li><a href="#gate-c-preflight">最初に実施：N leg（新driver＋NoDfx）</a></li>
+      <li><a href="#gate-b">B leg：旧driverでGate B閉鎖</a></li>
+      <li><a href="#pc-causality">旧PC原因調査（任意）</a></li>
+      <li><a href="#mapping-closed">D17：既存確認でClosed</a></li>
+      <li><a href="#rearm-deferred">再アームbaseline計測</a></li>
+      <li><a href="#gate-c">判定build・matched A/B総括</a></li>
+      <li><a href="#diagnostics">DFX確定と条件付き診断</a></li>
+      <li><a href="#revision-sheet">判定・退出チェック</a></li>
+      <li><a href="#revision-risks">停止条件と注意</a></li>
+      <li><a href="#revision-appendix">トレーサビリティ</a></li>
     </ol>
   </nav>
 
   <main class="doc-main">
+
+    <!-- ===== DRAFT 2.6 COMPLETED RUNBOOK ===== -->
+    <section id="revision-summary">
+      <h2>目的と最終判断</h2>
+      <div class="callout callout-success"><div class="callout-title">実機セッション完了（2026-07-19整理）</div><p>本runbookの実行対象は2026-07-16〜17に完了した。Gate Bは2026-07-17に条件付きPassで閉鎖され、D4は2026-07-19のowner gateでr7移植例外が承認された。N leg formal soakはPhase 4の100run soakへ集約済み。再実行は計画されておらず、最新状態と次gateは親プランを正とする。</p></div>
+      <p>本runbookの目的は、完了済み試験を反復することではなく、フェーズ0の実機確認で残った判断を最小限の試験で閉じることである。2026-07-16のDFX A-B-A（session <code>20260716_111343</code>）でWin11新driver <code>1.3.0.4</code>のSet後EP4 failureはDFX（WDF Directed Power Transitions）が因果要因と確認され、owner decision <strong>D23でNoDfx（<code>WdfDirectedPowerTransitionEnable=0</code>）を正式採用</strong>した。今回の最終判断は、<strong>telemetry graceful-stop buildを判定buildとして、(1) 新driver＋NoDfx構成（将来の運用候補構成）のformal soakとtelemetry baseline、(2) driver原状回復後の旧driver <code>1.2.3.20</code>でのGate B正式証跡（FL/FH data integrity＋telemetry CSV／summary、D4 owner gateの前提）</strong>の2点を、同一EXE/DLLのmatched両legで閉じることとする。物理ch順（D17）は確認済みのため追加実験の対象にしない。</p>
+      <div class="callout callout-info">
+        <div class="callout-title">PC採用と原因証明を分離する</div>
+        <p>新PCで遅延しないことは運用採用の根拠になるが、旧PC遅延の根本原因がPCだったことの証明にはならない。<strong>原因証明はフェーズ0の必須gateにしない</strong>。必要になった場合だけ、同日matched A/Bを別調査として実施する。</p>
+      </div>
+      <div class="card-grid">
+        <div class="card card--accent-green"><div class="card-label">完了</div><div class="card-value">Step 0 / Exp 1 / D17 / DFX A-B-A</div><div class="card-detail">r7採用、直結標準化、CH1–CH13対応確認、DFX因果確認→D23 NoDfx採用</div></div>
+        <div class="card card--accent-blue"><div class="card-label">判定build</div><div class="card-value">r7 telemetry graceful-stop</div><div class="card-detail"><code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>。Release x64／hash pin済み</div></div>
+        <div class="card card--accent-amber"><div class="card-label">当時の次の1段</div><div class="card-value">N leg（1.3.0.4＋NoDfx）</div><div class="card-detail">2026-07-16〜17に実施済み。formal soakはPhase 4へ集約</div></div>
+        <div class="card card--accent-red"><div class="card-label">当時未成立</div><div class="card-value">Gate B / D4 / 新engine最終p99</div><div class="card-detail">Gate B／D4は閉鎖済み。新engine最終p99のみPhase 4</div></div>
+      </div>
+    </section>
+
+    <section id="revision-status">
+      <h2>確定済み事実と残課題</h2>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>状態</th><th>観測事実／扱い</th></tr></thead>
+        <tbody>
+          <tr><td>ステップ0：r7</td><td><span class="badge badge-confirmed">Pass</span></td><td>既存driver <code>1.2.3.20</code>、直結、Manual Get OFF。low 3/3＋high 1/1 Type C。</td></tr>
+          <tr><td>ステップ0：r18相当</td><td><span class="badge badge-risk-high">Fail</span></td><td>low 3/3＋high 1/1が全て <code>queue_full_timeout</code>／<code>-20013</code>。timeout recovery前に終了したため20ms backoff／64KiB clampは未評価。D4の「r18合格後にdev採用」gateは未成立。</td></tr>
+          <tr><td>実験1：物理区間</td><td><span class="badge badge-confirmed">Pass</span></td><td>直結4/4 Type C、<code>SW-SEG-01</code>挿入2/2 Type A、直結復帰2/2 Type C。標準は直結、区間はラベル保管。</td></tr>
+          <tr><td>旧PC遅延</td><td><span class="badge badge-open">未判定</span></td><td>Type Cでも約53–87秒と212秒／530秒が混在。単発EP6／save callに5–10分停止はなく、支配要因未分離。</td></tr>
+          <tr><td>新PC high×3</td><td><span class="badge badge-open">Reference / Gate B承認</span></td><td><code>260714_1611</code>／<code>1613</code>／<code>1616</code>は3/3 Type C、遅延なし、全1,997 pairのデータ完全性Pass。2026-07-15にownerが実行binaryは<code>0.1.4r7</code>、Gate Bとの差はbinaryだけで他条件は不変と確認。historical inventoryは推測で遡及せず参考証跡に留め、Gate Bのread-only inventoryで現条件を固定する。</td></tr>
+          <tr><td>D17：物理ch順</td><td><span class="badge badge-confirmed">Closed</span></td><td>実機はCH1–CH13。現行gcsaで既存データを開き、波形とラベルの対応が正しいことをオーナーが目視確認済み。追加のch特定runは行わず、この対応を新Decoder／Writerのgolden regression基準にする。</td></tr>
+          <tr><td>preview／consumer併用</td><td><span class="badge badge-wont">Skip</span></td><td><code>sys_app</code>準リアルタイム読込は廃止予定。合否条件から除外し、完成pairのオフライン確認だけ残す。</td></tr>
+          <tr><td>再アームp99</td><td><span class="badge badge-open">Baseline build ready</span></td><td>既存ログからの算出は禁止のまま。新固定buildは初回active RD_END／host drain／publish-cleanup／host-ready／外部triggerを固定長メモリへ記録し、停止後CSVで外部待ちと分離する。Phase 0はbaseline、最終合否は新engineのPhase 4。</td></tr>
+          <tr><td>2026-07-15 Gate B</td><td><span class="badge badge-open">ログ条件Pass／全体未判定</span></td><td>旧build＋driver <code>1.2.3.20</code>のinventory Pass。logはlow 3＋high 31、34/34 Type C、全件WR/RD END=1・timeout 0。ただし返却packageにFL/FH data integrity証跡とtelemetry CSV／summaryがなく、全体Passへ昇格しない。</td></tr>
+          <tr><td>2026-07-15 Gate C</td><td><span class="badge badge-risk-high">Fail</span></td><td>旧build＋driver <code>1.3.0.4</code>のinventory Pass。clean idle EP4 10/10後、Set→automatic waitのEP4 failureを3/3再現し、low／high前に停止。</td></tr>
+          <tr><td>10ms polling remediation build</td><td><span class="badge badge-risk-high">実機3/3 Fail（DFX有効）</span></td><td>Build ID <code>r7-driver-ep4-polling-20260715T1618JST</code>を2026-07-15夕に実機試験。DFX有効のままではSet後EP4 failureを約+0.82／5.11／2.22秒で3/3再現（logs <code>2607151650</code>／<code>2607151817</code>）。<strong>poll-rate/cadence仮説は棄却</strong>。10ms cadence自体（CPU削減・診断文字列）は維持するが、driver判定の手段にしない。判定buildとしてはtelemetry graceful-stop buildへ更新。</td></tr>
+          <tr><td>2026-07-16 DFX A-B-A</td><td><span class="badge badge-confirmed">因果確認</span></td><td>session <code>20260716_111343</code>（driver <code>1.3.0.4</code>・同一build/port/cable/config固定・単変数）。A（DFX有効）＝Set後failure 3/3（historical A、hash一致確認済み）→ B（<code>WdfDirectedPowerTransitionEnable=0</code>のみ変更）＝idle EP4 10/10・automatic wait&gt;68s安定・low Type C（FH/FL 60/60）・high Type C（FH/FL 678/678、4,227,600,000B、<code>ep6Timeouts=0</code>）→ 復元A＝+25.448sでfailure再発。証跡：<code>host_source/diagnostic_runs/20260716_111343/SESSION_REPORT.md</code>。実機はDFX有効既定へ復元済み。</td></tr>
+          <tr><td>D23：NoDfx正式採用</td><td><span class="badge badge-confirmed">Owner decision</span></td><td>2026-07-16 owner採用。新driver構成＝<code>cyusb3 1.3.x</code>＋NoDfx。適用は<code>dfx_off.ps1</code>系スクリプト＋<code>dfx_status.ps1</code>読み戻し検証のみ（INF編集・<code>CyUsb3NoDfx</code>セクション・regedit手作業は禁止のまま）。<strong>新driver INFはインストール時に<code>WdfDirectedPowerTransitionEnable=1</code>を書き込む（NOCLOBBERなし）ため、driver（再）インストール毎にNoDfx再適用＋検証を必須とする</strong>。</td></tr>
+          <tr><td>telemetry graceful-stop build</td><td><span class="badge badge-confirmed">Release・package確定</span></td><td>Build ID <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>。EXE <code>9da8a811c71d64fedd40bd9fb9990ee0e15dd40d08d02f43efda30c5c13b3bfd</code>、DLL <code>4897942d1a85f6fcaab4cee812ef88631eaaece9c7ac17ce7aad32c3701960d6</code>。<code>claude-review-fixer</code> Blocker/Major 0、Release x64 0警告／0エラー、native gate 771/771、build／READY checksumをPass。session開始前にpin済み<code>run_00_verify_package.bat</code>をPassさせた。</td></tr>
+        </tbody>
+      </table>
+      <div class="callout callout-success">
+        <div class="callout-title">D4 owner gate（閉鎖済み）</div>
+        <p>r18合格条件が満たされなかったため、2026-07-19に<strong>r7から必要資産を移植する例外</strong>をオーナー承認した。devの修正・再gateはcritical path外の任意作業。</p>
+      </div>
+    </section>
+
+    <section id="revision-common">
+      <h2>共通条件・判定語彙</h2>
+      <h3>全判定ランの固定条件</h3>
+      <ul>
+        <li>機械からPCへ直結。<code>SW-SEG-01</code>、USBハブ、延長区間を入れない。</li>
+        <li>Manual Getは現場通常条件の<strong>OFF</strong>。機械側開始を使用する。</li>
+        <li>Release x64、デバッガ／DebugView／USBPcap／Wiresharkなし。判定中に取得ホットパスへ計装を追加しない。</li>
+        <li>判定buildは<strong>telemetry graceful-stop build</strong>で固定し、同一EXE/DLLを新（N leg）／旧（B leg）driverで共用する。build ID・EXE/DLL SHA-256は「判定build・matched A/B総括」節と自己検証packageへpin済み。<strong>実機測定前に <code>TELEMETRY_CSV_READY_1314\run_00_verify_package.bat</code>をPassさせる</strong>。旧判定build <code>r7-driver-ep4-polling-20260715T1618JST</code>はsupersededとし、count・証跡は新buildで0から取り直す。</li>
+        <li>PC、driver version、<strong>DFX状態（<code>dfx_status.ps1</code>出力の保存）</strong>、EXE/DLL SHA-256、USB port/controller、サンプル、設定、保存先、NVMe、電源モードを各ブロックの開始前に記録する。</li>
+        <li>成功・失敗を問わずログ、cfg、完成bin、<code>.tmp</code>を削除しない。</li>
+      </ul>
+      <h3>結果語彙</h3>
+      <div class="glossary">
+        <div class="glossary-item"><div class="glossary-term">Pass</div><div class="glossary-def">そのgateのログ条件とデータ条件を全て満たす。ログだけが成功でもデータ未確認ならPassにしない。</div></div>
+        <div class="glossary-item"><div class="glossary-term">Fail</div><div class="glossary-def">Type A/B、切断、遅延、データ欠落、波形異常、または固定条件逸脱。次段へ進まない。</div></div>
+        <div class="glossary-item"><div class="glossary-term">Skip</div><div class="glossary-def">目的が廃止・別phaseへ移管・分岐条件不成立。理由を必ず記録する。</div></div>
+        <div class="glossary-item"><div class="glossary-term">未判定</div><div class="glossary-def">必要な証跡が不足。成功扱いにせず、再取得かowner判断へ送る。</div></div>
+        <div class="glossary-item"><div class="glossary-term">Type A / B / C</div><div class="glossary-def">A＝取得中EP6 timeoutで両END=0、B＝ドレイン後timeoutでWR=1/RD=0、C＝<code>ep6Timeouts=0</code>かつWR/RD END=1。</div></div>
+        <div class="glossary-item"><div class="glossary-term">4GiB counter表示</div><div class="glossary-def"><code>WAVE_RD_CNT=0</code>や巨大な<code>maxBacklogBytes</code>を単独判定に使わない。<code>ep6Bytes</code>、END flag、timeout、データ完全性を合わせる。</div></div>
+      </div>
+    </section>
+
+    <section id="revision-flow">
+      <h2>実行した順序（当時の残作業）</h2>
+      <figure class="diagram-container">
+        <div class="mermaid">
+flowchart TB
+  PKG[telemetry graceful-stop build\npackage確定・hash pin\nrun_00_verify_package PASS]
+  PKG --> N0{N0: Gate C inventory PASS\n+ NoDfx適用\ndfx_status=0確認}
+  N0 -- inventory/hash Fail --> FIX[停止: 不一致を解消し\n再inventory PASSまで測定しない]
+  N0 -- DFX異常/restart warning --> HOLD[停止: USB抜かず状態保存\nowner判断待ち]
+  HOLD -- owner指示 --> RB
+  N0 -- OK --> N1[N1: fail-fast smoke 非count\nidle EP4 x10 + Set→wait + low x1 + high x1]
+  N1 -- Fail --> SAVE[証跡保存\nD23再検討材料]
+  N1 -- Pass --> N2[N2: low x3]
+  N2 -- Pass --> N3[N3: high x10 中間gate]
+  N3 -- Pass --> N4[N4: high 残り20 累計x30 + 正常停止\ntelemetry CSV/summary回収]
+  N3 -- 時間予算超過 --> TRUNC[N leg打ち切りを記録] --> RB
+  N2 -- Fail --> SAVE
+  N3 -- Fail --> SAVE
+  N4 -- Fail --> SAVE
+  SAVE -- owner承認あり --> DIAG[詳細status build 最小1回\nEP4_FAILURE 1件取得] --> RB
+  SAVE -- 承認なし --> RB
+  N4 -- Pass --> RB[R: driver原状回復\n1.3.0.4→1.2.3.20 rollback\ndfx_status記録]
+  RB --> B0{B0: Gate B inventory PASS?\ndriver 1.2.3.20}
+  B0 -- Fail --> STOP[停止: 不一致解消まで測定しない]
+  B0 -- OK --> B1[B1: low x3]
+  B1 -- Pass --> B2[B2: high x10 中間gate]
+  B2 -- Pass --> B3[B3: high x30 + 正常停止\ntelemetry CSV/summary回収]
+  B1 -- Fail --> STOP2[停止: 証跡保全]
+  B2 -- Fail --> STOP2
+  B3 -- Fail --> STOP2
+  B3 -- Pass --> DONE[Gate B閉鎖 → D4 owner gate\n最終状態 = 旧driver運用]
+  DONE -. 後日 .-> P4[新AcquisitionEngineでPhase 4 p99最終判定]
+        </div>
+        <figcaption>図1. 実機は現在driver 1.3.0.4のため、driver入替が1回で済むN leg（新driver＋NoDfx）を先に実施し、driver原状回復（rollback）を挟んでB leg（旧driver）でGate B正式証跡を閉じる。セッション終了時の実機は旧driver＝現行運用状態。</figcaption>
+      </figure>
+      <div class="callout callout-warning"><div class="callout-title">優先順位はGate B閉鎖（D4前提）</div><p>N legはNoDfx構成のformal soakと将来構成telemetry取得だが、<strong>セッションの必達はB legのGate B閉鎖</strong>。N3（high×10）完了時点で残り時間がB leg全量（low×3＋high×30）に不足すると判断した場合は、N4を打ち切って記録し、直ちに原状回復→B legへ進む。N1のlow×1＋high×1はsmokeでありN2〜N4のformal countへ合算しない。N legがFailしてもB legは実施する（旧driverは既知の安定構成で、Gate B閉鎖は独立の必達）。</p></div>
+    </section>
+
+    <section id="gate-a">
+      <h2>Gate A：既存の新PC high×3を証跡として閉じる</h2>
+      <p>対象runは<code>260714_1611</code>、<code>260714_1613</code>、<code>260714_1616</code>。元データは<code>D:\Analyzer_data\260714\</code>、監査用コピーはworkspaceの<code>260714/</code>。データ本体を変更しない。</p>
+      <div class="callout callout-success"><div class="callout-title">データ完全性はPass（2026-07-14）</div><p>全1,997 pair、3,994 bin、約12GBを監査。index欠落・片側pair・非最終size anomaly・<code>.tmp</code>は0。全binがgcsa v1のevent境界に一致し、各runの永続化bytesはログ<code>saveBytes</code>と完全一致。詳細は<code>docs/archive/field-session/2026-07-14-new-pc-high3-audit.md</code>。</p></div>
+      <div class="callout callout-info"><div class="callout-title">Owner decision（2026-07-15）</div><p>実行EXE/DLLは<code>0.1.4r7</code>。Gate Bとの差はbinaryのみで、PC・driver・USB／直結・sample・保存先NVMe・電源条件は変えない。既存3runはhistorical hashを推測してPassへ昇格せず参考証跡として閉じ、<strong>Gate Bの開始を承認</strong>する。Gate B/Cではinventory collectorで現在条件を機械的に固定する。</p></div>
+      <table class="spec-table"><thead><tr><th>Run</th><th>Pair</th><th>Events</th><th>永続化bytes</th><th>結果</th></tr></thead><tbody>
+        <tr><td><code>260714_1611</code></td><td>628</td><td>62,800</td><td>3,918,720,000</td><td><span class="badge badge-confirmed">Pass</span></td></tr>
+        <tr><td><code>260714_1613</code></td><td>689</td><td>68,829</td><td>4,294,929,600</td><td><span class="badge badge-confirmed">Pass</span></td></tr>
+        <tr><td><code>260714_1616</code></td><td>680</td><td>67,930</td><td>4,238,832,000</td><td><span class="badge badge-confirmed">Pass</span></td></tr>
+      </tbody></table>
+      <ol>
+        <li>データ監査結果、代表SHA-256 manifest、現行gcsaの代表decode sanity、波形／ラベル対応確認をGate A証跡として保持する。</li>
+        <li>実行binaryが<code>0.1.4r7</code>だったことと、Gate Bとの差はbinaryのみというowner確認を残す。</li>
+        <li>historical driver／port／disk／power値を現在値から推測して埋めず、Gate B開始前のinventoryを新しい固定条件の正本にする。</li>
+      </ol>
+      <table class="spec-table"><thead><tr><th>結果</th><th>分岐</th></tr></thead><tbody>
+        <tr><td><strong>Pass</strong></td><td>データ条件は達成済み。provenanceも回収できれば履歴証跡を閉じる。新buildのcountには合算しない。</td></tr>
+        <tr><td><strong>参考証跡／進行承認</strong></td><td>2026-07-15 owner decision。既存3runは参考証跡に留め、Gate B inventoryで固定条件を新規記録してcount 0から開始する。</td></tr>
+        <tr><td><strong>Fail</strong></td><td>missing、<code>.tmp</code>、波形破損、条件逸脱 → soakへ進まず原因を切り分ける。</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="field-evidence">
+      <h2>現地データ完全性集計（データ本体を移さない場合）</h2>
+      <div class="callout callout-info"><div class="callout-title">既存3runでは実施済み</div><p><code>260714_1611</code>／<code>1613</code>／<code>1616</code>はworkspaceコピーを直接監査済み。以下のcollectorは、今後データ本体を持ち帰れないrunに使用する。</p></div>
+      <p>次の非破壊PowerShellを<code>Collect-FieldEvidence-v1.ps1</code>として保存し、runごとに実行する。出力フォルダだけを持ち帰る。スクリプト本文、版名、実行コマンド、標準出力も証跡に含める。</p>
+      <pre><code>$CollectorVersion = "FieldEvidence-v1"
+$RunId = "260714_1611"
+$DataDir = "D:\Analyzer_data\260714"
+$OutDir = Join-Path $DataDir ("evidence_" + $RunId)
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+$files = @(Get-ChildItem -LiteralPath $DataDir -File |
+  Where-Object { $_.Name -like ($RunId + "*") })
+$files | Select-Object Name,Length,LastWriteTimeUtc |
+  Export-Csv (Join-Path $OutDir "file_inventory.csv") -NoTypeInformation -Encoding UTF8
+
+$parts = @($files | ForEach-Object {
+  if ($_.Name -match '_(fl|fh)_(\d+)\.bin$') {
+    [pscustomobject]@{ Stream=$Matches[1]; Index=[int]$Matches[2]; Length=$_.Length; FullName=$_.FullName }
+  }
+})
+$groups = @($parts | Group-Object Index)
+$present = @($groups | ForEach-Object { [int]$_.Name })
+$minIndex = ($present | Measure-Object -Minimum).Minimum
+$maxIndex = ($present | Measure-Object -Maximum).Maximum
+$missingIndex = @($minIndex..$maxIndex | Where-Object { $present -notcontains $_ })
+$missingPair = @($groups | Where-Object { @($_.Group.Stream | Sort-Object -Unique).Count -ne 2 })
+
+$sizeAnomalies = foreach ($stream in 'fl','fh') {
+  $series = @($parts | Where-Object Stream -eq $stream)
+  $modeSize = [long](($series | Where-Object Index -ne $maxIndex | Group-Object Length |
+    Sort-Object Count -Descending | Select-Object -First 1).Name)
+  $series | Where-Object { $_.Index -ne $maxIndex -and $_.Length -ne $modeSize }
+}
+$sizeAnomalies | Select-Object Stream,Index,Length |
+  Export-Csv (Join-Path $OutDir "size_anomalies.csv") -NoTypeInformation -Encoding UTF8
+
+$complete = @($groups | Where-Object { @($_.Group.Stream | Sort-Object -Unique).Count -eq 2 } |
+  ForEach-Object { [int]$_.Name } | Sort-Object)
+$pick = @($complete[0], $complete[[math]::Floor(($complete.Count-1)/2)], $complete[-1]) |
+  Sort-Object -Unique
+$representatives = @($parts | Where-Object { $pick -contains $_.Index })
+$hashTargets = @($files | Where-Object Name -like '*_cfg.txt') + @($representatives)
+$hashTargets | ForEach-Object { Get-FileHash -LiteralPath ($_.FullName) -Algorithm SHA256 } |
+  Export-Csv (Join-Path $OutDir "representative_sha256.csv") -NoTypeInformation -Encoding UTF8
+$tmp = @($files | Where-Object { $_.Name -like '*.tmp' -or $_.Name -like '*.tmp.*' })
+
+@(
+  "collector=$CollectorVersion"
+  "run_id=$RunId"
+  "data_dir=$DataDir"
+  "pair_count=$($complete.Count)"
+  "index_range=$minIndex..$maxIndex"
+  "missing_indexes=$($missingIndex -join ',')"
+  "missing_pairs=$($missingPair.Name -join ',')"
+  "size_anomaly_count=$(@($sizeAnomalies).Count)"
+  "tmp_count=$($tmp.Count)"
+) | Set-Content (Join-Path $OutDir "summary.txt") -Encoding UTF8</code></pre>
+      <div class="callout callout-warning"><div class="callout-title">サイズ異常の解釈</div><p>最終indexは100波形未満で正常に小さくなり得るため、自動異常判定から除外して別途確認する。Passには、gcsaで各ファイルが<code>bytes_per_cell</code>の整数倍で、対応FL/FHのイベント数が一致することも必要。</p></div>
+      <p>現地集計後、<code>summary.txt</code>へwaveform spot checkの対象pair、使用gcsa版、結果（正常／異常／未確認）を追記する。スクリプトにエラーが出た場合は推測で集計せず、原文エラーとinventoryだけを持ち帰り「未判定」とする。</p>
+    </section>
+
+    <section id="gate-c-preflight">
+      <h2>最初に実施：N leg（新driver 1.3.0.4＋NoDfx）</h2>
+      <div class="callout callout-info"><div class="callout-title">D23の執行として実施する</div><p>実機はすでにdriver <code>1.3.0.4</code>なので、driverを変更せずD23で採用したNoDfx構成を適用し、将来の運用候補構成のformal soakとtelemetry baselineを取得する。NoDfx適用は診断ではなく<strong>provisioning</strong>（採用構成のセットアップ）であり、試験後にDFX有効へ戻す復元は行わない（駆動legの終了処理はdriver rollbackそのもの）。</p></div>
+      <h3>N0：inventory＋NoDfx provisioning（AnalogBoardを閉じたまま）</h3>
+      <pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\collect_gate_inventory.ps1 `
+  -Stage GateC `
+  -PackageRoot (Resolve-Path .) `
+  -SampleId "&lt;sample-or-batch-id&gt;" `
+  -UsbPortNote "&lt;physical-port-note&gt;" `
+  -CableConfiguration Direct `
+  -DataDriveLetter D</code></pre>
+      <ol>
+        <li><code>run_00_verify_package.bat</code>をPassさせる（判定buildのpin済みhashで検証）。</li>
+        <li>driver <code>1.3.0.4</code>、新EXE/DLL hash、FX3（対象deviceが1台のみ）、USB topology、D: disk、manual contextがinventoryでPassした場合だけ次へ進む。</li>
+        <li><code>dfx_status.ps1</code>を実行し変更前状態を保存する（新driverインストール直後はINF由来の<code>1 = DFX ENABLED</code>、A-B-A復元後は<code>not set</code>のはず。どちらでも続行可）。</li>
+        <li>管理者PowerShellで<code>dfx_off.ps1</code>を実行し、再度<code>dfx_status.ps1</code>で<code>0 = DFX DISABLED (NoDfx)</code>を確認・保存する。restart warningが出た場合はUSBを抜かず停止し、状態を保存してowner判断を仰ぐ。</li>
+        <li>旧buildの<code>evidence/</code>と<code>bin/logs/</code>を削除しない。</li>
+      </ol>
+      <h3>N1：測定経路smoke（非count）</h3>
+      <ol>
+        <li>connect後、<code>FPGA Debug</code>の<code>EP4 RX</code>を10回押し、10/10成功を確認する。</li>
+        <li>Manual Get OFFでSetを押し、<code>Set parameters success</code>と<code>Automatic get waveform data start</code>の後も待機が継続することを確認する（過去のfailureはSet後+0.8〜25.4秒で発生。最初のtriggerまたは60秒以上の安定待機を観測する）。</li>
+        <li>low-density×1を実行し、Type CとFL/FH完全性を確認する。</li>
+        <li>lowがPassした場合だけhigh-density×1を実行し、同じ条件を確認する。</li>
+      </ol>
+      <h3>N2〜N4：formal soak＋telemetry（新driver＋NoDfx）</h3>
+      <ol>
+        <li><strong>N2</strong>：low-densityを<strong>3連続run</strong>実施し、各runでログとデータ完全性を確認する（N1の2本は合算しない）。</li>
+        <li><strong>N3</strong>：high-densityを<strong>10連続run</strong>で中間gateとする。ここで残り時間を評価し、B leg全量（low×3＋high×30）に不足するならN4を打ち切って記録し、Rへ進む。</li>
+        <li><strong>N4</strong>：同一条件のまま<strong>残り20run（N3と合わせ高密度累計30run）</strong>を継続する。各runでType、<code>FPGA start sampling</code>→<code>Read over</code>、細胞数カウントの進み、データ完全性を記録する。</li>
+        <li>最終run後は外部trigger待ち状態で正常停止し、<code>*_rearm_telemetry*.csv</code>と<code>[REARM][SUMMARY]</code>（<code>csvWrite=1</code>／<code>dropped=0</code>）を回収する。</li>
+      </ol>
+      <h3>R：driver原状回復（rollback）</h3>
+      <p>N legの結果にかかわらず、アプリ終了・証跡回収後に必ず実施する。<strong>レジストリは触らない</strong>。旧driverフォルダ（<code>1.2.3.20</code>系。<code>FX3/</code>はgitignoreのため実機ローカルに用意）を事前に確認しておく。</p>
+      <ol>
+        <li>AnalogBoardアプリを終了していることを確認する。</li>
+        <li>スタートボタンを右クリック→「デバイス マネージャー」→「ユニバーサル シリアル バス コントローラー」からCypress／FX3系デバイス（ハードウェアIDに<code>VID_04B4</code>）を開き、プロパティ→「ドライバー」タブで現版数（<code>1.3.0.4</code>のはず）を記録する。</li>
+        <li>「<strong>ドライバーを元に戻す</strong>」が押せる場合はクリックして案内に従う。灰色の場合は「ドライバーの更新」→「コンピューターを参照」→「<strong>コンピューター上の利用可能なドライバーの一覧から選択</strong>」→一覧から<strong>1.2.3.20系</strong>を選択（一覧に無ければ「参照」で旧driverフォルダを指定）。</li>
+        <li>「ドライバー」タブで版数が<code>1.2.3.20</code>系へ戻ったこと、デバイスに「！」が無いことを確認・記録する（「！」が付いた場合はUSB抜き差し→PC再起動の順で回復を試み、経緯を記録）。</li>
+        <li>rollback後に<code>dfx_status.ps1</code>を実行し出力を保存する（<code>WdfDirectedPowerTransitionEnable=0</code>が残っていてよい——旧driverはDFXに参加せずこの値は不活性。削除しない）。</li>
+        <li>復帰確認の測定runは行わない——<strong>B0 inventoryのPASSが復帰確認を兼ねる</strong>。</li>
+      </ol>
+      <table class="spec-table"><thead><tr><th>結果</th><th>次</th></tr></thead><tbody>
+        <tr><td><strong>N leg Pass</strong>：N0〜N4＋data integrity＋telemetry成立</td><td>NoDfx構成のformal soak成立。R（原状回復）→B legへ。</td></tr>
+        <tr><td><strong>N leg Fail</strong>（NoDfx適用済みでEP4 failure等）</td><td>原文と証跡を保存し、そのrunで停止。<strong>A-B-A結果と矛盾するためD23の再検討材料</strong>として記録し、詳細status build（条件付き診断節）の実施をowner判断へ。R（原状回復）→B legは実施する。</td></tr>
+        <tr><td><strong>N3で時間予算超過</strong></td><td>N4打ち切りを記録（partial soak）。R→B legへ。NoDfx採用自体は覆さない（不足分は次セッション）。</td></tr>
+      </tbody></table>
+      <div class="callout callout-warning"><div class="callout-title">10ms cadenceのtrigger検出</div><p>外部待ちpollの10ms cadenceは、A-B-AのB legでlow（60 pair）／high（678 pair）のtrigger検出成功を実機確認済み。N2〜N4ではsoak規模でtrigger取りこぼしがないことを細胞数カウントとFL/FH pair数で継続確認する。</p></div>
+    </section>
+
+    <section id="gate-b">
+      <h2>B leg：旧driver <code>1.2.3.20</code>によるGate B閉鎖（driver原状回復後）</h2>
+      <div class="callout callout-info"><div class="callout-title">N leg＋R（原状回復）の後に実施する必達leg</div><p>N legと同一のtelemetry graceful-stop build（同一EXE/DLL hash）を旧driver <code>1.2.3.20</code>で使い、不足しているFL/FH data integrityとre-arm telemetry baselineを閉じる。これがGate B正式証跡＝D4 owner gateの前提。<strong>N legがFail・打ち切りでもB legは実施する</strong>（旧driverは34/34 Type Cの既知安定構成）。</p></div>
+      <h3>B0：read-only inventory（測定開始前）</h3>
+      <p>固定package同梱の<a href="../scripts/field-session/collect_gate_inventory.ps1"><code>collect_gate_inventory.ps1</code></a>を管理者権限なしで実行する。これはevidenceを書くだけで、driver、device、電源設定、アプリ、測定データを変更しない。</p>
+      <div class="callout callout-info"><div class="callout-title">default_config.csvは可変設定</div><p>AnalogBoardは正常終了時に現在の設定を<code>default_config.csv</code>へ書き戻す。保存先などの正当な変更を妨げないため、collectorはこのファイルの<strong>存在だけ</strong>を確認し、hashの検証やinventoryへの記録は行わない。固定hashの対象はEXEとDLLである。</p></div>
+      <pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\collect_gate_inventory.ps1 `
+  -Stage GateB `
+  -PackageRoot (Resolve-Path .) `
+  -SampleId "&lt;sample-or-batch-id&gt;" `
+  -UsbPortNote "&lt;physical-port-note&gt;" `
+  -CableConfiguration Direct `
+  -DataDriveLetter D</code></pre>
+      <ol>
+        <li><code>OK</code>、exit code 0、<code>summary.txt</code>の<code>result=PASS</code>を確認する。</li>
+        <li><code>inventory.json</code>、<code>artifact_hashes.csv</code>、<code>usb_parent_chain.csv</code>、<code>computer.json</code>、<code>data_disk.json</code>、<code>active_power_plan.txt</code>を回収する。</li>
+        <li>build ID、EXE/DLL artifact hash、<code>default_config.csv</code>の存在、driver <code>1.2.3.20</code>、FX3検出、<code>D:</code> disk、必須manual contextのいずれかが不一致なら測定を開始しない。</li>
+        <li><code>dfx_status.ps1</code>の出力を保存する（R節で保存済みなら再実行不要。<code>WdfDirectedPowerTransitionEnable=0</code>の残置は正常——旧driverには不活性）。</li>
+      </ol>
+      <h3>B1：未確認密度のbaseline</h3>
+      <ol>
+        <li>B0のinventoryを固定条件の正本とし、旧driver <code>1.2.3.20</code>、新固定build、直結、Manual Get OFF、USB port、sample、保存先を変えない。</li>
+        <li>low-densityを<strong>3連続run</strong>実施し、ログとデータ完全性を各runで確認する。</li>
+        <li>全run Type C、missing／残置<code>.tmp</code>／波形異常なしでB2へ進む。</li>
+      </ol>
+      <h3>B2／B3：high-density段階soak</h3>
+      <ol>
+        <li>既存3runは合算せず、新固定buildで<strong>high-density 10連続run</strong>を取る。</li>
+        <li>10run全件Passを中間gateとし、同一driver／build／条件のまま<strong>残り20runを継続して累計30run</strong>とする。</li>
+        <li>各runでType、<code>FPGA start sampling</code>→<code>Read over</code>、細胞数カウントの進み、機械側サンプル終了→記録終了、データ完全性を記録する。</li>
+        <li>30run後に外部trigger待ち状態で正常停止し、<code>*_rearm_telemetry*.csv</code>と<code>[REARM][SUMMARY]</code>を回収する。</li>
+      </ol>
+      <div class="callout callout-info"><div class="callout-title">30runの意味</div><p>故障0件でも故障率ゼロは証明できない。rule of threeでは、0/30のとき1run当たり故障率の95%上限は約10%、0/100なら約3%。phase 0はlegacy r7上のPC運用qualificationとして30run（高密度データ約129GiB）までとし、<strong>新アプリの100run soakはphase 4で実施</strong>する。phase 0で100runを要求するのは、ownerが「約3%上限」の証拠を今必要と判断した場合だけ。</p></div>
+      <h3>資源計測を行う場合</h3>
+      <p>Windows <code>typeperf</code>を1秒間隔で試験ブロックの前後まで取得し、同じ方法を比較対象すべてに使う。例：</p>
+      <pre><code>typeperf "\Processor(_Total)\% Processor Time" "\Memory\Available MBytes" "\PhysicalDisk(_Total)\% Disk Time" "\PhysicalDisk(_Total)\Avg. Disk sec/Transfer" -si 1 -f CSV -o resources.csv</code></pre>
+      <p>CPU &gt;90%またはDisk Time &gt;95%が10秒以上、Avg. Disk sec/Transfer &gt;0.100秒が5サンプル以上、Available Memory &lt;4096MBを診断triggerとする。単独でFailにはせず、遅延時刻との一致を調べる。</p>
+      <table class="spec-table"><thead><tr><th>結果</th><th>分岐</th></tr></thead><tbody>
+        <tr><td><strong>Pass</strong></td><td>low 3/3、high 30/30がログ＋データ条件を満たし、5–10分級遅延なし、telemetryが<code>csvWrite=1</code>／<code>dropped=0</code> → <strong>Gate B閉鎖・新PC採用確定・D4 owner gateへ</strong>。実機は旧driver＝現行運用状態のままセッション終了。</td></tr>
+        <tr><td><strong>Fail</strong></td><td>Type A/B、切断、顕著な速度低下、missing、波形異常、成功runの<code>.tmp</code> → 直ちに停止し証跡保全。Gate B未閉鎖のままD4 gateへ進まない。</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="pc-causality">
+      <h2>旧PC遅延の原因調査（任意・採用gate外）</h2>
+      <p>運用上はGate B合格で新PCを採用できる。旧PCが根本原因だったと主張する必要がある場合だけ、別セッションで旧PC／新PC各10run以上を、同日・同じr7／driver／直結／設定／サンプルbatch／保存先種別で交互に実施し、1秒資源ログと機械側終了時刻を取る。</p>
+      <ul>
+        <li>旧PCで遅延が再現し、新PCで再現しない：PC構成差に関連する証拠。ただしCPU、storage、USB controller等の内訳は未分離。</li>
+        <li>旧PCで遅延が再現しない：<strong>未判定</strong>。新PC採用を取り消す根拠にはしない。</li>
+        <li>両PCで遅延：PC単独原因仮説を棄却し、データ到着／polling／保存／UI schedulingへ切り分ける。</li>
+      </ul>
+    </section>
+
+    <section id="mapping-closed">
+      <h2>D17：物理ch順は既存確認でClosed</h2>
+      <p>実機の表記はCH1–CH13であり、現行gcsaで既存データを開いた際に、各波形と表示ラベルの対応が正しいことをオーナーが目視確認済みである。この確認をD17の実機証跡として扱い、<strong>全13ch基準runや1chずつ条件を変える追加runは実施しない</strong>。</p>
+      <div class="callout callout-info"><div class="callout-title">新アプリ実装時の扱い</div><p>確認済みのCH1–CH13→<code>FSC,SSC,FL1..FL6</code>／<code>fsGMI..bfGMI</code>対応を基準にDecoder／Writerを実装する。既存データと対応表をgolden regressionへ固定し、新アプリが出力するラベル・波形順を現行gcsaと比較する。これは実装回帰テストであり、本runbookの追加実機gateではない。</p></div>
+    </section>
+
+    <section id="rearm-deferred">
+      <h2>再アームbaseline計測（今回実施、最終判定は新engine）</h2>
+      <div class="callout callout-danger"><div class="callout-title">既存ログからの算出は禁止のまま</div><p><code>[PR01][CYCLE]</code>→次の<code>FPGA start sampling.</code>を再アーム窓として扱わない。外部sampler／操作者の待ち時間が混在する。今回使うのは新固定buildが停止後に出す専用CSVだけ。</p></div>
+      <p>新固定buildは、取得loopへ逐次ログやfile I/Oを追加せず、最大128 cycleの固定長メモリへ次のmarkerを同一cycle ID・<code>GetTickCount64()</code>で記録する。1 acquisition threadは128 cycle以下で正常停止し、<code>dropped&gt;0</code>は当該run無効とする。</p>
+      <ol>
+        <li>外部trigger検出</li>
+        <li>active cycleで<code>DDR_RD_END=1</code>を初めて確定</li>
+        <li>host drain完了（unread=0。診断用の別marker）</li>
+        <li>publish／cleanup完了（RD_ENDとの前後順を仮定せず実時刻を記録）</li>
+        <li>上記境界が全て完了し、次の外部triggerを受付可能になったhost-ready</li>
+        <li>次の外部trigger検出</li>
+      </ol>
+      <table class="spec-table"><thead><tr><th>値</th><th>式</th><th>今回の扱い</th></tr></thead><tbody>
+        <tr><td><code>rearm_ms</code></td><td><code>host_ready - ddr_rd_end_confirmed</code></td><td><strong>両legで取得</strong>：N leg（新driver＋NoDfx＝将来運用候補構成）とB leg（旧driver＝legacy構成）それぞれのlow×3＋high×30（N legは打ち切り時は取得分）のp50／p95／p99／maxをdriver構成別に保存する。matched pairの差分でdriver構成がre-armタイミングへ与える寄与を定量化し、D2（4GB再アーム）設計マージンの入力とする</td></tr>
+        <tr><td><code>external_trigger_wait_ms</code></td><td><code>next_external_trigger_detected - host_ready</code></td><td>外部待ちとして別集計。re-armへ混ぜない</td></tr>
+      </tbody></table>
+      <p>最終cycle後はアプリを強制終了せず、外部trigger待ち状態で正常停止する。保存先の<code>YYMMDD_HHMMSS_rearm_telemetry.csv</code>と<code>[REARM][SUMMARY] csvWrite=1 ... dropped=0</code>を回収する。Phase 0では数値閾値を置かず、<strong>今回baselineを取得し、最終p99合否は正式Tier1/2を通した新AcquisitionEngineでPhase 4に再実施</strong>する。</p>
+    </section>
+
+    <section id="gate-c">
+      <h2>判定build・matched A/B総括</h2>
+      <p>本セッションの判定buildは<strong>telemetry graceful-stop build</strong>（telemetry CSV／summaryの確実な出力＝正常停止経路を追加した新build）。R18 engine、20ms backoff、64KiB clampを含まない。両legで同一EXE/DLLを使い、driver構成（N leg＝<code>1.3.0.4</code>＋NoDfx／B leg＝<code>1.2.3.20</code>）だけを変えるmatched A/Bとする。</p>
+      <table class="spec-table"><thead><tr><th>Artifact</th><th>SHA-256</th></tr></thead><tbody>
+        <tr><td>Build ID</td><td><code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code></td></tr>
+        <tr><td><code>AnalogBoard_TestApp.exe</code></td><td><code>9da8a811c71d64fedd40bd9fb9990ee0e15dd40d08d02f43efda30c5c13b3bfd</code></td></tr>
+        <tr><td><code>AnalogBoard_Dll.dll</code></td><td><code>4897942d1a85f6fcaab4cee812ef88631eaaece9c7ac17ce7aad32c3701960d6</code></td></tr>
+      </tbody></table>
+      <div class="callout callout-warning"><div class="callout-title">supersededの取り扱い</div><p>旧判定build <code>r7-driver-ep4-polling-20260715T1618JST</code>（EXE <code>e33ba31c…</code>／DLL <code>55a5bf42…</code>）は2026-07-15実機試験でDFX有効下のSet後EP4 failure 3/3を記録済み。この結果はDFX A-B-Aの「historical A」証跡として保存し、新judgment buildのcountとは分離する。製品採用・再配布前には判定buildのsource状態をcommitで凍結する。</p></div>
+      <h3>leg対応表（旧C0/C1/C2からの読み替え）</h3>
+      <table class="spec-table"><thead><tr><th>本Draft</th><th>内容</th><th>旧Draft 2.5</th></tr></thead><tbody>
+        <tr><td>N0〜N1</td><td>新driver＋NoDfx provisioning＋fail-fast smoke（非count）</td><td>C0（新driver fail-fast。ただしDFX既定のまま）</td></tr>
+        <tr><td>N2〜N4</td><td>新driver＋NoDfxのformal soak（low×3＋high×10/30）＋telemetry</td><td>該当なし（C2はlow×1＋high×1のみだった）</td></tr>
+        <tr><td>R</td><td>driver原状回復（<code>1.3.0.4</code>→<code>1.2.3.20</code>）</td><td>rollback手順（同一）</td></tr>
+        <tr><td>B0〜B3</td><td>旧driverのGate B正式証跡（low×3＋high×10/30）＋telemetry</td><td>Gate B／C1（同一内容。実施順が後ろへ移動）</td></tr>
+        <tr><td>廃止</td><td>—</td><td>C2「Gate B後に新driverへ戻して最終確認」——N legが上位互換のためsuperseded。セッションは旧driverで終了する</td></tr>
+      </tbody></table>
+    </section>
+
+    <section id="diagnostics">
+      <h2>DFX確定と条件付き診断</h2>
+      <h3>DFX A/B（完了——再実施しない）</h3>
+      <p>2026-07-16に単変数A-B-A（session <code>20260716_111343</code>）として実施済み。A（DFX有効）＝Set後EP4 failure 3/3 → B（NoDfx）＝idle 10/10・wait&gt;68s・low／high Type C全Pass → 復元A＝failure再発、によりDFXを因果要因と確認し、<strong>D23でNoDfxを正式採用</strong>した。以後のDFX操作は診断ではなくprovisioning（N0節）であり、<code>dfx_off.ps1</code>適用＋<code>dfx_status.ps1</code>検証を新driverインストール（再インストール含む）毎に必須実施する。INF編集・<code>CyUsb3NoDfx</code>セクションによるインストール・regedit手作業の禁止は不変。</p>
+      <h3>詳細status build（条件付き）</h3>
+      <p>NoDfx適用済みのN legでEP4 failureが再発した場合だけ、owner承認のうえ詳細status build（<code>EP4_DIAGNOSTIC_READY_0105</code>＝<code>r7-driver-ep4-failure-status-20260716T0105JST</code>）でconnect→idle EP4×10→Set×1→automatic waitを最小1回実施し、<code>[PR01][DLL][EP4_FAILURE]</code>の<code>UsbdStatus</code>／<code>NtStatus</code>／Cypress <code>LastError</code>／Win32 last error／実転送長を1件取得する。retry・追加Set・EP6・captureは行わない。取得レコードはInfineon support caseとPhase 1エラー分類設計の入力とする。</p>
+      <p>connect／endpoint探索でFailした場合は取得を開始せず、DebugView等でconnectを1回だけ再現し、<code>[PR01][DLL][CONNECT]</code>の<code>event/alt/addr/attr/ep2/ep4/ep6/usbdStatus/ntStatus/lastError/win32LastError</code>を原文保存する。normal high-density判定runではDebugViewを併用しない。</p>
+      <h3>USBPcap</h3>
+      <p>判定ランでは起動しない。driver first gate failureなど、短い単一操作の専用診断ランだけで使う。実験1では既にdirect／switch／recoveryの3 captureを取得済みなので、通常経路で再取得しない。captureはPass/Failの主証拠にしない。</p>
+    </section>
+
+    <section id="revision-sheet">
+      <h2>判定・退出チェック</h2>
+      <table class="spec-table">
+        <thead><tr><th>Gate</th><th>判定</th><th>必須証跡</th><th>次</th></tr></thead>
+        <tbody>
+          <tr><td>A 既存high×3</td><td>Data Pass／参考証跡</td><td>監査報告、代表hash、waveform、2026-07-15 owner進行承認。新build countには不算入</td><td>—（closed）</td></tr>
+          <tr><td>DFX A-B-A</td><td>因果確認（完了）</td><td>session <code>20260716_111343</code> SESSION_REPORT＋dfx_status 3点＋B leg low/high Type C証跡</td><td>D23採用済み。再実施しない</td></tr>
+          <tr><td>Build pin</td><td></td><td>telemetry graceful-stop buildのID／EXE／DLL hashをpin、<code>run_00_verify_package.bat</code> PASS</td><td>pin前は実機実行禁止</td></tr>
+          <tr><td>N0 inventory＋NoDfx</td><td></td><td>Gate C inventory PASS＋<code>dfx_status</code>変更前／適用後（<code>=0</code>）の2点保存</td><td>inventory/hash Fail→不一致解消・再inventoryまで測定しない。DFX異常/restart warning→USB抜かず停止・状態保存・owner判断（owner指示によりR→B legへ）</td></tr>
+          <tr><td>N1 smoke（非count）</td><td></td><td>idle EP4×10、Set→automatic wait安定、low×1、high×1、data integrity</td><td>FailならD23再検討材料として記録、R→B legへ</td></tr>
+          <tr><td>N2 new driver low×3</td><td></td><td>N0固定条件、3runのログ＋データ完全性</td><td></td></tr>
+          <tr><td>N3 new driver high×10</td><td></td><td>全run Type／時間／データ。<strong>時間予算checkpoint</strong></td><td>不足ならN4打ち切り→R</td></tr>
+          <tr><td>N4 new driver high累計×30（N3の10runを含む）</td><td></td><td>同上、CSV、<code>csvWrite=1</code>／<code>dropped=0</code></td><td></td></tr>
+          <tr><td>R driver原状回復</td><td></td><td>rollback後のdriver版数<code>1.2.3.20</code>系確認＋<code>dfx_status</code>出力保存</td><td>必ず実施（N leg結果に依らず）</td></tr>
+          <tr><td>B0 inventory</td><td></td><td>Gate B <code>summary.txt</code> PASS＋JSON／CSV／power plan＋<code>dfx_status</code></td><td></td></tr>
+          <tr><td>B1 old driver low×3</td><td></td><td>B0固定条件、3runのログ＋データ完全性</td><td></td></tr>
+          <tr><td>B2 old driver high×10</td><td></td><td>全run Type／時間／データ</td><td></td></tr>
+          <tr><td>B3 old driver high累計×30（B2の10runを含む）</td><td></td><td>同上、遅延なし、CSV、<code>csvWrite=1</code>／<code>dropped=0</code></td><td>PassでGate B閉鎖</td></tr>
+          <tr><td>D17 ch順</td><td>Closed</td><td>既存データのCH1–CH13波形／gcsaラベル対応を確認済み</td><td>追加runなし</td></tr>
+          <tr><td>詳細status build（条件付き）</td><td></td><td>N leg failure再発時のみ、<code>[PR01][DLL][EP4_FAILURE]</code> 1件</td><td>owner承認必須</td></tr>
+          <tr><td>D4 owner gate</td><td></td><td>r18 Fail証跡、Gate B閉鎖証跡、baseline方針の承認記録</td><td>フェーズ1着手前</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li>☐ 判定build（telemetry graceful-stop build）のhash pinと<code>run_00_verify_package.bat</code> PASSを確認してから測定を開始した。</li>
+        <li>☐ N0でNoDfx適用と<code>dfx_status=0</code>検証を記録した（変更前／適用後の2点）。</li>
+        <li>☐ N leg／B legのinventoryがPASSし、PC／driver／DFX状態／build hash／USB topology／port／直結／sample／保存先disk／電源プランを記録した。</li>
+        <li>☐ ログ、cfg、inventory、missing／size anomaly／tmp、代表hash、waveform結果を両legで回収した。</li>
+        <li>☐ telemetry CSVと<code>[REARM][SUMMARY]</code>を両leg（N legは取得分）で回収し、外部待ちをre-armへ混ぜていない。</li>
+        <li>☐ Fail runとUSB captureを削除していない。</li>
+        <li>☐ R（原状回復）を実施し、最終driver状態＝<code>1.2.3.20</code>系とrollback後の<code>dfx_status</code>を記録した。</li>
+        <li>☐ 次段へ進まないFail／未判定事項（N leg打ち切り・D23再検討材料を含む）を明記した。</li>
+      </ul>
+      <div class="callout callout-success"><div class="callout-title">実機部分の完了条件</div><p>Gate A〜Cの結果とD4 owner gateが記録され、確認済みD17対応を新Decoder／Writerのgolden regressionへ引き継げること。<strong>AnalogBoard phase 0全体の完了には、別作業の暗号化Zarr往復・シャーディング決着・出力契約凍結も必要</strong>。</p></div>
+    </section>
+
+    <section id="revision-risks">
+      <h2>停止条件と注意</h2>
+      <div class="risk-card risk-card--high"><div class="risk-header"><span class="badge badge-risk-high">Stop</span><span class="risk-title">ログ成功・データ未確認</span></div><div class="risk-body">Type CだけでPassにしない。missing pair、index欠落、成功runのtmp、波形破損のいずれかで停止。</div></div>
+      <div class="risk-card risk-card--high"><div class="risk-header"><span class="badge badge-risk-high">Stop</span><span class="risk-title">inventoryまたはhashがFail</span></div><div class="risk-body">比較不能。<code>collector_error.txt</code>を保全し、不一致を解消して新しいtimestampのinventoryがPASSするまで測定を開始しない。</div></div>
+      <div class="risk-card risk-card--high"><div class="risk-header"><span class="badge badge-risk-high">Stop</span><span class="risk-title">DFX状態が期待値と異なる</span></div><div class="risk-body">N legで<code>dfx_status</code>が<code>0 = DFX DISABLED</code>にならない、適用時にrestart warning、対象deviceが1台でない——いずれもUSBを抜かず停止して状態を保存し、owner判断を仰ぐ。DFX有効のままN legの測定を開始しない（3/3 failの再確認にしかならない）。</div></div>
+      <div class="risk-card risk-card--high"><div class="risk-header"><span class="badge badge-risk-high">Stop</span><span class="risk-title">遅延・disconnect・Type A/B</span></div><div class="risk-body">次の大量runやdriver入替へ進まない。直前の成功runと最初の失敗runを一式保全する。</div></div>
+      <div class="risk-card risk-card--medium"><div class="risk-header"><span class="badge badge-risk-medium">Caution</span><span class="risk-title">4GiB counter折り返し</span></div><div class="risk-body"><code>ep6Bytes=4294967296</code>時の<code>WAVE_RD_CNT=0</code>／巨大backlog表示を実backlogの証拠にしない。</div></div>
+      <div class="risk-card risk-card--medium"><div class="risk-header"><span class="badge badge-risk-medium">Caution</span><span class="risk-title">観測がタイミングを変える</span></div><div class="risk-body">DebugView、デバッガ、USBPcapを判定ランから除外する。必要なOS資源ログは低負荷・同一条件で取得する。</div></div>
+      <div class="risk-card risk-card--medium"><div class="risk-header"><span class="badge badge-risk-medium">Caution</span><span class="risk-title">telemetry CSVが出る前の強制終了</span></div><div class="risk-body">CSV／summaryは取得thread停止後にだけ出る。最終cycle後は外部trigger待ちで正常停止し、<code>csvWrite=1</code>を確認してからアプリを終了する。128 cycle超過は<code>dropped</code>に出るため、そのsessionのp99を採用しない。</div></div>
+    </section>
+
+    <section id="revision-appendix">
+      <h2>付録（トレーサビリティ）</h2>
+      <table class="spec-table"><thead><tr><th>本runbook</th><th>根拠</th><th>扱い</th></tr></thead><tbody>
+        <tr><td>完了済みStep 0／Exp 1、新PC×3</td><td><code>runbook_revision_bundle_260714/current/RESULT_SHEET.md</code>、実験1サマリ、新PCログ</td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+        <tr><td>PC採用／原因証明の分離、soak再設計</td><td>同bundleの観測事実・容量・未確定事項</td><td><span class="badge badge-inferred">Derived</span></td></tr>
+        <tr><td>旧build field result</td><td><code>artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/field_package/evidence/</code>＋<code>bin/logs/260715*.log</code></td><td><span class="badge badge-confirmed">Recorded</span></td></tr>
+        <tr><td>EP4 polling remediation build実機結果（3/3 Fail・DFX有効）</td><td><code>field_package/bin/logs/2607151650.log</code>／<code>2607151817.log</code>＋<code>START_CODEX_HERE.md</code></td><td><span class="badge badge-confirmed">Recorded / superseded as judgment build</span></td></tr>
+        <tr><td>DFX A-B-A因果確認・D23 NoDfx採用</td><td><code>host_source/diagnostic_runs/20260716_111343/SESSION_REPORT.md</code>＋owner decision（2026-07-16）</td><td><span class="badge badge-confirmed">Confirmed / Adopted</span></td></tr>
+        <tr><td>telemetry graceful-stop judgment build</td><td><code>tasks/todo_archive.md</code> 2026-07-16 batch＋<code>docs/archive/field-session/2026-07-16-telemetry-graceful-stop-build-log.md</code>＋build manifest/checksums</td><td><span class="badge badge-confirmed">Release・package確定／hash pin済み</span></td></tr>
+        <tr><td>D17確認済み対応</td><td>オーナーによる実機CH1–CH13波形／現行gcsaラベル対応の目視確認</td><td><span class="badge badge-confirmed">Closed</span></td></tr>
+        <tr><td>D4／phase gate</td><td><code>docs/plans/260710-analogboard-rebuild-plan.html</code></td><td><span class="badge badge-confirmed">Preserved</span></td></tr>
+        <tr><td>再アームmarker／算式</td><td>新packageの<code>TELEMETRY_CSV_SCHEMA.md</code>＋取得ホットパスguardrail</td><td><span class="badge badge-confirmed">Implemented baseline</span></td></tr>
+      </tbody></table>
+    </section>
+
+    <details id="legacy-draft" style="margin-bottom:3rem;">
+      <summary style="cursor:pointer;font-weight:700;padding:1rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);">比較用：旧 Draft 1.3（2026-07-14実測前の計画。実行禁止）</summary>
+      <div class="callout callout-danger"><div class="callout-title">Superseded</div><p>以下は履歴比較専用。×100、preview併用、現行ログからの再アーム算出、交絡したwin11-driver-compat buildの手順を含むため、現地実行には使用しない。</p></div>
 
     <!-- ===== SUMMARY ===== -->
     <section id="summary">
@@ -741,7 +1151,7 @@ pre {
         <thead><tr><th></th><th>項目</th><th>内容</th><th>依存する実験</th></tr></thead>
         <tbody>
           <tr><td>☐</td><td>USBレベルキャプチャツール</td><td>URB レベルの録画用。標準は <strong>USBPcap＋Wireshark</strong> とする。<strong>キャプチャ自体がタイミングへ影響しうるため、判定ランでは使わず専用の短時間診断ランで使う</strong>。ハードウェア USB アナライザが使える場合は非侵襲の優先候補として併用可</td><td>6</td></tr>
-          
+
           <tr><td>☐</td><td>実験5b用スクリプト一式</td><td><code>scripts\field-session\</code>（<code>dfx_status.ps1</code>／<code>dfx_off.ps1</code>／<code>dfx_on.ps1</code>／README）を実機PCへコピー（例：<code>C:\field-session\</code>）。実験5bは条件付きだが<strong>スクリプトは必ず持参</strong>（現地でのレジストリ手作業を防ぐ）</td><td>5b</td></tr>
           <tr><td>☐</td><td>本手順書＋判定シート（印刷 or ローカルコピー）</td><td>ネットワーク非依存で参照できる形で持参</td><td>全部</td></tr>
           <tr><td>☐</td><td>gcsa 実行環境（解析PC）</td><td>gcsa v0.4.1 が動く環境。実験4の照合はセッション中でなくても良いが、<strong>取得パラメータの記録はセッション中に必須</strong></td><td>4</td></tr>
@@ -1259,12 +1669,14 @@ flowchart TB
       </table>
     </section>
 
+    </details>
+
   </main>
 </div>
 
 <footer class="doc-footer">
-  <p>Generated from <strong>docs/plans/260710-analogboard-rebuild-plan.html「まとめ実機セッション」節ほか</strong> on 2026-07-06.</p>
-  <p>本書は実施用の手順書であり、実験定義・判定基準の規範は親プランと各 runbook（baseline_next.md / driver_next.md）にある。図の描画に Mermaid（CDN）を使用。</p>
+  <p>Generated from <strong>docs/plans/260710-analogboard-rebuild-plan.html</strong> on 2026-07-06; revised from 2026-07-14 field evidence and the 2026-07-15 Gate B entry decision; revised 2026-07-16 from DFX A-B-A (session 20260716_111343) and owner decision D23 (NoDfx adoption).</p>
+  <p>Draft 2.6のN leg（新driver＋NoDfx）→R（driver原状回復）→B leg（旧driver Gate B閉鎖）は2026-07-16〜17に実行済み。再実行は計画されていない。D17の追加ch特定runは行わない。旧Draft 1.3は比較用。図の描画にMermaid（CDN）を使用。</p>
 </footer>
 <!-- Lightbox modal for diagrams (Pan & Zoom) -->
 <div class="diagram-modal" id="diagramModal" role="dialog" aria-modal="true" aria-label="Enlarged diagram" tabindex="-1">

@@ -10,7 +10,6 @@
 
 ## Current Operations
 
-- [Field session runbook](260706-field-session-runbook.html)
 - [Baseline next](operations/usb-acquisition-stability/baseline_next.md)
 - [Driver next](operations/usb-acquisition-stability/driver_next.md)
 - [Lab next](operations/usb-acquisition-stability/lab_next.md)
@@ -40,3 +39,10 @@
 ## Archive
 
 完了済みチェックリスト、古い process log、過去プランは [archive/](archive/) に置く。進行中の判断根拠は [process_log/INDEX.md](process_log/INDEX.md) から辿る。
+
+- [Completed field session runbook](260706-field-session-runbook.html)
+- [NoDfx dual-driver session (2026-07-16〜17)](archive/field-session/2026-07-16-nodfx-dual-driver-session.html)
+- [New-driver fail-fast task — superseded](archive/field-session/2026-07-15-new-driver-fail-fast-next-task.html)
+- [New-PC high3 data audit](archive/field-session/2026-07-14-new-pc-high3-audit.md)
+- [Field session runbook revision summary](archive/field-session/2026-07-14-runbook-revision-summary.md)
+- [Field artifact and worktree cleanup](archive/repository-maintenance/2026-07-19-field-artifact-worktree-cleanup-checklist.md)

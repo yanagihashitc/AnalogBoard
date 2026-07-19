@@ -14,6 +14,19 @@
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-19 | Field artifact and worktree cleanup | [log](../archive/repository-maintenance/2026-07-19-field-artifact-worktree-cleanup-log.md) |
+| 2026-07-16 | D23 NoDfx adoption + dual-driver session design | [log](../archive/field-session/2026-07-16-d23-nodfx-adoption-session-design-log.md) |
+| 2026-07-16 | D23実機copy-ready bundle | [log](../archive/field-session/2026-07-16-d23-copy-ready-bundle-log.md) |
+| 2026-07-16 | r7 telemetry graceful-stop build | [log](../archive/field-session/2026-07-16-telemetry-graceful-stop-build-log.md) |
+| 2026-07-15 | r7 EP4 polling portable source package | [log](../archive/field-session/2026-07-15-portable-source-package-log.md) |
+| 2026-07-15 | Gate B/C field result and EP4 polling remediation | [log](../archive/field-session/2026-07-15-gate-bc-ep4-polling-remediation-log.md) |
+| 2026-07-15 | Gate package mutable config fix | [log](../archive/field-session/2026-07-15-gate-package-mutable-config-log.md) |
+| 2026-07-15 | Gate inventory single-device fix | [log](../archive/field-session/2026-07-15-gate-inventory-single-device-fix-log.md) |
+| 2026-07-15 | Gate B/C inventory collector | [log](../archive/field-session/2026-07-15-gate-inventory-collector-log.md) |
+| 2026-07-14 | R7 driver + re-arm telemetry validation build | [log](../archive/field-session/2026-07-14-r7-rearm-telemetry-build-log.md) |
+| 2026-07-14 | New-PC high3 data audit | [log](../archive/field-session/2026-07-14-new-pc-high3-audit-log.md) |
+| 2026-07-14 | D17 existing-evidence closure | [log](../archive/field-session/2026-07-14-d17-closure-log.md) |
+| 2026-07-14 | Field-session runbook revision | [log](../archive/field-session/2026-07-14-runbook-revision-log.md) |
 | 2026-07-07 | Docs organization | [log](../archive/docs-organization/2026-07-07-docs-organization-log.md) |
 | 2026-03-22 | application_specification polish | [log](../archive/application-specification/2026-03-22-application-specification-polish-log.md) |
 | 2026-03-21 | application_specification rescore | [log](../archive/application-specification/2026-03-21-application-specification-rescore-log.md) |

@@ -1,0 +1,20 @@
+{
+  "build_id": "fixture-build",
+  "artifacts": [
+    {
+      "path": "bin/AnalogBoard_TestApp.exe",
+      "sha256": "03492f0d97c0051e828e4b75dbbf54e692b9b1bf65221af26071a0fdb3ce6db9"
+    },
+    {
+      "path": "bin/AnalogBoard_Dll.dll",
+      "sha256": "fc78c622f45e245ad7433ec4b74ba2002d4cee347beab1f0a69739d6b43d21a3"
+    }
+  ],
+  "required_runtime_files": [
+    {
+      "path": "bin/default_config.csv",
+      "mutable": true,
+      "validation": "existence_only"
+    }
+  ]
+}

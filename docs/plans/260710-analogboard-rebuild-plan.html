@@ -738,9 +738,10 @@ pre {
   <p class="subtitle">高速多パラメータ計測アプリの刷新 — ストラングラー型リビルド／新UI／堅牢化／リアルタイム scatter・gating／4GB制限撤廃／自動再接続／診断ログ／実機エミュレーション</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実装プラン</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 2.4</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 3.5</span>
+    <span class="doc-meta-item"><strong>Status:</strong> in_progress（current＝フェーズ0：実機gate・owner gateは決着済み。次gate＝Frozen v1＝出力契約凍結）</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
-    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-12（<strong>Draft 2.4</strong>：codex cross-review 反映——gate 定義表・保存の権威・store 一覧・受け入れ表・フェーズ図の具体入力を canonical v2 へ直接更新（boolean は {op, operands}・NOT=1・AND/OR≥2、payload 例は schema マーカー付き v2、固定パスは gcsa 実装 layout 準拠へ。読み替え callout 依存を解消）。sys_app 乖離の記述に gate 契約整合 phase（GA-S2）への参照を追加。<strong>Draft 2.3</strong>：D13 の gate 出力契約を正準v1 → <strong>canonical v2</strong>（構造化 boolean・schema マーカー・version 名前空間統一）へ改訂——gate 契約整合 phase の owner decision D-GA-11（2026-07-12）。差分と移行（reader-first 両読み・v2 書き）の正本は task_management の 260712 横断 plan。本文中の「正準v1」記述は「gcsa 互換契約」節の amendment 注記に従い読み替える。<strong>Draft 2.2</strong>：codex 再レビュー反映——D19 の AEAD 実装層を Store ラッパへ確定（numcodecs では座標 AAD 不可と実証）、判別子を producer/capability 字段へ、D12 表記を c-blosc 自作ライタ第一候補へ同期、gate 保存の原子性（正準 payload 固定パス＋コミットポインタ）、移送マニフェスト（GCM タグは欠落/余剰/平文改竄を検出しない）、.gcsa_store.json の位置と additive 字段。<strong>Draft 2.1</strong>：codex レビュー反映——FR-04 損失定義の再定義・暗号ワイヤ契約（nonce/AAD/tag/版）・D21 書込順序/クラッシュ回復・録画データ取扱い・背圧定量化/再接続再同期・UX-10/ロック整合・FR-12 レシピ全項目化・gate 保存権威と境界意味論の正準明記（sys_app 乖離は S7 で整合）・データ移送契約・軽微整合（footer 版数・モック 60Msps・FR/UX 範囲）。<strong>Draft 2.0</strong>：ファイル名を 260703→260710 へ更新。D20（別アプリ維持・一製品複数プロセス）／D21（ストア可視性契約＝finalization マーカ・write_generation・パーティションマニフェスト・min/max レンジ）／D22（sys_app ストア完全直読・射影廃止）を追加し、D11 の達成手段を直読へ改訂。C ABI 中立性ルール・フィード fan-out・finalize イベント・非WPF Tier1 適合テスト・共存 NFR・デプロイトポロジ節を追加。フェーズ0 に契約凍結＋シャーディング決着を明記（実機確認は 2026-07-13 週予定・完了後に実装着手）。根拠調査：docs/260709-analogboard-sysapp-integration-study.html。7-09：P1 採用→D19。7-06：FR-13/UX-20 追加ほか）</span>
+    <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-19（<strong>Draft 3.5</strong>：D13 canonical v2の本文伝播——読替calloutに依存していた「正準v1」記述8箇所を解消（D19行・FR-03表／本文・UX gate管理・UIモック表・gcsa互換riskの生存仕様はv2へ直接更新、P1クローズ済み提案・gcsa v0.4.1ソース参照の履歴記述は当時v1／現行v2の注記方式）。<strong>Draft 3.4</strong>：codex cross-review反映——D4のr7 baseline決定をエグゼクティブサマリ・方針判断へ伝播、切替SW／DFXの因果表現を証跡範囲へ整合（旧driver側failureは「因果未確定のopen reliability note」へ統一。「DFX非依存」「切替SWが唯一の真因」表現を撤回）、validator証跡を実在2件（N-smoke／B-formal）へ分離、Gate C行へN formal soakのphase 4集約を明記、Status metadata追加。<strong>Draft 3.3</strong>：owner gate 2件を確定（2026-07-19 オーナー承認）——<strong>D4＝移植baselineとして「r7移植例外」を承認</strong>（実機実証済みr7を移植baselineとし、dev限定回復policyはheader単位でTier2回帰つきcherry-pick可。devの修正・再gateはcritical path外の任意作業へ格下げ。フェーズ1着手のD4前提は成立）。<strong>N leg formal soak＝再実施せずphase 4の100run soakへ集約</strong>（30 valid high cycleの非formal aggregateをPhase 0記録として受理）。<strong>Draft 3.2</strong>：D23 NoDfx dual-driver session（session <code>20260716_2</code>・判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>＝hash pin済み）の2026-07-16〜17実行結果を反映。N leg＝N0／N-smoke Pass、N-formalは単一セッション未達で<strong>30 valid high cycleの非formal aggregate</strong>（EP4 failure 0・rearm中央値15ms／max 16ms）として記録。R＝driver <code>1.2.3.20</code>への原状回復Pass。B leg＝初回pre-trigger EP4 failure（Set+98.19s・<code>UsbdStatus=0xC0000011</code>）→再試行Type B drain stall（pair 56）→承認済みUSB replug後のrecovery 33/33 Type C（FL/FH 20,750 pair・<code>.tmp</code> 0・telemetry 33行 <code>dropped=0</code>）により、<strong>ownerがGate Bを条件付きPassとして閉鎖（2026-07-17 13:02 JST・初回attempt信頼性はopen note）</strong>。旧driver側でもEP4 failureが発生したため<strong>DFXは唯一の故障機構ではない</strong>と明記。legacy再アームbaselineを取得済みへ更新し、2026-07-17午後のcharacterization 6 run＋USBPcap capture（<code>artifacts/field-session/2026-07-17-characterization/</code>）を参考証跡として登録。<strong>Draft 3.1</strong>：DFX A-B-A（session <code>20260716_111343</code>、driver 1.3.0.4固定・単変数）でA＝Set後EP4 failure 3/3→B＝NoDfxでidle 10/10・low/high Type C全Pass→復元A＝failure再発を確認し、DFXを因果要因と確定。owner decisionで<strong>D23（新driver構成＝cyusb3 1.3.x＋NoDfx）を追加</strong>。10ms polling remediation buildは実機3/3 Fail（DFX有効）でpoll-rate仮説棄却。判定buildをtelemetry graceful-stop buildへ更新し、実行順を「新driver＋NoDfx（N leg formal soak）→driver原状回復→旧driver Gate B閉鎖（B leg）」へ改訂（runbook Draft 2.6）。<strong>Draft 3.0</strong>：返却packageから、旧build＋driver 1.2.3.20のGate Bはlow 3＋high 31の34/34 Type Cだがdata／telemetry証跡不足、driver 1.3.0.4のGate Cはidle EP4 10/10後にSet→automatic EP4 failure 3/3と確定。外部trigger待ちの成功・未trigger pollだけ10ms cadenceを入れた新buildをreview後にclean rebuildし、現在の新driverでlow×1＋high×1のfail-fast smokeを30本より先に行う。<strong>Draft 2.9</strong>：既存新PC high×3はデータ完全性Passの参考証跡として保持し、実行binaryは<code>0.1.4r7</code>、Gate Bとの差はbinaryのみというowner確認によりGate B開始を承認。historical inventoryは推測で遡及せず、Gate B/C開始前に固定package hash・driver・USB topology・PC/OS・保存先disk・active power planとmanual contextを取得するread-only collectorを必須化。<strong>Draft 2.8</strong>：R7取得系＋endpoint hardening＋境界telemetryの新固定buildを作成。旧driver low×3＋high×30でPC qualificationと再アームbaselineを同時取得し、同じEXE/DLLのまま新driver first gateへ進む順序に統合。既存high×3は参考証跡として新build countへ合算しない。最終p99判定は新AcquisitionEngineでPhase 4に再実施。<strong>Draft 2.7</strong>：新PC high×3の全12GBを監査し、1,997 FL/FH pairの完全性とログ<code>saveBytes</code>一致を確認。Gate A残件をdriver／binary hash／port等の実行条件provenanceに限定。<strong>Draft 2.6</strong>：実機CH1–CH13と現行gcsaの波形／ラベル対応をオーナー確認済み証跡としてD17を凍結し、追加のch特定runを実機gateから除外。driver A/BをGate Cへ繰上げ。<strong>Draft 2.5</strong>：実機ステップ0／スイッチ区間A/B／新PC高密度×3の証跡を反映。r18全4run FailによりD4 gate未成立、残りのlegacy検証はr7を使用。PC採用と旧PC原因証明を分離し、phase 0はlow×3＋high合計30の段階qualification、100run soakはphase 4へ集約。現行r7ログからの再アームp99算出を禁止し、marker実装後の別計画へ分離。R7取得系matched buildで旧→新driver単変数A/Bを行う順序へ更新。<strong>Draft 2.4</strong>：gate 定義表・保存の権威・store 一覧・受け入れ表・フェーズ図の具体入力を canonical v2 へ直接更新。<strong>Draft 2.3</strong>：D13 の gate 出力契約をcanonical v2へ改訂。<strong>Draft 2.2</strong>：D19のAEAD実装層をStoreラッパへ確定。<strong>Draft 2.1</strong>：cross-review反映。<strong>Draft 2.0</strong>：D20〜D22と横断ロードマップ同期を追加）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> オーナー／開発チーム</span>
     <span class="doc-meta-item"><strong>Source:</strong> prompt.md ＋ 2件のコードベース調査</span>
   </div>
@@ -784,17 +785,17 @@ pre {
         現行 AnalogBoard は Windows の MFC ダイアログアプリ（<code>AnalogBoard_TestApp</code>）＋ Cypress CyAPI をラップする DLL（<code>AnalogBoard_Dll</code>）で、FX3 USB3 経由で FPGA ボードから高速多パラメータ計測データを取得する。本プランは、オーナーの7要求（直感的UI・新ドライバ対応・堅牢化・リアルタイム scatter/histogram/gating・4GB制限撤廃・自動再接続・診断ログ）を満たすための再構築方針を定める。
       </p>
       <p>
-        2件の多エージェント調査（コード・FPGA仕様・git履歴・現場ログの横断精査）と、オーナーからの重要な追加情報（後述の「真因」）を突き合わせた結論は<strong>「ストラングラー型リビルド」</strong>である。initial commit へ戻す全面やり直しは推奨しない — それは現場で鍛えられた実証済み資産（テスト済みポリシー群・レジスタ意味論・SimRunner）を捨て、god class と欠陥DLLの骨格へ後退することを意味する。代わりに、<strong>UI・描画・オーケストレーションは新スタックで作り直し、取得・通信コアはネイティブ C++ の新設計としつつ dev ブランチの実証資産を移植</strong>する。UIスタックの推奨は <strong>C#/.NET 8 WPF ＋ ネイティブ C++ コア（C ABI）</strong>。
+        2件の多エージェント調査（コード・FPGA仕様・git履歴・現場ログの横断精査）と、オーナーからの重要な追加情報（後述の「真因」）を突き合わせた結論は<strong>「ストラングラー型リビルド」</strong>である。initial commit へ戻す全面やり直しは推奨しない — それは現場で鍛えられた実証済み資産（テスト済みポリシー群・レジスタ意味論・SimRunner）を捨て、god class と欠陥DLLの骨格へ後退することを意味する。代わりに、<strong>UI・描画・オーケストレーションは新スタックで作り直し、取得・通信コアはネイティブ C++ の新設計としつつ実機実証済み資産を移植</strong>する（移植baselineは<strong>r7</strong>＝2026-07-19 D4 owner gateで移植例外承認。dev限定の回復policyはheader単位でTier2回帰つきcherry-pick）。UIスタックの推奨は <strong>C#/.NET 8 WPF ＋ ネイティブ C++ コア（C ABI）</strong>。
       </p>
       <p>
-        最大の技術リスクだった「18回の現場イテレーションでも閉じなかった高密度EP6タイムアウト」は、オーナーの調査により<strong>物理層（機械側ケーブル先端のインラインon/off切替スイッチ）が真因</strong>と判明し、これを外すことで Win10/Win11 とも高密度で96ウェル1枚を完走できるレベルまで解消した。この判明により最大リスクはブロッカーから大幅に格下げされ、通信コアの再設計は「未診断問題の引き継ぎ」ではなく「堅牢化・自動再接続・4GB再アームのための設計改善」に純化する。加えて実機アクセスが希少という制約に対し、<strong>実機通信を録画して決定論的に再生するエミュレータ（Tier 1〜3、2枚目FX3をデバイスエミュレータとする HIL を初期から含む）</strong>を一級ワークストリームとして構築し、日常開発・回帰・UI/描画開発を実機ゼロで回せるようにする。
+        最大の技術リスクだった「18回の現場イテレーションでも閉じなかった高密度EP6タイムアウト」は、オーナーの調査により<strong>物理層（機械側ケーブル先端のインラインon/off切替スイッチ）が主要因</strong>と判明し、これを外すことで Win10/Win11 とも高密度で96ウェル1枚を完走できるレベルまで解消した（この判明が説明するのは高密度EP6タイムアウト＝Type A系であり、後の実機確認で判明した別軸事象——r18系の<code>queue_full_timeout</code>、driver 1.3.0.4のSet後EP4 failure（DFX因果・D23）、旧driverで散発したEP4 failure／Type B stall（因果未確定・open note）——はこの限りではない）。この判明により最大リスクはブロッカーから大幅に格下げされ、通信コアの再設計は「未診断問題の引き継ぎ」ではなく「堅牢化・自動再接続・4GB再アームのための設計改善」に純化する。加えて実機アクセスが希少という制約に対し、<strong>実機通信を録画して決定論的に再生するエミュレータ（Tier 1〜3、2枚目FX3をデバイスエミュレータとする HIL を初期から含む）</strong>を一級ワークストリームとして構築し、日常開発・回帰・UI/描画開発を実機ゼロで回せるようにする。
       </p>
 
       <div class="card-grid">
         <div class="card card--accent-green">
           <div class="card-label">方針判断</div>
           <div class="card-value">ストラングラー型リビルド</div>
-          <div class="card-detail">UI・描画は新規、取得コアは新設計＋dev資産移植。initial commit へは戻さない。</div>
+          <div class="card-detail">UI・描画は新規、取得コアは新設計＋r7実証資産移植（D4）。initial commit へは戻さない。</div>
         </div>
         <div class="card card--accent-blue">
           <div class="card-label">推奨スタック</div>
@@ -817,14 +818,14 @@ pre {
     <!-- ===== DECISIONS ===== -->
     <section id="decisions">
       <h2>確定した意思決定</h2>
-      <p>オーナーと確定した22件（D1〜D18：2026-07-03〜06、D19〜D22：2026-07-09〜10 の統合検討スタディ後に確定）。以降の設計はこれを前提とする。</p>
+      <p>オーナーと確定した23件（D1〜D18：2026-07-03〜06、D19〜D22：2026-07-09〜10 の統合検討スタディ後に確定、D23：2026-07-16 DFX A-B-A後に確定）。以降の設計はこれを前提とする。</p>
       <table class="spec-table">
         <thead><tr><th>#</th><th>論点</th><th>決定</th><th>要点</th></tr></thead>
         <tbody>
           <tr><td>D1</td><td>UIスタック</td><td><strong>C#/.NET 8 WPF ＋ ネイティブC++コア</strong></td><td>フォーム系UIとログ基盤が最速。生データはC++に閉じGCを触れさせない。</td></tr>
           <tr><td>D2</td><td>4GB破棄の許容度</td><td><strong>実測後に判断</strong></td><td>既存logs/のfill/drainレートで判定。まずホスト側再アーム、FW変更は要否を測定で決める。</td></tr>
           <tr><td>D3</td><td>FPGA FW改変</td><td><strong>段階的（並行判断）</strong></td><td>ホスト側再アームを先行、リングバッファ＋abortレジスタは並行で発注判断。リビルドをブロックしない。</td></tr>
-          <tr><td>D4</td><td>移植ベースライン</td><td><strong>r18実機テスト後にdev</strong></td><td>devは知見の上位集合。まとめセッションでr18高密度テストを通してから採用。</td></tr>
+          <tr><td>D4</td><td>移植ベースライン</td><td><strong>r7移植例外を承認（2026-07-19 owner gate通過）</strong></td><td>当初決定「r18実機テスト後にdev」は、2026-07-14の直結A/Bでr18相当がlow 3/3＋high 1/1全て<code>queue_full_timeout</code>（<code>-20013</code>）となり採用gate不成立。<strong>2026-07-19のowner gateで「r7からの移植例外」を承認</strong>——移植baselineは実機実証済みr7（Phase 0の全gate証跡＝Gate B閉鎖33/33・N leg・re-arm baselineはr7系buildで取得）。dev限定の回復policy（例：<code>Ep6TimeoutRecoveryPolicy.h</code>）はheader単位でTier2回帰つきcherry-pick可。devの<code>queue_full_timeout</code>修正・再gateはcritical path外の任意作業とし、フェーズ1着手をブロックしない。</td></tr>
           <tr><td>D5</td><td>pulse特徴量の権威</td><td><strong>アプリが算出・記録し下流が使用</strong></td><td>本アプリがA/H/Wを算出して出力に記録、gcsa/sys_appは記録値を使う（gcsaは改変プロンプトでupdate）。</td></tr>
           <tr><td>D6</td><td>gate軸</td><td><strong>FL pulse特徴量(A/H/W)のみ</strong></td><td>FL 8ch×{A,H,W}=24カラム。GMIには_A/_H/_W経路が無く対象外。</td></tr>
           <tr><td>D7</td><td>ゲインUI</td><td><strong>自動求解スナップ＋詳細展開</strong></td><td>1スライダーで達成可能な(リレー×DAC)組合せへスナップ。CH9-13はリレーのみで粗い。</td></tr>
@@ -836,13 +837,14 @@ pre {
           <tr><td>D13</td><td>gate の下流出力</td><td><strong>出力する（正準 payload＝canonical v2。2026-07-12 改訂）</strong></td><td>ストアの gates/ ＋ 正準 payload（<strong>canonical v2</strong>：構造化 boolean・schema マーカー・version 一本化）で出力。旧 sys_app v2.0 envelope 拡張（fill_*・階層root）は正準の一部として出さない（unknown extras 扱いで保全）。UIは正準で表現できる gate 種のみ提示（UX-03）。<strong>Amendment（2026-07-12・D-GA-11）</strong>：gate 契約整合 phase の owner decision により v1→v2 へ改訂。正本は <code>task_management/plans/260712-gcsa-sys-app-gate-contract-alignment-plan.html</code>。</td></tr>
           <tr><td>D14</td><td>特徴量の版管理</td><td><strong>整数版＋meta.versions</strong></td><td>feature_schema_version=1（gcsa v1 準拠）から開始、算出値が変わる改訂で+1。versions にアプリ/FW/アルゴ版を記録。同一データセット内の版混在禁止。下流は記録値権威・版は表示のみ（UX-12）。</td></tr>
           <tr><td>D15</td><td>sys_app Parquet 精度</td><td><strong>float64化＋round除去</strong></td><td>下流プラン S6 を確定。往復テストの合格判定を bit 一致に単純化。</td></tr>
-          <tr><td>D16</td><td>切替スイッチ</td><td><strong>除去を標準化</strong></td><td>機械から出る固定ケーブルは交換不可のため、管理対象は先端の<strong>スイッチ区間（メス—スイッチ—オス・着脱可能）</strong>。直結（区間除去）を標準とし、外した区間をラベル保管、対照実験（#1）でのみ再装着。</td></tr>
-          <tr><td>D17</td><td>物理ch順の前提</td><td><strong>gcsa想定順で先行実装</strong></td><td><code>FSC,SSC,FL1..FL6</code>／<code>fsGMI..bfGMI</code> 前提で Decoder/Writer を実装し、実機#7の実サンプル照合で凍結。差異は ch-mapping 表1枚で吸収できる設計にする。</td></tr>
+          <tr><td>D16</td><td>切替スイッチ</td><td><strong>除去を標準化</strong></td><td>2026-07-14実機A/Bで、直結4/4 Type C、<code>SW-SEG-01</code>挿入2/2 Type A、直結復帰2/2 Type Cを確認。直結（区間除去）を標準とし、外した区間は再現用にラベル保管する。</td></tr>
+          <tr><td>D17</td><td>物理ch順の前提</td><td><strong>gcsa想定順で凍結（2026-07-14実機確認済み）</strong></td><td>実機はCH1–CH13。現行gcsaで既存データを開き、波形とラベルの対応が正しいことをオーナーが目視確認済み。確認済みの<code>FSC,SSC,FL1..FL6</code>／<code>fsGMI..bfGMI</code>対応でDecoder／Writerを実装し、既存データをgolden regressionに使う。追加のch特定runは行わない。</td></tr>
           <tr><td>D18</td><td>UI仕様の突き合わせ</td><td><strong>現行設定項目の完全継承＋ダイアログ集約</strong></td><td>現行アプリの全設定項目（「UI仕様」節の一覧）を新アプリでも設定可能にする。チャンネル毎設定（ゲイン段・Offset・Ext Ctrl・有効）はモーダルダイアログに集約（UX-18）。開始/停止ボタンは Manual Get ON のときのみ表示（UX-19）。</td></tr>
-          <tr><td>D19</td><td>ストア暗号化</td><td><strong>チャンク暗号化を採用（抑止レベル）。AEAD は Store 層で実施（2026-07-10 方式確定）</strong></td><td>測定配列チャンクのみ Blosc(lz4)圧縮→AES-256-GCM で保護。鍵はアプリ（C++コア）と gcsa が共有する埋込鍵、チャンクヘッダの <code>key_id</code>（1バイト）で将来の鍵替えに備える。<strong>抑止レベル（配布物内に鍵が存在する以上、解析には耐えない）と明記した上での採用</strong>。<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準v1）は平文維持。<strong>実装層（2026-07-10 オーナー判断・codex レビュー起点）</strong>：numcodecs の <code>Codec</code> は <code>encode(buf)</code>/<code>decode(buf)</code> のみでチャンク座標を受け取らない（numcodecs 0.13.1 <code>abc.py</code>・zarr 2.18.3 <code>core.py</code> で実証）。よって当初案の「カスタム numcodecs コーデック」では座標を AAD に束縛できず、<strong>読取側の AEAD は zarr の Store ラッパ層</strong>（<code>__getitem__</code> がチャンクキーを受け取る）で行い、<code>.zarray</code> の compressor には<strong>内側の Blosc を宣言</strong>する。zarr v2 の DirectoryStore ではチャンクキー＝ファイル名のため、C++ ライタ（直接ファイル書込）と gcsa の Store ラッパは同一の AAD を計算でき相互運用が成立する。帰結：c-blosc＋最小自作ライタが実質第一候補（D12 のフォールバック昇格）、フェーズ0往復検証は保護込み、gcsa へ G4（Store ラッパ＋鍵管理）。GCM 認証タグによりチャンク単位のサイレント破損検知が付随する。同一座標への旧チャンク差し戻しは AAD では防げないため D21 マニフェスト（<code>write_generation</code>）で担保する。詳細は「リスクと未決事項」節の提案 P1 参照。2026-07-09 採用／2026-07-10 実装層を確定。</td></tr>
+          <tr><td>D19</td><td>ストア暗号化</td><td><strong>チャンク暗号化を採用（抑止レベル）。AEAD は Store 層で実施（2026-07-10 方式確定）</strong></td><td>測定配列チャンクのみ Blosc(lz4)圧縮→AES-256-GCM で保護。鍵はアプリ（C++コア）と gcsa が共有する埋込鍵、チャンクヘッダの <code>key_id</code>（1バイト）で将来の鍵替えに備える。<strong>抑止レベル（配布物内に鍵が存在する以上、解析には耐えない）と明記した上での採用</strong>。<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準payload＝現行canonical v2。D-GA-11）は平文維持。<strong>実装層（2026-07-10 オーナー判断・codex レビュー起点）</strong>：numcodecs の <code>Codec</code> は <code>encode(buf)</code>/<code>decode(buf)</code> のみでチャンク座標を受け取らない（numcodecs 0.13.1 <code>abc.py</code>・zarr 2.18.3 <code>core.py</code> で実証）。よって当初案の「カスタム numcodecs コーデック」では座標を AAD に束縛できず、<strong>読取側の AEAD は zarr の Store ラッパ層</strong>（<code>__getitem__</code> がチャンクキーを受け取る）で行い、<code>.zarray</code> の compressor には<strong>内側の Blosc を宣言</strong>する。zarr v2 の DirectoryStore ではチャンクキー＝ファイル名のため、C++ ライタ（直接ファイル書込）と gcsa の Store ラッパは同一の AAD を計算でき相互運用が成立する。帰結：c-blosc＋最小自作ライタが実質第一候補（D12 のフォールバック昇格）、フェーズ0往復検証は保護込み、gcsa へ G4（Store ラッパ＋鍵管理）。GCM 認証タグによりチャンク単位のサイレント破損検知が付随する。同一座標への旧チャンク差し戻しは AAD では防げないため D21 マニフェスト（<code>write_generation</code>）で担保する。詳細は「リスクと未決事項」節の提案 P1 参照。2026-07-09 採用／2026-07-10 実装層を確定。</td></tr>
           <tr><td>D20</td><td>アプリ統合方針</td><td><strong>AnalogBoard と sys_app は別アプリ維持</strong></td><td>コードベース統合はしない（3視点独立調査で一致・<code>docs/260709-analogboard-sysapp-integration-study.html</code>）。到達形は「一製品・複数プロセス」——同梱配布＋自動ハンドオフ（近期）、必要なら WPF シェルへの WebView2 埋込（将来アドオン）。根拠：sys_app は ML 追加で頻繁更新（リリースサイクル非対称）、取得側は常駐ネイティブ必須（FR-11）＋障害ドメイン隔離、解析数値核は gcsa（Python+Rust）。sys_app は ML/DR 実装後に Tauri デスクトップ化を計画。2026-07-09 決定。</td></tr>
           <tr><td>D21</td><td>ストア可視性契約</td><td><strong>finalization マーカ＋パーティションマニフェスト導入</strong></td><td>meta.json に additive：<code>status: open|finalized</code>・<code>finalized_at</code>・単調増加 <code>write_generation</code>・パーティションマニフェスト（配列毎行数＋per-partition <code>sealed</code>）・特徴量毎 min/max レンジ。単一書き手規則（<code>datasets/&lt;id&gt;/</code> の書き手は取得コアのみ）＋「ストア＋meta.json＝唯一のクロスアプリレジストリ」。取得中 import のサイレント切詰め防止・再アーム append と gcsa の meta.json-last 慣習の非両立を解消・クラッシュ回復に単独価値。出力契約凍結前に確定、フェーズ0往復で gcsa 許容を検証。2026-07-09 決定。</td></tr>
           <tr><td>D22</td><td>sys_app 読取方式</td><td><strong>ストア完全直読（registration-only import）</strong></td><td>射影コピー（旧 S1）を廃し、sys_app は登録のみの import＋gcsa 経由のストア直読へ。根拠（実コード調査 2026-07-10）：旧射影はピーク RAM≒生データサイズで大データセット不可・読者不在の全波形コピー・D19 暗号化を平文コピーが無効化。読取 seam は狭く（DuckDBFeatureStore 1箇所・波形チェーン1本）差替えは S/M、唯一の設計変更は補償列の sidecar 化。D11 の達成手段変更であり要件は不変。2026-07-10 決定。</td></tr>
+          <tr><td>D23</td><td>新driver構成</td><td><strong>cyusb3 1.3.x＋NoDfx（<code>WdfDirectedPowerTransitionEnable=0</code>）を正式採用</strong></td><td>根拠：2026-07-16 DFX A-B-A（session <code>20260716_111343</code>、driver 1.3.0.4固定・単変数）——A（DFX有効）＝Set後EP4 failure 3/3 → B（NoDfx）＝idle EP4 10/10・automatic wait&gt;68s・low/high Type C全Pass（high 4,227,600,000B・<code>ep6Timeouts=0</code>）→ 復元A＝+25.448sで再発。runbook判定表「実験5失敗＋5b成功→Plan A＋NoDfxで確定」（要旨）分岐の執行。NoDfxはMicrosoft文書化済みのWDF opt-out（レジストリhackではない）。<strong>適用は配布スクリプト（<code>dfx_off.ps1</code>）＋<code>dfx_status.ps1</code>読み戻し検証のみ</strong>——INF編集・<code>CyUsb3NoDfx</code>セクション・regedit手作業は禁止のまま。<strong>新driver INFはインストール時に<code>WdfDirectedPowerTransitionEnable=1</code>を書き込む（NOCLOBBERなし）ため、driver（再）インストール毎のNoDfx再適用＋検証を運用要件とする</strong>。新コアは接続時にdriver版数とDFX状態をreadbackし不一致を通知する（環境検証）。旧driver <code>1.2.3.20</code>（WHQL署名検証済み）はフェーズ0統制baseline＋rollback経路として維持し、「1.3.x＋NoDfx」が同一hashゲート＋新コアsoakをPassした時点でrollback専用へ格下げ。FX3 FWのLPM/suspend対応可否のvendor照会で本設定が恒久出荷要件か暫定かを確定する（暫定でも構成は不変）。WU Update Catalogの1.3.0.5/1.3.0.6はUSB-Serialブリッジ（PID_0004）向けでPID_FFF2は現時点で配信対象外——将来のtargeting追加を定期確認。2026-07-16 オーナー採用。<strong>実行証跡（2026-07-16〜17）</strong>：D23 session <code>20260716_2</code>でNoDfx適用・readback=0を検証し、N leg＝smoke＋30 valid high cycleでEP4 failure 0を確認（詳細は「まとめ実機セッション」節）。</td></tr>
         </tbody>
       </table>
     </section>
@@ -926,7 +928,7 @@ pre {
       </table>
       <div class="callout callout-success">
         <div class="callout-title">真因判明による更新</div>
-        <p>「作り直しが未診断のタイムアウト問題を引き継ぐ」という最大の反対理由は、真因が物理層（切替スイッチ）と判明したことで解消。結果として、通信コアはフルリライトではなく <strong>dev の現場検証済みコアを活かして堅牢化する</strong>ストラングラー型が相対的に有利になった。ただし堅牢化・自動再接続・4GB再アームのための通信層手術は要求由来で依然必要。</p>
+        <p>「作り直しが未診断のタイムアウト問題を引き継ぐ」という最大の反対理由は、高密度EP6タイムアウトの主要因が物理層（切替スイッチ）と判明したことで解消。結果として、通信コアはフルリライトではなく <strong>実機実証済みコア資産を活かして堅牢化する</strong>ストラングラー型が相対的に有利になった（移植baselineは2026-07-19 D4 owner gateでr7に確定。dev限定policyはheader単位cherry-pick）。ただし堅牢化・自動再接続・4GB再アームのための通信層手術は要求由来で依然必要。</p>
       </div>
     </section>
 
@@ -936,13 +938,13 @@ pre {
       <p>
         オーナーの調査で、機械側から出ているケーブルの先端に付いていた<strong>インラインの USB on/off 切替スイッチ（メス—スイッチ—オスの区間）</strong>を外したところ、Win10/Win11 とも高密度で96ウェル1枚分の計測をエラーなく完走できるレベルまでタイムアウト率が低下した。USB3 SuperSpeed の差動ペア上にある機械式スイッチは、インピーダンス不整合・スタブ反射・接点抵抗を持ち込み、転送レートが上がるほどリンクエラー→リカバリ→バルク転送ストール（＝タイムアウト）を誘発する。
       </p>
-      <p>これまで「説明がつかない」とされた手がかりが、すべてこの一点で整合する：</p>
+      <p>当時「説明がつかない」とされた高密度EP6タイムアウトの手がかりが、この一点で整合する：</p>
       <table class="spec-table">
         <thead><tr><th>これまでの手がかり</th><th>物理層（切替SW）での説明</th></tr></thead>
         <tbody>
           <tr><td>低密度は常にクリーン、高密度でだけタイムアウト</td><td>マージナルなリンクは転送レートが上がると破綻する（典型的なUSB3信号品質症状）</td></tr>
           <tr><td>同一バイナリ(0.1.4r7)がWin10クリーン・Win11タイムアウト</td><td>別マシン＝別ケーブル/ポート経路。OS差と思われた一部はリンク品質差</td></tr>
-          <tr><td>18回のホスト側イテレーションでも閉じない</td><td>そもそもソフトの問題ではなかった</td></tr>
+          <tr><td>18回のホスト側イテレーションでも閉じない</td><td>高密度EP6タイムアウトに関してはソフトの問題ではなかった（注：本節の範囲は高密度EP6タイムアウト。2026-07-14以降に判明した直結でのr18 <code>queue_full_timeout</code>・Set後EP4 failure・散発Type B stallは別軸で、切替SWでは説明されない）</td></tr>
           <tr><td>タイムアウトに切断が伴う（Type A/B）</td><td>物理層断の典型</td></tr>
           <tr><td>「USBを抜き差しすると直る」</td><td>マージナルな接点の再装着でリンクが張り直される</td></tr>
         </tbody>
@@ -1045,7 +1047,7 @@ flowchart TB
             <td>取得中の範囲選択による gating。gate定義は <code>../sys_app</code> / <code>gcsa</code> 互換フォーマットで入出力。</td>
             <td><span class="badge badge-must">Must</span></td>
             <td><span class="badge badge-confirmed">確定</span></td>
-            <td>gcsa v0.4.1 ソースから互換契約を抽出済み（下記「gcsa 互換契約」節）。gateは <strong>sys_app互換の正準v1ストラテジ payload <code>{"version":"1.0","gates":[...]}</code></strong> で入出力。gate種は polygon/rectangle/threshold/quadrant/boolean（ellipse不可。「all」は UI 上の root 概念で正準 payload には出力しない——「gcsa 互換契約」節の階層規則参照）。軸は pulse特徴量カラム名（例 <code>FSC_A</code>）を直接参照、<strong>座標は生ADCカウントの線形空間</strong>。<strong>gcsa自体は直接改変しない</strong>（改変プロンプト方式）。残る実行時確認は未決事項に記載。</td>
+            <td>gcsa v0.4.1 ソースから互換契約を抽出済み（下記「gcsa 互換契約」節）。gateは <strong>正準payload＝canonical v2（top-level schemaマーカー必須・boolean構造化<code>{op, operands}</code>・D13／D-GA-11）</strong>で入出力（旧v1系<code>{"version":"1.0",...}</code>は互換読取のみ）。gate種は polygon/rectangle/threshold/quadrant/boolean（ellipse不可。「all」は UI 上の root 概念で正準 payload には出力しない——「gcsa 互換契約」節の階層規則参照）。軸は pulse特徴量カラム名（例 <code>FSC_A</code>）を直接参照、<strong>座標は生ADCカウントの線形空間</strong>。<strong>gcsa自体は直接改変しない</strong>（改変プロンプト方式）。残る実行時確認は未決事項に記載。</td>
           </tr>
           <tr>
             <td><code>FR-04</code></td>
@@ -1121,7 +1123,7 @@ flowchart TB
       </table>
       <div class="callout callout-success">
         <div class="callout-title">gating 互換について（契約抽出済み）</div>
-        <p><code>FR-03</code>は「取得中に定義したgateが下流の <code>sys_app</code> / <code>gcsa</code> の解析へそのまま引き継がれる」ことを保証する。gcsa v0.4.1 ソースから実フォーマットを抽出し、次節「gcsa 互換契約」に整理した。本アプリの scatter/gating は gcsa の <strong>FL 8chの pulse特徴量 A/H/W（24カラム）</strong>を軸とし、gate は <strong>sys_app互換の正準v1ストラテジ payload</strong> で出力する。</p>
+        <p><code>FR-03</code>は「取得中に定義したgateが下流の <code>sys_app</code> / <code>gcsa</code> の解析へそのまま引き継がれる」ことを保証する。gcsa v0.4.1 ソースから実フォーマットを抽出し、次節「gcsa 互換契約」に整理した。本アプリの scatter/gating は gcsa の <strong>FL 8chの pulse特徴量 A/H/W（24カラム）</strong>を軸とし、gate は <strong>正準payload＝canonical v2（D13／D-GA-11）</strong>で出力する。</p>
       </div>
     </section>
 
@@ -1148,7 +1150,7 @@ flowchart TB
           </tr>
           <tr>
             <td><code>UX-03</code></td><td>FR-03</td>
-            <td><strong>gate管理パネル＋ライブgate統計</strong>：gate毎の%・イベント数・レートをライブ表示。一覧・リネーム・色変更・親子階層・削除。作図時の下流互換フィードバック（正準v1で表現できない形状は非提示または警告）。</td>
+            <td><strong>gate管理パネル＋ライブgate統計</strong>：gate毎の%・イベント数・レートをライブ表示。一覧・リネーム・色変更・親子階層・削除。作図時の下流互換フィードバック（正準payload＝canonical v2で表現できない形状は非提示または警告）。</td>
             <td><span class="badge badge-should">Should</span></td><td>中</td>
             <td><span class="badge badge-confirmed">確定</span></td>
           </tr>
@@ -1551,7 +1553,7 @@ flowchart TB
           <tr><td>左：トリガ・取得設定・生FL保全</td><td>FR-12 / UX-13</td><td>トリガCH/値/範囲（グローバル設定）、サンプルレート（fc併記）、Waveforms/File。生FL ON/OFF はレシピ項目。</td></tr>
           <tr><td>中央：マルチプロットタイル＋表示gate選択</td><td>UX-20 / FR-02</td><td>「＋ プロット」でタイル追加、削除・並べ替え可。タイル毎に種別（scatter/histogram/GMI波形）・軸・スケール・表示母集団gate（既定 All Events）を独立に選択。</td></tr>
           <tr><td>中央：scatter＋表示スケール</td><td>FR-02 / UX-04</td><td>密度ビニング描画、軸選択、Lin/Log/Biexp は表示のみ変換。</td></tr>
-          <tr><td>中央：histogram＋gate 作図</td><td>FR-02 / FR-03</td><td>範囲選択で gate 作図。正準v1で表現できる種のみ提示。</td></tr>
+          <tr><td>中央：histogram＋gate 作図</td><td>FR-02 / FR-03</td><td>範囲選択で gate 作図。正準payload（canonical v2）で表現できる種のみ提示。</td></tr>
           <tr><td>中央：GMI波形ライブ</td><td>FR-13 / FR-01</td><td>直近〜100波形のオーバーレイ、ch選択（fsGMI〜bfGMI）。ゲイン変更の即時フィードバック用（表示専用・保存契約に影響しない）。</td></tr>
           <tr><td>右：gate 管理＋ライブ統計</td><td>FR-03 / UX-03</td><td>gate 毎の %・イベント数、階層・色・リネーム。</td></tr>
           <tr><td>右：接続ヘルス＋トリアージ</td><td>FR-06 / UX-01</td><td>リンク速度・カウンタ、異常時は是正手順を提示。</td></tr>
@@ -1903,7 +1905,7 @@ stateDiagram-v2
       </ul>
       <div class="callout callout-warning">
         <div class="callout-title">残留ロス</div>
-        <p>破棄は「停止→残バックログのドレイン＋約500us FPGA WAIT＋約10us INIT＋レジスタ往復」の再アーム窓に限定される。並行ドレインでバックログが小さければ窓は典型的に秒未満だが、ディスク停滞でバックログが膨れると最悪で数十秒になりうる。<strong>p99再アーム窓（ms）を実機ゲートの測定基準にする。</strong></p>
+        <p>破棄は「停止→残バックログのドレイン＋約500us FPGA WAIT＋約10us INIT＋レジスタ往復」の再アーム窓に限定される。並行ドレインでバックログが小さければ窓は典型的に秒未満だが、ディスク停滞でバックログが膨れると最悪で数十秒になりうる。<strong>p99再アーム窓（ms）を実機ゲートの測定基準にする。</strong>既存legacy r7ログの<code>[PR01][CYCLE]</code>→次の<code>FPGA start sampling.</code>は外部待ち混在のため算出禁止。Phase 0専用の判定build（telemetry計測機構は<code>r7-driver-ep4-polling-20260715T1618JST</code>で導入、現行は<code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>＝<code>TELEMETRY_CSV_READY_1314</code> package・hash pin済みが引き継ぐ）は、active cycleの初回<code>DDR_RD_END=1</code>／host drain完了／publish-cleanup完了／host-ready／外部trigger検出を同一cycle ID・monotonic timeで固定長メモリへ記録し、停止後CSVで<code>host_ready - ddr_rd_end_confirmed</code>と外部待ちを分離する。1 threadは128 cycle以下、<code>dropped&gt;0</code>はrun無効。これはlegacy比較baselineであり、<strong>最終合否は新AcquisitionEngineで正式Tier1/2検証後にPhase 4実機gateとして再測定</strong>する。<strong>実測済み（2026-07-16〜17）</strong>：本機構は全closed sessionで機能（<code>[REARM][SUMMARY]</code>・<code>csvWrite=1</code>・<code>dropped=0</code>。official validator Passの保存証跡はN-smokeとB-formalの2件）し、legacy baseline＝B-formal 33 cycleでrearm p50 15／p95 31／p99 32／max 32ms、NoDfx側30 valid high cycleで中央値15／max 16msを取得——p99再アーム窓は目標（&lt;1s）に対し2桁の余裕（「まとめ実機セッション」節の再アーム行参照）。</p>
       </div>
 
       <h3>フェーズ2 — FPGA FW変更（真のゼロロスが必須の場合のみ）</h3>
@@ -1921,21 +1923,25 @@ stateDiagram-v2
     <!-- ===== DRIVER ===== -->
     <section id="driver">
       <h2>ドライバ・通信層戦略</h2>
-      <p>Win11の新ドライバでの通信不可は信号品質とは別問題。ゼロコードで決着する実験を実機まとめセッションで先に流す。</p>
-      <h3>先に流すゼロコード実験</h3>
+      <p>Win11の新ドライバでの通信不可は信号品質とは別問題。2026-07-14のステップ0では、既存<code>feature/win11-driver-compat</code>と同系統のr18 acquisitionが全4runで<code>queue_full_timeout</code>となり、endpoint hardening／driver差と取得engine差が交絡することが確定した。このbuildをEP6 driver acceptanceには使わない。</p>
+      <h3>DFX A-B-A確定とD23（2026-07-16改訂）</h3>
       <ol>
-        <li><strong>DFX無効化 A/B</strong>：Win11 1.3.0.x ドライバを <code>WdfDirectedPowerTransitionEnable=0</code> で入れ、アイドルEP4ゲートを再試験。INF自身が <code>CyUsb3NoDfx</code> パターンを同梱（<code>cyusb3.inf</code>）。<strong>INF編集は署名catを無効化するため、デバイスのHWキー・レジストリ値で単変数A/B</strong>を行う（NoDfxセクションは <code>DriverEnableDfx=0</code> と <code>WdfDirectedPowerTransitionEnable=0</code> の2つを変えるので交絡回避）。</li>
-        <li><strong>SDK 1.3 対応バイナリの実機検証</strong>：<code>feature/win11-driver-compat</code> worktree（SDK1.3一致の <code>CyAPI.h/.lib</code> にスワップ済み、ビルド通過、現場テスト未実施）を検証。【2026-07-06 オーナー決定】ブランチは origin に無いことを確認し、<code>dev</code> から切り直して<strong>再作成</strong>する（「資産の移植・破棄」節の確保リスト参照）。</li>
+        <li><strong>因果確定（完了）</strong>：単変数A-B-A（session <code>20260716_111343</code>、driver <code>1.3.0.4</code>・同一build/port/cable/config固定）で、A（DFX有効）＝Set後EP4 failure 3/3 → B（<code>WdfDirectedPowerTransitionEnable=0</code>のみ変更）＝idle 10/10・wait&gt;68s・low/high Type C全Pass → 復元A＝+25.448sで再発。<strong>DFX（WDF Directed Power Transitions）が因果要因</strong>。証跡：<code>host_source/diagnostic_runs/20260716_111343/SESSION_REPORT.md</code>。</li>
+        <li><strong>poll-rate仮説棄却（完了）</strong>：10ms cadence remediation build <code>r7-driver-ep4-polling-20260715T1618JST</code>は2026-07-15夕の実機試験でDFX有効下3/3 fail（+0.82／5.11／2.22s）。cadence調整はfixではない（cadence自体と診断文字列は衛生改善として維持）。failureは非周期（+0.8〜25.4s）・transient（disconnectなし・後続manual EP4成功）で、DLLの<code>-10</code> catch-allにより<code>UsbdStatus</code>は未取得。</li>
+        <li><strong>D23執行</strong>：新driver構成＝<code>cyusb3 1.3.x</code>＋NoDfx。適用は<code>dfx_off.ps1</code>＋<code>dfx_status.ps1</code>検証のみ。INF編集・<code>CyUsb3NoDfx</code>セクション・regedit手作業は禁止のまま。driver（再）インストール毎の再適用＋検証を運用要件とする（INFが<code>=1</code>を上書きするため）。</li>
+        <li><strong>実機セッション（実施済み 2026-07-16〜17）</strong>：判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>（<code>TELEMETRY_CSV_READY_1314</code>・EXE <code>9da8a811…</code>／DLL <code>4897942d…</code>）でD23 session <code>20260716_2</code>を実行。N leg（<code>1.3.0.4</code>＋NoDfx）＝N0・N-smoke Pass、high×30は単一セッション未達で2セッション合算の<strong>30 valid high cycle（EP4 failure 0）の非formal aggregate</strong>として記録。R＝<code>1.2.3.20</code>への原状回復Pass。B leg＝初回attemptがpre-trigger EP4 failure（Set+98.19s・<code>UsbdStatus=0xC0000011</code>・USB removal）、machine restart後の再試行もpair 56でType B drain stall、承認済みUSB replug後のrecovery runで33/33 Type C成立→<strong>owner裁定「Conditional Pass / Closed」（2026-07-17 13:02 JST）でGate B閉鎖</strong>。詳細は「まとめ実機セッション」節。</li>
+        <li><strong>条件付き診断（未使用のまま）と残存故障機構</strong>：NoDfx下ではEP4 failureが再発せず、詳細status build（<code>EP4_DIAGNOSTIC_READY_0105</code>）は未使用。一方、<strong>旧driver <code>1.2.3.20</code>側で2026-07-17にpre-trigger EP4 failureとType B drain stallが発生した（DFX registryはdriver default状態・因果未確定）——D23（NoDfx）はdriver 1.3.0.4のSet後EP4 failureへの因果対処であり、これだけで全故障が解消するとは言えない</strong>。判定buildのEP4 failure diagnosticが<code>UsbdStatus=0xC0000011</code>（<code>NtStatus=0xC0000001</code>・Cypress <code>LastError=997</code>）を初めて捕捉した。初回attempt信頼性はGate B条件付き閉鎖のopen reliability noteとして保持し、新コアの構造化エラーレコード（<code>-10</code> catch-all廃止・<code>UsbdStatus</code>伝搬）と自動再接続設計の根拠に加える。NoDfx下で再発した場合の詳細status build取得→D23再検討・Infineon support case入力という条件分岐は維持。</li>
       </ol>
       <h3>通信層の方針</h3>
       <ul>
-        <li><strong>Plan A（低リスク）</strong>：<code>cyusb3.sys</code> ＋ SDK1.3一致 <code>CyAPI.lib</code> で最小差分。FX3/FPGAが検証されたドライバを維持。<code>CyAPI.lib</code>のバイナリをリポジトリに固定——【2026-07-06 対応】<code>CyLib/x64・x86</code> へ配置＋gitignore 例外化済み（要コミット）。</li>
-        <li><strong>Plan B（フォールバック）</strong>：実験1-2が失敗した場合のみ、WinUSBへ独自INFで再バインドしCypressドライバ依存を排除。必要なプロトコル事実（エンドポイント・パケットサイズ・VID/PID・ダミープレフィックス）はドライバ非依存で文書化済み。ただしWin11/Secure Boot向けの署名（attestation）コストを伴う。</li>
+        <li><strong>Plan A（採用中・D23で具体化）</strong>：<code>cyusb3.sys</code>（1.3.x系＋NoDfx） ＋ SDK1.3一致 <code>CyAPI.lib</code> で最小差分。FX3/FPGAが検証されたドライバを維持。<code>CyAPI.lib</code>のバイナリをリポジトリに固定——【2026-07-06 対応】<code>CyLib/x64・x86</code> へ配置＋gitignore 例外化済み（要コミット）。バージョンは1.3.0.4凍結ではなく保守されている1.3.x線を目標とし、1.3.0.6等への昇格はINF diff＋単変数ゲート1回で判断。</li>
+        <li><strong>Plan B（ヘッジとして保持）</strong>：新driver＋NoDfxでも通信が成立しない場合のみ、WinUSBへ独自INFで再バインドしCypressドライバ依存を排除。必要なプロトコル事実（エンドポイント・パケットサイズ・VID/PID・ダミープレフィックス）はドライバ非依存で文書化済み。ただしWin11/Secure Boot向けの署名（attestation）コストを伴う——この署名インフラ投資はNoDfx既定焼き込みの自社署名INFパッケージ（配布の決定論化）と共通であり、投資判断は一度で両方をunlockする。<strong>新コアのcomm層はTier-2 mock境界と一致するtransport seamを切り、Plan Bを契約書き換えなしに後日実行可能へ保つ</strong>（FR-05/FR-06のCyAPI語彙はtransport抽象の背後へ置く）。</li>
         <li><strong>CyUSB.NETには賭けない</strong>：ローカルに存在証拠なし。USBは全てネイティブコアが所有。</li>
+        <li><strong>新コアの環境検証（D23付随）</strong>：接続時にdriver版数・DFX registry状態をreadbackし、期待構成（1.3.x＋NoDfx）との不一致を非ブロッキング通知で警告する。実機PCに出所不明の<code>WdfDirectedPowerTransitionEnable=1</code> overrideが既在した実績（正体はINFのAddReg）があり、既定を仮定しない。あわせて<code>-10</code> catch-allを廃し、全転送経路で<code>UsbdStatus</code>／<code>NtStatus</code>を構造化エラーレコードとして伝搬する。Set後の外部trigger待ち（armed waiting）は電源遷移に敏感な状態として設計上明示する（DFXが噛んだのはこの状態のみで、idle pollは無傷という観測に対応）。</li>
       </ul>
       <div class="callout callout-danger">
         <div class="callout-title">既知の上限</div>
-        <p>完全なホスト側再接続でも、FPGAがドレイン中にRD_WAITで固着した場合は回復不能（FWにabortレジスタが無い）。USB回復後は必ずドレインを完了する設計にし、恒久解はFWのabortレジスタ（4GB戦略フェーズ2）。また、FX3 FWがUSBサスペンド/LPMを扱わない場合、NoDfxは回避策でなく恒久的な出荷要件になる可能性がある。</p>
+        <p>完全なホスト側再接続でも、FPGAがドレイン中にRD_WAITで固着した場合は回復不能（FWにabortレジスタが無い）。USB回復後は必ずドレインを完了する設計にし、恒久解はFWのabortレジスタ（4GB戦略フェーズ2）。また、NoDfx（D23で採用済み）はFX3 FWがUSBサスペンド/LPMを扱わない場合、回避策でなく恒久的な出荷要件になる——恒久か暫定かはvendor照会（FX3 FWのLPM対応可否・改変可能性）で確定する。どちらでも採用構成自体は変わらない。</p>
         <p><strong>再接続後のバイトストリーム再同期（2026-07-10 追加）</strong>：EP6 はフレーミング無しのフラットな生バイト列（固定 <code>bytes_per_cell</code>）のため、切断時に転送途中のイベントが発生しうる。規定：デコーダは <code>bytes_per_cell</code> 単位でストリームオフセットを追跡し、<strong>Abort/ReConnect 時は転送中バッファを破棄して次のイベント境界（bytes_per_cell 整列位置）から再開</strong>する。部分イベントは損失としてカウント（FR-04 の損失記録に計上）。切断位置を変えた障害注入（イベント境界上・中間・ヘッダ相当位置）を Tier2 回帰に追加する。</p>
       </div>
     </section>
@@ -1944,7 +1950,7 @@ stateDiagram-v2
     <section id="salvage">
       <h2>資産の移植・破棄</h2>
       <h3>移植する（keep）</h3>
-      <p>dev ブランチ（回復ポリシーを含む上位集合）からネイティブコアへ取り込む。多くはヘッダオンリーでMFC非依存だが、7/11はWindows APIに依存するためWindowsネイティブコア前提でそのまま利用可（クロスプラットフォーム化はしない）。</p>
+      <p>移植baselineは<strong>r7（2026-07-19 D4 owner gateで移植例外承認）</strong>。下記のヘッダオンリーpolicy群はdev側が上位集合（回復ポリシー含む）であり、dev限定分はheader単位でTier2回帰つきcherry-pickして取り込む。多くはヘッダオンリーでMFC非依存だが、7/11はWindows APIに依存するためWindowsネイティブコア前提でそのまま利用可（クロスプラットフォーム化はしない）。</p>
       <div class="tree-view">
 <span class="dir">移植資産（→ 新ネイティブコア）</span>
 ├── <span class="dir">ポリシー/ロジック（ヘッダオンリー・単体テスト付き）</span>
@@ -1983,7 +1989,7 @@ stateDiagram-v2
       <div class="callout callout-danger">
         <div class="callout-title">再起動前に確保するもの</div>
         <ul>
-          <li><code>feature/win11-driver-compat</code> はWindows実機のローカルworktree（<code>D:\...\AnalogBoard-win11-driver</code>）にのみ存在。<strong>originへpush必須。</strong>【2026-07-06 更新・オーナー決定】origin に存在しないことを確認し、<strong><code>dev</code> から切り直して再作成する</strong>（変更範囲は <code>docs/operations/usb-acquisition-stability/driver_next.md</code> が正：<code>AnalogBoard_Dll</code> の endpoint discovery hardening。public API 維持・取得セマンティクス非接触。同梱 <code>CyLib/header</code> は SDK 1.3 世代一致確認済み＝ヘッダ差し替え不要、<code>CyAPI.lib</code> は gitignore の <code>x64/</code> パターンで管理外→worktree へ手動補完、入手元は main tree または <code>C:\Program Files (x86)\Cypress\EZ-USB FX3 SDK\1.3\library\cpp\lib\x64</code>）。再作成後は最初から push して進める。</li>
+          <li><code>feature/win11-driver-compat</code>はr18 acquisition変更を含み、2026-07-14実機でdriver単変数評価に使えないことが確定。代わりに<code>validation/win11-driver-r7-acq</code> worktreeでR7 acquisition＋endpoint discovery hardening＋境界telemetryを作成し、2026-07-15 field Gate Cで判明した自動外部trigger待ちbusy pollへ10ms cadenceを加えたmatched配布物 <code>r7-driver-ep4-polling-20260715T1618JST</code> を生成済み（policy 15/15、fixture非依存unit 1,275/1,275、Claude review未解決Blocker/Major 0、Release x64 warning 0。実機は2026-07-15にDFX有効下3/3 Fail→DFX A-B-Aのhistorical A証跡として保存、判定buildはtelemetry graceful-stop buildへ更新）。source差分はmanifest作成時点でlocal uncommitted patchのため、field A/Bは固定hash packageで行い、製品採用前にcommitで凍結する。旧field build／既存endpoint-only package／branchを上書きしない。</li>
           <li><code>CyAPI.lib</code> はgitignoreで別管理 → ビルド非再現。バイナリの保管場所を確定。【2026-07-06 対応】<code>CyLib/x64</code>・<code>CyLib/x86</code> に配置し <code>.gitignore</code> を例外化（要コミット）。アーキテクチャ・<code>LIBCMT</code> 指示を検証済み。</li>
           <li><code>logs/</code> は実機PCにのみ存在（gitignore）。定量分析のため共有が必要。</li>
         </ul>
@@ -1994,58 +2000,76 @@ stateDiagram-v2
     <section id="field">
       <h2>まとめ実機セッション</h2>
       <p>
-        実機アクセスは希少なため、確認を1回のまとめセッションに集約する。真因（切替スイッチ）判明でタイムアウト切り分け実験（新旧バイナリA/B等）は不要になり、内容は軽くなった。事前にビルド済みバイナリ・手順書・判定シートを全て用意し、1セッションで流し切る。
+        2026-07-14にステップ0とスイッチ区間A/Bを実施した結果、実測前に定義した「実験1〜7を1セッションで流す」前提を終了する。完了済み試験は再実施せず、残った意思決定を段階gateで閉じる。D17は実機CH1–CH13と現行gcsaの波形／ラベル対応を目視確認済みのため、追加のch特定runを行わない。新PC high×3の全12GBはデータ完全性Passだが、新固定buildとhashが異なるため30run countへ合算せず参考証跡とする。2026-07-15返却packageでは、旧driver Gate Bは34/34 Type Cだがdata／telemetry証跡不足、新driver Gate Cはidle EP4 10/10後にSet→automatic EP4 failure 3/3と確定した。10ms polling remediation buildは同日夕の実機試験でDFX有効下3/3 Failとなりpoll-rate仮説を棄却。2026-07-16のDFX A-B-A（session <code>20260716_111343</code>）でDFXを因果確認し、owner decision D23でNoDfxを正式採用した。このNoDfx dual-driver sessionは<strong>2026-07-16〜17に実施済み</strong>（D23 session <code>20260716_2</code>・判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>）：N leg＝N0／N-smoke Pass＋30 valid high cycle（非formal aggregate）、R＝rollback Pass、B leg＝初回Fail（pre-trigger EP4 failure）→承認済みUSB replug後のrecovery 33/33 Type Cで、<strong>ownerがGate Bを条件付きPassとして閉鎖（2026-07-17 13:02 JST）</strong>。正規の実施順・停止条件・現地集計は<code>docs/260706-field-session-runbook.html</code> Draft 2.6を正とし、session証跡は<code>artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/TELEMETRY_CSV_READY_1314/evidence/session/20260716_2/</code>に保存されている。
       </p>
       <table class="spec-table">
         <thead>
-          <tr><th>#</th><th>実験</th><th>目的</th><th>判定基準</th></tr>
+          <tr><th>段</th><th>状態</th><th>目的／実測</th><th>判定・次gate</th></tr>
         </thead>
         <tbody>
           <tr>
-            <td>1</td>
-            <td>直結標準化＋対照（スイッチ区間を再挿入して1ラン）</td>
-            <td>「スイッチが主因」を定量確定</td>
-            <td>直結で高density×N runがType C（ep6Timeouts=0）、対照（スイッチ区間挿入）でのみ再現</td>
+            <td>Step 0</td>
+            <td><span class="badge badge-confirmed">完了</span></td>
+            <td>既存driver <code>1.2.3.20</code>・直結・Manual Get OFFでr7/r18を比較。r7はlow 3/3＋high 1/1 Type C、r18は全4run <code>queue_full_timeout</code>。</td>
+            <td>残りのlegacy実機確認はr7。D4は2026-07-19 owner gateで「r7移植例外」承認により決着（決定表D4参照）。</td>
           </tr>
           <tr>
-            <td>2</td>
-            <td>Win11 DFX無効化 A/B（レジストリ単変数）</td>
-            <td>新ドライバ通信不可の主因切り分け</td>
-            <td>NoDfxで「Get ep4 register data failed.」が消えるか</td>
+            <td>Exp 1</td>
+            <td><span class="badge badge-confirmed">完了</span></td>
+            <td>直結4/4 Type C、<code>SW-SEG-01</code>挿入2/2 Type A、直結復帰2/2 Type C。USBPcap診断も別runで取得。</td>
+            <td>D16の直結標準化を実証。再実施しない。</td>
           </tr>
           <tr>
-            <td>3</td>
-            <td>SDK1.3対応バイナリ検証</td>
-            <td>新ドライバ＋一致SDKで通信可能か</td>
-            <td>Win11新ドライバでType Cを達成</td>
+            <td>Gate A</td>
+            <td><span class="badge badge-confirmed">参考証跡としてclosed</span></td>
+            <td>新PC high×3はログ3/3 Type Cかつデータ完全性Pass（1,997 pair、missing／片側pair／非最終size anomaly／<code>.tmp</code>なし、永続化bytes＝ログ<code>saveBytes</code>）。実行binaryは<code>0.1.4r7</code>、Gate Bとの差はbinaryのみとowner確認。</td>
+            <td>historical inventoryは推測で補完せず参考証跡に留める。2026-07-15 owner承認により、Gate B inventoryで条件を新規固定しhigh count 0から開始。</td>
           </tr>
           <tr>
-            <td>4</td>
-            <td>r18高密度フィールドテスト（既存runbook <code>docs/operations/usb-acquisition-stability/baseline_next.md</code>）</td>
-            <td>高密度EP6タイムアウトが（直結で）ホスト側で解決済みか確認</td>
-            <td>高density×3、100サイクルsoakでType C維持</td>
+            <td>DFX A-B-A／D23</td>
+            <td><span class="badge badge-confirmed">完了（2026-07-16）</span></td>
+            <td>session <code>20260716_111343</code>：A（DFX有効）3/3 fail→B（NoDfx）idle 10/10・low/high Type C全Pass→復元Aで再発。単変数でDFXを因果確認。旧remediation buildのfail-fast計画（DFX既定）はsuperseded——同build実機3/3 Failはhistorical A証跡。</td>
+            <td>owner decision D23＝NoDfx正式採用。次セッションはN leg（NoDfx）→R→B leg（runbook Draft 2.6）。</td>
           </tr>
           <tr>
-            <td>5</td>
-            <td>auto-mode再アームギャップ計測</td>
-            <td>4GB再アーム窓の実測値取得</td>
-            <td><code>[PR01][CYCLE]</code>からp99再アーム窓（ms）とmaxBacklogBytes</td>
+            <td>N leg（新driver＋NoDfx）</td>
+            <td><span class="badge badge-confirmed">実施済み（2026-07-16）・formal soak未達</span></td>
+            <td>判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>：N0（NoDfx apply・readback <code>=0</code>・Gate C inventory Pass 16:44）→N-smoke Pass（idle EP4 10/10・automatic wait約138s・low×1＋high×1 Type C・telemetry 2行 validator Pass）。N-formalは単一セッション未達：14 cycle session（cycle 9＝sample apply操作起因で除外）＋20/20 high supplemental sessionを合算した<strong>30 valid high cycle（EP4 failure 0・<code>ep6Timeouts=0</code>）の非formal aggregate</strong>として記録——rearm_ms 平均9.9／中央値15／p95=p99=16／max 16。</td>
+            <td>result sheetの「N leg formal soak Pass」は未チェックのまま確定——<strong>2026-07-19 owner決定：単一セッションsoakは再実施せず、phase 4の100run soakへ集約</strong>（非formal aggregateをPhase 0記録として受理）。証跡：<code>TELEMETRY_CSV_READY_1314/evidence/session/20260716_2/N_TELEMETRY_BASELINE_AGGREGATE.md</code>（N leg CSV実体は現地D:のみ・SHA-256 pinはaggregate文書に記録）。</td>
           </tr>
           <tr>
-            <td>6</td>
-            <td>録画キャプチャ（全実験を録画）</td>
-            <td>エミュレータ・コーパスの初期充填</td>
-            <td>各config・各ドライバ構成（Win11 旧/新）でEP2/4/6録画を取得、障害トレースも保全</td>
+            <td>Gate B（B leg）</td>
+            <td><span class="badge badge-confirmed">条件付きPass・closed（2026-07-17）</span></td>
+            <td>driver原状回復（<code>1.2.3.20</code>）後、初回attemptはpre-trigger EP4 failure（Set+98.19s・<code>UsbdStatus=0xC0000011</code>・USB removal）、machine restart後の再試行もpair 56でType B drain stall（<code>DDR_RD_END=0</code>）。承認済みUSB unplug/replug後のrecovery run（<code>D:\Analyzer_data\260717_B_recovery</code>・11:26〜12:57 JST）で<strong>low×3＋high×30＝33/33 Type C</strong>、FL/FH 20,750 pair・41,500 bin・129,336,916,800 bytes・<code>.tmp</code> 0、telemetry 33行 <code>dropped=0</code>（rearm p50 15／p95 31／p99 32／max 32ms）・validator Pass。旧build 34/34 Type C（7/15）はhistorical参考証跡のまま。</td>
+            <td><strong>owner裁定「Conditional Pass / Closed」（2026-07-17 13:02 JST）</strong>——記録は「initial B FAIL；post-USB-replug B PASS」。初回attempt信頼性（旧driverでもEP4 failure発生。因果未確定の残存故障機構）は<strong>open reliability note</strong>。<strong>D4 owner gateは2026-07-19に「r7移植例外」承認で通過</strong>。hardwareはdriver <code>1.2.3.20</code>のまま。証跡：<code>…/evidence/session/20260716_2/B_POST_USB_REPLUG_RECOVERY_BASELINE_20260717.md</code>・<code>B_PRETRIGGER_EP4_FAILURE_20260717.md</code>・<code>B_TYPE_B_DRAIN_STALL_20260717.md</code>。</td>
           </tr>
           <tr>
-            <td>7</td>
-            <td>実 .bin/_cfg.txt サンプルの取得とgcsa照合</td>
-            <td>gcsa互換契約の実行時確認（ch順・cfg必須行・特徴量）</td>
-            <td>実サンプルが gcsa v1パーサを通り、物理ch順・<code>Select(0/1)</code>・A/H/W算出方針が確定</td>
+            <td>D17</td>
+            <td><span class="badge badge-confirmed">完了</span></td>
+            <td>実機CH1–CH13の既存データを現行gcsaで開き、波形とラベルの対応が正しいことをオーナーが目視確認済み。</td>
+            <td>追加実機runなし。確認済み対応を新Decoder／Writerのgolden regressionへ固定する。</td>
+          </tr>
+          <tr>
+            <td>再アーム</td>
+            <td><span class="badge badge-confirmed">baseline取得済み（2026-07-16〜17）</span></td>
+            <td>marker実装buildの実測で取得：legacy baseline（driver <code>1.2.3.20</code>・B-formal 33 cycle）＝rearm p50 15／p95 31／p99 32／max 32ms。NoDfx側（N aggregate 30 valid high cycle）＝中央値15／max 16ms。2026-07-17 characterizationのCSV 2本（<code>260717_152854</code>／<code>260717_153430_rearm_telemetry.csv</code>）でも0〜31ms・外部trigger待ち93〜186s。全closed sessionで<code>csvWrite=1</code>・<code>dropped=0</code>（official validator Passの保存証跡はN-smoke／B-formalの2件）。</td>
+            <td>既存r7ログからの算出禁止は維持（本baselineはtelemetry markerの実測値）。p99は目標&lt;1sに対し2桁の余裕。最終合否は新AcquisitionEngine＋正式Tier1/2後のphase 4で再測定。</td>
+          </tr>
+          <tr>
+            <td>Gate C（新driver評価）</td>
+            <td><span class="badge badge-confirmed">原因確定→N legへ移行</span></td>
+            <td>Set後automatic EP4 failure（旧build 3/3・remediation build 3/3）はDFX A-B-AでDFXが因果と確定。NoDfxでlow/high Type C成立（EP6高密度4.2GB込み）。</td>
+            <td>旧C2（Gate B後の新driver最終確認）は廃止——N legのformal soakが上位互換（そのformal soak自体は2026-07-19 owner決定でphase 4の100run soakへ集約）。DFX A/Bの条件付き再実施もなし（完了済み）。<strong>実績（2026-07-16〜17）</strong>：NoDfx下のN leg（smoke＋30 valid high cycle）でEP4 failure再発ゼロ、詳細status build（<code>EP4_DIAGNOSTIC_READY_0105</code>）は未使用のまま。残る条件付き診断はNoDfx下でfailure再発時の詳細status buildのみ。</td>
+          </tr>
+          <tr>
+            <td>計測・capture（2026-07-17・参考）</td>
+            <td><span class="badge badge-confirmed">取得済み</span></td>
+            <td>Gate B閉鎖後、判定build＋driver <code>1.2.3.20</code>でcharacterization 7 run（15:24〜15:47 JST・EP4 failure 0・全run Type C）。うち6 runのFL/FH bin 3,520本（合計bytes＝ログ<code>saveBytes</code>が6 run全一致・欠損なし）・cfg×6（全run同一設定）・telemetry CSV×2を<code>artifacts/field-session/2026-07-17-characterization/</code>へ回収。USBPcap captureとの対応（pcap内部timestampで確定）：<code>low_mid.pcapng</code>＝app session全体を起動前から終了まで記録（run <code>260717_1529</code> low＋<code>260717_1532</code> mid）、<code>mid</code>＝<code>1535</code>、<code>low</code>＝<code>1539</code>、<code>high1</code>＝<code>1542</code>、<code>high2</code>＝<code>1545</code>（high 2本は4GiB DDR満杯到達）、<code>idle_180_1700.pcapng</code>＝idle観測（capture開始約180s後にapp起動・約1700s時点でapp終了。13:06〜13:40 JST）。</td>
+            <td>connect／graceful stop時のプロトコル解析はapp session全体を持つ<code>low_mid</code>と<code>idle_180_1700</code>の2本が参照先。USBPcap並走は正式gate runとの条件差のため参考証跡扱い。run <code>260717_1525</code>（B_recovery先頭run）はcapture・回収対象外で現地D:のみ。新エンジンのTier1録画コーパス（録画→再生）の初期候補データ。</td>
           </tr>
         </tbody>
       </table>
-      <p>プロトコルのテンプレートは <code>docs/archive/usb-acquisition/0929_log_cut_test_instructions.md</code>。全実験で<strong>物理接続構成を管理変数</strong>とする——機械の固定ケーブルは交換不可のため、直結（インラインスイッチ区間なし）を標準とし、外したスイッチ区間をラベル保管・ホストポートを固定して記録する。詳細手順・判定シートは <code>docs/260706-field-session-runbook.html</code>。<strong>実機PCは Win11・1台</strong>のため全実験を直列実施し、新ドライバ系列は<strong>実験3（レジストリ不要）を先行、実験2（DFXレジストリ単変数）は実験3の first gate 失敗時のみ</strong>の条件付きとする——オペレータのレジストリ操作を極力避ける方針（2026-07-06 オーナー確定。操作が必要な場合も <code>scripts/field-session/</code> の配布スクリプトで自動化）。</p>
+      <p>新PCの運用採用と旧PC遅延の原因証明は分離する。<code>sys_app</code> preview／consumer併用はSkip。fail-fast／Gate B／Gate Cはいずれも<code>scripts/field-session/collect_gate_inventory.ps1</code>のinventory Passをentry条件とし、判定はログだけでなく、config存在・実設定、pair数、index、missing、size anomaly、<code>.tmp</code>、代表pair hashとwaveform spot checkを必須とする。<code>default_config.csv</code>のhashは固定・記録しない。</p>
     </section>
 
     <!-- ===== ROADMAP ===== -->
@@ -2071,8 +2095,8 @@ flowchart LR
         <tbody>
           <tr>
             <td><strong>0 地固め</strong></td>
-            <td>資産のpush/確保（<code>feature/win11-driver-compat</code> は dev から再作成→push＝オーナー決定 2026-07-06）、現場版の監査＋現行buildの暫定deploy、まとめ実機セッション実施（<strong>2026-07-13 週に実機確認を予定、完了後に実装着手＝オーナー決定 2026-07-10</strong>。手順書：<code>docs/260706-field-session-runbook.html</code>）、録画コーパス初期化、scatter描画プロトタイプ（表示スケール変換後空間のビニング要件を含む・UX-04。GMI波形〜100本オーバーレイの描画経路も併せて検証・FR-13）、Zarrライタ往復プロトタイプ（D19 暗号化コーデック込み。c-blosc＋最小自作ライタを実質第一候補として検証・D12/D19）、<strong>パーティションシャーディング方式の決着（D21 マニフェストとセット・gcsa バリデータ改修と同一契約変更）</strong>、<strong>出力契約の凍結（D21 可視性契約・min/max レンジ込み）</strong></td>
-            <td>実機セッション完了・コーパス取得・描画/Zarr書込（暗号化込み往復）が成立・出力契約凍結</td>
+            <td>実機確認（<strong>2026-07-17時点：実機gateの主要残件を消化</strong>。Step 0／スイッチA/B／D17確認完了、新PC high×3は参考証跡としてclosed。DFX A-B-A＝session <code>20260716_111343</code>で因果確認→<strong>D23＝NoDfx正式採用</strong>。D23 session <code>20260716_2</code>（判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>）でN leg＝N0／N-smoke Pass＋30 valid high cycle非formal aggregate、R＝rollback Pass、<strong>B leg＝Gate B条件付きPass・closed（2026-07-17）</strong>、legacy re-arm baseline取得済み、2026-07-17 characterization＋USBPcap captureを回収。実機gateは全て決着——<strong>D4 owner gate＝r7移植例外承認・N formal soak＝phase 4集約（いずれも2026-07-19 オーナー承認）</strong>）、初期録画コーパス（<code>artifacts/field-session/2026-07-17-characterization/</code>のbin＋pcapが初期候補）、scatter描画プロトタイプ（UX-04／FR-13）、Zarrライタ往復プロトタイプ（D19暗号化込み・c-blosc＋最小自作ライタ）、パーティションシャーディング決着、出力契約凍結（D21可視性契約・min/max）。</td>
+            <td>Gate A reference closure（済）、Gate B/C inventory＋実機結果（<strong>Gate B条件付き閉鎖済み・Gate CはN legへ移行済み</strong>）、D4 owner gate（<strong>済＝r7移植例外承認 2026-07-19</strong>）、legacy re-arm baseline（<strong>取得済み</strong>）、確認済みD17対応のgolden regression化、初期コーパス取得、描画／暗号化Zarr往復成立、シャーディング決着、出力契約凍結。再アームの最終合否は新engineのphase 4で再実施。</td>
           </tr>
           <tr>
             <td><strong>1 ネイティブコア</strong></td>
@@ -2096,8 +2120,8 @@ flowchart LR
           </tr>
           <tr>
             <td><strong>4 受け入れ・移行</strong></td>
-            <td>Win11 実機受け入れ（Type C・高密度×3・100サイクルsoak）、現場移行、（測定次第）FWフェーズ2の発注判断。<strong>実機PCは Win11・1台に固定（2026-07-06 オーナー確定）</strong>のため OS マトリクスは Win11 のみ</td>
-            <td>Win11 実機ゲート合格・現場稼働</td>
+            <td>Win11 実機受け入れ（Type C・高密度×3・<strong>新アプリで100サイクルsoak</strong>。<strong>NoDfx構成のformal soak＝N leg未達分を本gateへ集約（2026-07-19 owner決定）</strong>、初回attempt信頼性のopen reliability note検証を含む）、実装済みmarkerによるp50／p99／max再アーム窓、現場移行、（測定次第）FWフェーズ2の発注判断。実機PCはGate BでqualificationしたWin11主測定PCを使用する。</td>
+            <td>Win11実機ゲート合格（100run無故障時のrule of three 95%上限≈3%を明記）・再アーム実測・現場稼働</td>
           </tr>
         </tbody>
       </table>
@@ -2144,7 +2168,7 @@ flowchart LR
       <div class="pyramid">
         <div class="pyramid-level">
           <div class="pyramid-bar" style="width:34%;background:#e03131;">実機受け入れ <span class="count">(希少・Win11)</span></div>
-          <div class="pyramid-detail">Type C・高密度×3・100サイクルsoak。まとめセッションに集約。</div>
+          <div class="pyramid-detail">phase 0は段階qualification、phase 4で新アプリのType C・高密度×3・100サイクルsoak＋再アームp99。</div>
         </div>
         <div class="pyramid-level">
           <div class="pyramid-bar" style="width:62%;background:#e8910c;">HIL / Tier3 <span class="count">(2枚目FX3)</span></div>
@@ -2180,8 +2204,8 @@ flowchart LR
         <div class="risk-body">10万点超のライブscatter＋点ごとのgate着色＋lasso判定＋連動histogramを取得中に成立させる要件は既製チャートライブラリでは満たせない可能性。<strong>対策：</strong>スタック確定前に密度ビニングscatterの描画経路を合成10万イベントで先行プロトタイプ。ライブラリは「pro」でなく「risk」として扱う。</div>
       </div>
       <div class="risk-card risk-card--low">
-        <div class="risk-header"><span class="badge badge-risk-low">Low</span><span class="risk-title">gcsa/sys_app互換（契約抽出済み・残るは実行時確認）</span></div>
-        <div class="risk-body">gcsa v0.4.1ソースから .bin（ヘッダレス<code>&lt;u2</code>・channel-major・FL8/FH5・exact-multiple）、_cfg（必須3フィールド・<code>Select(0/1)</code>）、gate正準v1 payload、pulse特徴量24カラムを確定（本文「gcsa互換契約」節）。<strong>残リスクは実行時確認のみ</strong>：物理ch順が <code>FSC..FL6 / fsGMI..bfGMI</code> と一致するか、実 cfg サンプルが必須行を書くか、特徴量をアプリ算出するかgcsa再計算に委ねるか。<strong>対策：</strong>実機セッションで実サンプルを1件取得し照合＋SHA256/ゴールデンで凍結。gcsaは直接改変しない。</div>
+        <div class="risk-header"><span class="badge badge-risk-low">Low</span><span class="risk-title">gcsa/sys_app互換（契約抽出済み・物理ch順確認済み）</span></div>
+        <div class="risk-body">gcsa v0.4.1ソースから .bin（ヘッダレス<code>&lt;u2</code>・channel-major・FL8/FH5・exact-multiple）、_cfg（必須3フィールド・<code>Select(0/1)</code>）、gate正準payload（抽出時v1・現行はcanonical v2＝D-GA-11）、pulse特徴量24カラムを確定（本文「gcsa互換契約」節）。物理ch順は、実機CH1–CH13の既存データを現行gcsaで開き、波形とラベルの対応が正しいことを2026-07-14にオーナー確認済み。<strong>残リスクは新Decoder／Writerによる対応退行</strong>。<strong>対策：</strong>確認済み既存データと対応表をgolden regressionに固定し、新アプリ出力を比較する。gcsaは直接改変しない。</div>
       </div>
       <div class="risk-card risk-card--medium">
         <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">C#/C++ 相互運用境界のGC接触</span></div>
@@ -2189,7 +2213,7 @@ flowchart LR
       </div>
       <div class="risk-card risk-card--medium">
         <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">Win11新ドライバ問題の残存（別軸）</span></div>
-        <div class="risk-body">切替スイッチとは別に、新ドライバでの通信不可が残る。<strong>対策：</strong>まとめセッションのDFX A/B＋SDK1.3検証で決着。失敗時はWinUSB再バインド（署名コスト）。FX3 FWがLPM非対応ならNoDfxが恒久要件化。</div>
+        <div class="risk-body">切替スイッチとは別軸だった新ドライバでの通信不可は、2026-07-16のDFX A-B-Aで<strong>DFX（WDF Directed Power Transitions）が因果要因と確定し、D23（NoDfx採用）で対処方針が決定済み</strong>。残存リスクは (a) NoDfx構成のsoak規模での未知のfailure——2026-07-16のN leg（smoke＋30 valid high cycle・非formal aggregate）ではEP4 failure 0。ただし<strong>2026-07-17に旧driver <code>1.2.3.20</code>側でpre-trigger EP4 failure（+98.19s・<code>UsbdStatus=0xC0000011</code>）とType B drain stallが発生しており（DFX registryはdriver default状態・因果未確定）、D23だけで全故障が解消するとは言えない</strong>（Gate B条件付き閉鎖のopen reliability note。NoDfx下で再発時は詳細status buildで追加取得→D23再検討・WinUSB再バインド＝Plan Bトリガー）、(b) NoDfx registry値がdriver（再）インストールで<code>=1</code>に上書きされる運用ドリフト（再適用＋検証をSOP化、新コアの接続時readbackで検出）、(c) FX3 FWのLPM非対応ならNoDfxが恒久出荷要件になる（vendor照会で確定。構成は不変）。</div>
       </div>
       <div class="risk-card risk-card--medium">
         <div class="risk-header"><span class="badge badge-risk-medium">Medium</span><span class="risk-title">2枚目FX3 HILの再現忠実度の過信</span></div>
@@ -2200,13 +2224,14 @@ flowchart LR
         <div class="risk-body">デプロイ版と2025-01-29 restoreの一致が未確認。レジスタ挙動（address値のWAVE_WR/RD_CNT、stale 0x000C）は実機で再検証が必要。<strong>対策：</strong>まとめセッションで版とレジスタ挙動を確認。</div>
       </div>
 
-      <h3>未決事項（意思決定 D1〜D22 は完了 → 「確定した意思決定」節。残りは実行時確認・フェーズ0決定のみ）</h3>
+      <h3>未決事項（意思決定 D1〜D23 は完了 → 「確定した意思決定」節。残りは実行時確認・フェーズ0決定のみ）</h3>
       <ul class="question-list">
-        <li>【実機で確認・まとめセッション#7】物理ch順が gcsa想定（<code>FSC,SSC,FL1..FL6</code> / <code>fsGMI..bfGMI</code>）と一致するか？ ROI/BG既定（FSC/SSC/FL4-6=1100・FL1-3=125・長250・BG[0:50]）が実取得タイミングと整合するか？ 実サンプル1件で照合し、D17（gcsa想定順で先行実装）の前提を凍結。</li>
+        <li>【クローズ 2026-07-19】D4 owner gate：<strong>「r7からの移植例外」をオーナー承認</strong>（決定表D4に反映済み）。devの<code>queue_full_timeout</code>修正・再gateはcritical path外の任意作業。フェーズ1着手のD4前提は成立——残る着手前提は出力契約凍結（合流点1）のみ。</li>
+        <li>【実施済み 2026-07-16〜17・残件1点】NoDfx dual-driver session（runbook Draft 2.6が正本）は判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>で実行済み：N leg（N0／N-smoke Pass＋30 valid high cycle非formal aggregate）→R（原状回復Pass）→B leg（初回Fail→USB replug後recovery 33/33 Type C→<strong>Gate B条件付きPass・closed</strong>）。N leg formal soakは<strong>2026-07-19 owner決定でphase 4の100run soakへ集約</strong>（クローズ）。残件：<strong>初回attempt B reliability</strong>（旧driverのpre-trigger EP4 failure＋Type B drain stall・承認済みUSB replug 1回で回復）はopen note——新コアの自動再接続・構造化エラー設計で対処し、phase 4 soakで検証する。旧fail-fast計画（build <code>r7-driver-ep4-polling-20260715T1618JST</code>・DFX既定・C2最終確認）はD23とDFX A-B-Aによりsuperseded——同buildの実機3/3 FailはDFX A-B-Aのhistorical A証跡として保存。</li>
         <li>【フェーズ0で確認】Zarr ライタ往復検証は <strong>D19 の暗号化コーデック込み</strong>で実施する。acquire-zarr はカスタムコーデック段を挟めない可能性が高いため、c-blosc＋最小自作ライタを実質第一候補として検証（D12 のフォールバック昇格）。合格条件＝gcsa ストアレイアウト（<code>partition_{p}.zarr</code>・<code>.zarray</code>・meta 構成）適合＋暗号化チャンクの復号往復（G4 コーデック登録済み gcsa で改変なしロード）＋D21 additive 字段の gcsa 許容確認。</li>
         <li>【フェーズ0で決定】パーティションシャーディング方式：round-robin（<code>e % n_partitions</code>）維持＋マニフェストの per-partition <code>sealed</code> で追従安全性を担保するか、append-sequential＋seal へ変更するか。gcsa のリーダ検証（<code>validate_partition_set</code>）が分配式そのものを検証しているため、決定は gcsa バリデータ改修と同一の契約変更として往復検証で確定する。</li>
       </ul>
-      <p style="font-size:0.875rem;color:var(--color-text-secondary);">2026-07-03 クローズ：Zarrライタ選定（→D12）・特徴量版管理（→D14）・切替スイッチ標準化（→D16）・生FL既定（D10で決定済み）・sys_app の表示空間変換の確認（sys_app 精読で解消：座標は生ADC線形・変換は表示時のみと確認済み）。2026-07-09 クローズ：ストア暗号化提案 P1（オーナー採用 → D19）。</p>
+      <p style="font-size:0.875rem;color:var(--color-text-secondary);">2026-07-03 クローズ：Zarrライタ選定（→D12）・特徴量版管理（→D14）・切替スイッチ標準化（→D16）・生FL既定（D10で決定済み）・sys_app の表示空間変換の確認（sys_app 精読で解消：座標は生ADC線形・変換は表示時のみと確認済み）。2026-07-09 クローズ：ストア暗号化提案 P1（オーナー採用 → D19）。2026-07-14 クローズ：D17の物理ch順（実機CH1–CH13と現行gcsaの波形／ラベル対応をオーナーが目視確認済み。追加runなし）。2026-07-19 クローズ：D4 owner gate（r7移植例外を承認）・N leg formal soak（再実施せずphase 4の100run soakへ集約）。</p>
 
       <h3>検討済みの提案（クローズ）</h3>
       <div class="callout callout-success">
@@ -2215,7 +2240,7 @@ flowchart LR
         <p><strong>案の骨子：</strong>Zarr v2 のストア構造（partition 追記・atomic rename・自己記述 meta・4GB再アーム＝append）は D9 のまま変えず、<strong>配列チャンクのみ Blosc(lz4) 圧縮→AES-256-GCM 暗号化</strong>して書き、<code>.zarray</code> の compressor を独自 ID（例 <code>gcsa-aes</code>）にする。公開 numcodecs レジストリに存在しない ID のため、素の zarr / Python / 汎用ビューアでは「配列の形は見えるが中身は復号できない」状態になる。読取側は gcsa に numcodecs カスタムコーデックを登録する additive な小変更のみ（sys_app は gcsa 経由で読むため原則個別対応不要）。</p>
         <ul>
           <li><strong>鍵管理＝抑止レベル</strong>：難読化した共通鍵を本アプリ（C++コア）と gcsa に埋め込む。チャンクヘッダに <code>key_id</code>（1バイト）を持たせ将来の鍵替えに備える。<strong>バイナリ解析には耐えない</strong>（アプリが開ける以上、鍵は配布物内に存在する）ことを明記した上での採用となる。解析耐性が必要ならライセンスサーバ／ドングル等の外部鍵権威が要るが、運用コストが大きく現時点では対象外。</li>
-          <li><strong>平文のまま残すもの</strong>：<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（正準v1）。自己記述性・現場デバッグ性・サポート性を維持し、保護対象は測定配列本体（特徴量・波形）に限定する。</li>
+          <li><strong>平文のまま残すもの</strong>：<code>meta.json</code>・<code>.gcsa_store.json</code>・gate（起案当時＝正準v1。現行契約はcanonical v2＝D-GA-11）。自己記述性・現場デバッグ性・サポート性を維持し、保護対象は測定配列本体（特徴量・波形）に限定する。</li>
           <li><strong>副次効果</strong>：AES-GCM の認証タグでチャンク単位のサイレント破損を暗号学的に検知できる（「破損サイレント解消」への追加防御）。</li>
           <li><strong>性能</strong>：暗号化は writer スレッド内（EP6 ホットパス外）。AES-NI で GB/s 級のため 200MB/s 経路に影響なし。圧縮→暗号化の順のため圧縮率も不変。</li>
         </ul>
@@ -2227,7 +2252,7 @@ flowchart LR
       <div class="callout callout-danger">
         <div class="callout-title">Assumptions</div>
         <ul>
-          <li>移植のベースラインは origin/dev（0.1.4r18、回復ポリシーを含む上位集合）とし、まとめセッションでr18高密度テストを通してから採用する。</li>
+          <li>移植ベースラインのD4 owner gateは2026-07-19に「r7移植例外承認」で通過（決定表D4参照）。phase 1着手の残る前提は出力契約凍結（合流点1）。</li>
           <li>ロードマップの工数・順序はチーム規模未確定のため概算。フェーズ間ゲートは維持する。</li>
           <li>「ほとんど出なくなった」は直結（スイッチ区間除去）前提の観測であり、ソフト側の自動再接続・リトライは引き続き必須要件とする。</li>
         </ul>
@@ -2260,10 +2285,17 @@ flowchart LR
         <li><code>docs/archive/2026-03-12-host-fpga-acquisition-reference.md</code> — レジスタ意味論（DDR_WR_END=ドレインヒント、DDR_RD_END=真の完了）</li>
         <li><code>docs/operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-field-reference.md</code> — Type A/B/C障害分類</li>
         <li><code>docs/troubleshooting/usb.md</code> — 負の知識（EP6スクラッチはCRT malloc/free、ホットパスlog禁止）</li>
-        <li><code>docs/operations/usb-acquisition-stability/baseline_next.md</code> — r18高密度テストrunbook</li>
-        <li><code>docs/operations/usb-acquisition-stability/driver_next.md</code> — <code>feature/win11-driver-compat</code> の状態</li>
+        <li><code>docs/archive/field-session/2026-07-14-new-pc-high3-audit.md</code> — 新PC high×3の全12GBデータ完全性監査（1,997 pair、代表hash、ログbyte照合）</li>
+        <li><code>artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/field_package/</code> — 2026-07-15 first gate返却package（Gate B/C inventory×3・RESULT_SHEET・旧build manifest）</li>
+        <li><code>artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/host_source/diagnostic_runs/20260716_111343/SESSION_REPORT.md</code> — DFX A-B-A session報告（D23の因果証跡・全47 evidence file）</li>
+        <li><code>artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/TELEMETRY_CSV_READY_1314/evidence/session/20260716_2/</code> — D23 NoDfx dual-driver session証跡（SESSION_RESULT_SHEET・N_TELEMETRY_BASELINE_AGGREGATE・B failure／stall／recovery報告・telemetry validator JSON・Gate B/C inventory）</li>
+        <li><code>artifacts/field-session/2026-07-17-characterization/</code> — 2026-07-17 characterization実測データ（FL/FH bin 3,520本・cfg×6・rearm telemetry CSV×2・USBPcap capture×6。run↔capture対応は「まとめ実機セッション」節）</li>
+        <li><code>docs/archive/field-session/2026-07-16-d23-nodfx-adoption-session-design-log.md</code> — D23採用とsession設計の経緯（INF NOCLOBBER・WHQL検証・hand-off）</li>
+        <li><code>scripts/field-session/collect_gate_inventory.ps1</code> — Gate B/C開始前のread-only system provenance collector（固定hash、driver、USB topology、PC/OS、保存先disk、power plan、manual context）</li>
+        <li><code>docs/operations/usb-acquisition-stability/baseline_next.md</code> — 2026-07-14以前のr18高密度テストrunbook（結果はr18 Fail。実行手順はfield-session runbook（現行Draft 2.6）で置換）</li>
+        <li><code>docs/operations/usb-acquisition-stability/driver_next.md</code> — 旧<code>feature/win11-driver-compat</code>方針の参照。実機A/BはR7-based matched build手順で置換</li>
         <li><code>docs/guides/SIMULATION.md</code> — SimRunner / フォールト注入プリセット</li>
-        <li><code>gcsa/</code> v0.4.1 — <code>constants.py</code>（チャンネル/特徴量定数）、<code>io/parsers/v1.py</code>（.bin/cfgパーサ）、<code>gating/definition.py</code>・<code>serialization.py</code>（gate正準v1）、<code>transform/pulse_features.py</code>（A/H/Wアルゴリズム）</li>
+        <li><code>gcsa/</code> v0.4.1 — <code>constants.py</code>（チャンネル/特徴量定数）、<code>io/parsers/v1.py</code>（.bin/cfgパーサ）、<code>gating/definition.py</code>・<code>serialization.py</code>（gate正準payload。v0.4.1当時はv1実装・現行契約はcanonical v2）、<code>transform/pulse_features.py</code>（A/H/Wアルゴリズム）</li>
         <li><code>gcsa/store/zarr_store.py</code>・<code>store/_zarr_*.py</code>（ネイティブ Zarr ストア構造・パーティション追記・Blosc）、<code>io/measurement_store.py</code>（外部特徴量を権威として読む唯一の経路）、<code>transform/pulse_feature_extractor.py</code>（24特徴量の並び：ch毎に A→H→W）、<code>transform/pulse_feature_exporters.py</code>（Parquet エクスポータ）、<code>io/exporters.py</code>（FCS/CSV）</li>
         <li><code>apps/api/src</code>（sys_app）— <code>services/dataset_import_steps.py</code>（取り込み・無条件再計算 :239）、<code>integrations/gcsa_adapter.py</code>、<code>services/duckdb_feature_store.py</code>・<code>pulse_feature_parquet.py</code>（権威Parquet面）、<code>services/visualization_*</code>（scatter/binning・生ADC線形）、<code>services/gate_*</code>・<code>gate_io/canonical_build.py</code>・<code>schemas/gate_base.py</code>（gate 6種）、<code>compensation/*</code>（表示のみ変換）</li>
         <li>調査生出力（本セッションscratchpad）：<code>w0l31pm7c.output</code>（refactor-vs-rewrite）、<code>wpqxwvpd9.output</code>（タイムアウト退行）</li>
@@ -2274,7 +2306,7 @@ flowchart LR
 </div>
 
 <footer class="doc-footer">
-  <p>Generated 2026-07-03 / Last updated 2026-07-10 — <strong>AnalogBoard 再構築プラン Draft 2.0</strong>。prompt.md ＋ 2件のコードベース調査 ＋ オーナー追加情報より作成。</p>
+  <p>Generated 2026-07-03 / Last updated 2026-07-19 — <strong>AnalogBoard 再構築プラン Draft 3.5</strong>。codex cross-review（証跡整合）＋owner gate 2026-07-19（D4＝r7移植例外・N formal soak＝phase 4集約）＋prompt.md ＋ コードベース調査 ＋ オーナー追加情報 ＋ 2026-07-14実機証跡 ＋ 2026-07-15 Gate B/C返却証跡 ＋ 2026-07-16 DFX A-B-A（session 20260716_111343）／owner decision D23（NoDfx採用） ＋ 2026-07-16〜17 D23 NoDfx dual-driver session（session 20260716_2・Gate B条件付き閉鎖・re-arm baseline） ＋ 2026-07-17 characterization／USBPcap capture証跡（artifacts/field-session/2026-07-17-characterization/）より作成。</p>
   <p>本ドキュメントは意思決定用の要約・再編である。規範的な仕様は各参照元を参照。図はMermaidをCDNから読み込む（オフライン閲覧時は描画に外部接続が必要）。</p>
 </footer>
 

@@ -23,7 +23,8 @@ foreach ($d in $devices) {
     Write-Host "Set NoDfx (=0) on $($d.InstanceId)"
     pnputil /restart-device "$($d.InstanceId)"
     if ($LASTEXITCODE -ne 0) {
-        Write-Host 'WARN: device restart failed. Unplug and replug the USB connector instead.' -ForegroundColor Yellow
+        Write-Host 'NG: device restart failed. Do not unplug USB. Preserve this output and stop for owner review.' -ForegroundColor Red
+        exit 2
     }
 }
 Write-Host ''
