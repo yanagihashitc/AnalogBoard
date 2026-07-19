@@ -1,6 +1,8 @@
 # Lab Next
 
-対象 branch: `lab/0.2.2-engine-semantics`
+> **Superseded／archived（2026-07-19）**：labを日常開発へ使用しない。SimRunner／FpgaDdrModel／レジスタ意味論の資産回収元としてreference-onlyで保持し、旧engine実装は移植しない。新規作業は[branch plan](../../../branch_plan/README.md)に従う。
+
+対象 branch（履歴）: `lab/0.2.2-engine-semantics`
 
 ## Purpose
 

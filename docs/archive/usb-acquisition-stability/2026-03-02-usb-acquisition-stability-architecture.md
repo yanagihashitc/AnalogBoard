@@ -1,5 +1,7 @@
 # USB Acquisition Stability Architecture Notes
 
+> **Historical reference（archived 2026-07-19）**: 現行アーキテクチャの正本ではありません。現在の設計・phase gateは`docs/plans/260710-analogboard-rebuild-plan.html`を参照してください。
+
 対象プラン: [USB データ取得・書き込み安定性改善プラン](./2026-03-02-usb-acquisition-stability.md)
 
 この文書は architecture / contract / design rationale の置き場とする。実行順や現行 gate は checklist / next docs を参照する。

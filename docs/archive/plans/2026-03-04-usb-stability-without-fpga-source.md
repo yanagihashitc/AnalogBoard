@@ -2,7 +2,7 @@
 
 ## 概要
 
-[元プラン](../../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md) から、**FPGA ファームウェアのソースコードが入手できない前提で実施可能な改修のみ** を抽出・再編成したサブセットプラン。
+[元プラン](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md) から、**FPGA ファームウェアのソースコードが入手できない前提で実施可能な改修のみ** を抽出・再編成したサブセットプラン。
 
 FPGA 側のレジスタマップ・ビット定義・パケットフォーマット・DDR 補正値（`+32`）・16K アライメント等は **現行仕様を変更せずそのまま使用** する。
 
@@ -365,7 +365,7 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat x64\Debug\AnalogBoard_UnitTest.exe"
 
 ## 関連ドキュメント
 
-- [元プラン: USB データ取得・書き込み安定性改善プラン（全体版）](../../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
+- [元プラン: USB データ取得・書き込み安定性改善プラン（全体版）](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
 - データ取得中断・タイムアウト安定化プラン: このリポジトリ snapshot には未収録
 - [Wave Output Format Handover (2026-03-02)](./2026-03-02-wave-output-handover.md)
 - [USB Data Acquisition Stability Process Log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)

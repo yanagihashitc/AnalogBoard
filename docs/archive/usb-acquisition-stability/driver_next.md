@@ -1,8 +1,10 @@
 # Driver Next
 
-対象 branch: `feature/win11-driver-compat`
+> **Superseded／archived（2026-07-19）**：DFX A-B-AとD23、NoDfx dual-driver sessionで本trackの判断は閉鎖済み。worktreeは撤去され、branchはreference-onlyのretirement candidate。本メモの実機手順を実行しない。現在のbranch役割は[branch plan](../../../branch_plan/README.md)を参照。
 
-対象 worktree: `D:\ubuntu\jupyter\sys_analyzer\AnalogBoard-win11-driver`
+対象 branch（履歴）: `feature/win11-driver-compat`
+
+対象 worktree（撤去済み）: `D:\ubuntu\jupyter\sys_analyzer\AnalogBoard-win11-driver`
 
 ## Purpose
 

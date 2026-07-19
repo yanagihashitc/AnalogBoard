@@ -1,5 +1,7 @@
 # USB Acquisition Stability Execution Notes
 
+> **Historical reference（archived 2026-07-19）**: 以下は完了済み調査の実行記録であり、現在のrunbookではありません。現在の作業は`docs/plans/260710-analogboard-rebuild-plan.html`を参照してください。
+
 対象プラン: [USB データ取得・書き込み安定性改善プラン](./2026-03-02-usb-acquisition-stability.md)
 
 この文書は phase / PR / test / rollback の実行詳細をまとめる。現在どこを進めるかは checklist / next docs を参照する。

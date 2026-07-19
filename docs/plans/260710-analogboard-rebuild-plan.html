@@ -2283,7 +2283,7 @@ flowchart LR
       <h3>参照</h3>
       <ul>
         <li><code>docs/archive/2026-03-12-host-fpga-acquisition-reference.md</code> — レジスタ意味論（DDR_WR_END=ドレインヒント、DDR_RD_END=真の完了）</li>
-        <li><code>docs/operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-field-reference.md</code> — Type A/B/C障害分類</li>
+        <li><code>docs/archive/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-field-reference.md</code> — Type A/B/C障害分類</li>
         <li><code>docs/troubleshooting/usb.md</code> — 負の知識（EP6スクラッチはCRT malloc/free、ホットパスlog禁止）</li>
         <li><code>docs/archive/field-session/2026-07-14-new-pc-high3-audit.md</code> — 新PC high×3の全12GBデータ完全性監査（1,997 pair、代表hash、ログbyte照合）</li>
         <li><code>artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/field_package/</code> — 2026-07-15 first gate返却package（Gate B/C inventory×3・RESULT_SHEET・旧build manifest）</li>
@@ -2292,8 +2292,8 @@ flowchart LR
         <li><code>artifacts/field-session/2026-07-17-characterization/</code> — 2026-07-17 characterization実測データ（FL/FH bin 3,520本・cfg×6・rearm telemetry CSV×2・USBPcap capture×6。run↔capture対応は「まとめ実機セッション」節）</li>
         <li><code>docs/archive/field-session/2026-07-16-d23-nodfx-adoption-session-design-log.md</code> — D23採用とsession設計の経緯（INF NOCLOBBER・WHQL検証・hand-off）</li>
         <li><code>scripts/field-session/collect_gate_inventory.ps1</code> — Gate B/C開始前のread-only system provenance collector（固定hash、driver、USB topology、PC/OS、保存先disk、power plan、manual context）</li>
-        <li><code>docs/operations/usb-acquisition-stability/baseline_next.md</code> — 2026-07-14以前のr18高密度テストrunbook（結果はr18 Fail。実行手順はfield-session runbook（現行Draft 2.6）で置換）</li>
-        <li><code>docs/operations/usb-acquisition-stability/driver_next.md</code> — 旧<code>feature/win11-driver-compat</code>方針の参照。実機A/BはR7-based matched build手順で置換</li>
+        <li><code>docs/archive/usb-acquisition-stability/baseline_next.md</code> — 2026-07-14以前のr18高密度テストrunbook（結果はr18 Fail。実行手順はfield-session runbook（現行Draft 2.6）で置換）</li>
+        <li><code>docs/archive/usb-acquisition-stability/driver_next.md</code> — 旧<code>feature/win11-driver-compat</code>方針の参照。実機A/BはR7-based matched build手順で置換</li>
         <li><code>docs/guides/SIMULATION.md</code> — SimRunner / フォールト注入プリセット</li>
         <li><code>gcsa/</code> v0.4.1 — <code>constants.py</code>（チャンネル/特徴量定数）、<code>io/parsers/v1.py</code>（.bin/cfgパーサ）、<code>gating/definition.py</code>・<code>serialization.py</code>（gate正準payload。v0.4.1当時はv1実装・現行契約はcanonical v2）、<code>transform/pulse_features.py</code>（A/H/Wアルゴリズム）</li>
         <li><code>gcsa/store/zarr_store.py</code>・<code>store/_zarr_*.py</code>（ネイティブ Zarr ストア構造・パーティション追記・Blosc）、<code>io/measurement_store.py</code>（外部特徴量を権威として読む唯一の経路）、<code>transform/pulse_feature_extractor.py</code>（24特徴量の並び：ch毎に A→H→W）、<code>transform/pulse_feature_exporters.py</code>（Parquet エクスポータ）、<code>io/exporters.py</code>（FCS/CSV）</li>

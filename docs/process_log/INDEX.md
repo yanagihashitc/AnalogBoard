@@ -5,15 +5,20 @@
 
 ## Active Logs
 
+現在、activeなprocess logはありません。
+
+## Historical Logs Retained In Place
+
 | Date | Feature | Log |
 |---|---|---|
-| 2026-03-02 | USB acquisition stability | [log](2026-03-02-usb-acquisition-stability-log.md) |
-| 2026-03-02 | USB acquisition stability (Part 2) | [log](2026-03-02-usb-acquisition-stability-log-02.md) |
+| 2026-03-02 | USB acquisition stability（historical） | [log](2026-03-02-usb-acquisition-stability-log.md) |
+| 2026-03-02 | USB acquisition stability Part 2（historical） | [log](2026-03-02-usb-acquisition-stability-log-02.md) |
 
 ## Archived Logs
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-19 | Branch plan refresh | [log](../archive/repository-maintenance/2026-07-19-branch-plan-refresh-log.md) |
 | 2026-07-19 | Field artifact and worktree cleanup | [log](../archive/repository-maintenance/2026-07-19-field-artifact-worktree-cleanup-log.md) |
 | 2026-07-16 | D23 NoDfx adoption + dual-driver session design | [log](../archive/field-session/2026-07-16-d23-nodfx-adoption-session-design-log.md) |
 | 2026-07-16 | D23実機copy-ready bundle | [log](../archive/field-session/2026-07-16-d23-copy-ready-bundle-log.md) |
