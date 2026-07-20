@@ -5,7 +5,9 @@
 
 ## Active Logs
 
-現在、activeなprocess logはありません。
+| Date | Feature | Log |
+|---|---|---|
+| 2026-07-20 | Phase 0 USBPcap analysis and corpus | [log](2026-07-20-usbpcap-corpus-log.md) |
 
 ## Archived Logs
 
