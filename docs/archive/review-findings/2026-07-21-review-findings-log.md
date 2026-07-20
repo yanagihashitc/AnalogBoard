@@ -16,3 +16,4 @@
 | 2026-07-21 01:10 | Completion / review | 指摘別差分、履歴保持、中央read-only境界、生成物scopeを再確認 | Pass | 2026-07-20履歴不変; central mirror未編集; commit/pushなし | 3.11実行環境でのcompileは未実施 | trackingをarchiveして最終検証 |
 | 2026-07-21 01:12 | Completion / archive verification | tracking archive後にPython全テスト、source compile、local links、HTML ID/metadata、Batch 3全7行、diff whitespaceを再検証 | Pass | unittest 36/36; `final_document_checks=PASS html_ids=31 html_links=24 batch3_rows=7`; `git diff --check` | None | Userへ結果報告 |
 | 2026-07-21 01:19 | Publish / request | ユーザー指示により全未コミット差分のcommit/push scopeを確認 | In progress | branch `analysis/phase0-usbpcap-corpus`; upstream `origin/analysis/phase0-usbpcap-corpus`; 6 files | commit/push結果は実行後に追記 | 全差分をstage・commit・push |
+| 2026-07-21 01:20 | Publish / result | 検証済み6ファイルをcommitし、同名remote branchへpush | Pass | commit `ebff58efbd62c2fa69bb50cdd02d4cc86d035dc7`; local HEAD＝upstream | 本結果追記は別tracking commitが必要 | tracking追記をcommit・pushしcleanを確認 |
