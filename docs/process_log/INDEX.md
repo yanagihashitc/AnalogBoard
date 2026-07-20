@@ -5,12 +5,17 @@
 
 ## Active Logs
 
-現在、activeなprocess logはありません。
+| Date | Feature | Log |
+|---|---|---|
 
 ## Archived Logs
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-21 | PR #2 reviewer and Cursor Bugbot fixes | [log](../archive/review-findings/2026-07-21-pr2-bugbot-review-log.md) |
+| 2026-07-21 | PR #2 Claude review and fixes | [log](../archive/review-findings/2026-07-21-pr2-claude-review-log.md) |
+| 2026-07-21 | Review findings correction | [log](../archive/review-findings/2026-07-21-review-findings-log.md) |
+| 2026-07-20 | Phase 0 USBPcap analysis and corpus | [log](../archive/usb-protocol-analysis/2026-07-20-usbpcap-corpus-log.md) |
 | 2026-07-20 | Repository-maintenance closeout | [log](../archive/repository-maintenance/2026-07-20-repository-maintenance-closeout-log.md) |
 | 2026-07-20 | Repository closeout prompt copy-ready | [log](../archive/repository-maintenance/2026-07-20-repository-closeout-prompt-copyready-log.md) |
 | 2026-07-20 | Phase 0 USBPcap goal prompt setup | [log](../archive/goal-setup/2026-07-20-usbpcap-goal-setup-log.md) |

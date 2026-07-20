@@ -20,6 +20,7 @@
 - [Simulation guide](guides/SIMULATION.md)
 - [Implementation tracking](guides/IMPLEMENTATION_TRACKING.md)
 - [Branch strategy](../branch_plan/README.md)
+- [USBPcap analyzer](../scripts/pcap-analysis/README.md)
 - [Troubleshooting](troubleshooting/INDEX.md)
 - [Test perspectives](test-perspectives/INDEX.md)
 
@@ -34,6 +35,7 @@
 - [Git migration notes](reference/git-migrate-analogboard-linux.md)
 - [Knowledge inventory](reference/knowledge_inventory.md)
 - [Project direction](reference/project_direction.md)
+- [2026-07-17 USBPcap protocol baseline](reference/usb-recording-corpus/2026-07-17/README.md)
 
 ## Archive
 

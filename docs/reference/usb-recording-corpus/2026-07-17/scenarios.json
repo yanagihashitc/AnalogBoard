@@ -1,0 +1,170 @@
+{
+  "common_observations": {
+    "device_selection": "Every capture independently selects bus 1/device 50 from VID 0x04b4/PID 0xfff2 descriptor evidence and endpoint coverage; the address is not reused as an assumption.",
+    "failure_trace_present": false,
+    "status_result": "All selected-device USBD statuses in these six captures are success; cancelled, non-success, unknown, duplicate, and truncated counts are zero.",
+    "transfer_length_limit": "USBPcap does not expose requested transfer length in the correlated rows, so short_transfer_evaluable is zero and all correlated pairs remain short_transfer_unknown.",
+    "use": "Successful Type C protocol baseline and provisional future Tier 1 replay candidate only."
+  },
+  "provisional": true,
+  "scenarios": [
+    {
+      "capture": "low_mid.pcapng",
+      "correlation": {
+        "correlated": 184875,
+        "short_transfer_unknown": 184875,
+        "unmatched_completion": 0
+      },
+      "endpoints": {
+        "ep2_out_completions": 1,
+        "ep4_in_completions": 167982,
+        "ep6_in_completions": 16874,
+        "ep6_total_bytes": 1140375552
+      },
+      "evidence_sequence": [
+        {"frame": 31, "phase": "connect_observation"},
+        {"frame": 3506, "phase": "ep2_set_completion"},
+        {"frame": 3526, "phase": "ep4_completion_after_set"},
+        {"frame": 34730, "phase": "ep6_completion_after_set"},
+        {"frame": 496930, "phase": "ep6_final_completion"},
+        {"frame": 496932, "phase": "ep4_successful_completion_after_final_ep6"},
+        {"frame": 528366, "phase": "close_observation"}
+      ],
+      "id": "low_mid",
+      "operator_context": "low 15:29 + mid 15:32",
+      "role": "primary full-lifecycle evidence"
+    },
+    {
+      "capture": "mid.pcapng",
+      "correlation": {
+        "correlated": 83640,
+        "short_transfer_unknown": 83640,
+        "unmatched_completion": 0
+      },
+      "endpoints": {
+        "ep2_out_completions": 0,
+        "ep4_in_completions": 71647,
+        "ep6_in_completions": 11990,
+        "ep6_total_bytes": 881655808
+      },
+      "evidence_sequence": [
+        {"frame": 31, "phase": "connect_observation"},
+        {"frame": 217168, "phase": "ep6_final_completion"},
+        {"frame": 217170, "phase": "ep4_successful_completion_after_final_ep6"},
+        {"frame": 245658, "phase": "close_observation"}
+      ],
+      "id": "mid",
+      "operator_context": "mid 15:35",
+      "role": "mid-density corroboration"
+    },
+    {
+      "capture": "low.pcapng",
+      "correlation": {
+        "correlated": 95029,
+        "short_transfer_unknown": 95029,
+        "unmatched_completion": 1,
+        "unmatched_completion_evidence_frames": [37]
+      },
+      "endpoints": {
+        "ep2_out_completions": 0,
+        "ep4_in_completions": 89455,
+        "ep6_in_completions": 5572,
+        "ep6_total_bytes": 344702976
+      },
+      "evidence_sequence": [
+        {"frame": 31, "phase": "connect_observation"},
+        {"frame": 236295, "phase": "ep6_final_completion"},
+        {"frame": 236297, "phase": "ep4_successful_completion_after_final_ep6"},
+        {"frame": 263804, "phase": "close_observation"}
+      ],
+      "id": "low",
+      "operator_context": "low 15:39",
+      "role": "low-density corroboration",
+      "special_observation": "Frame 37 is an unmatched completion at the capture boundary; it is retained as evidence rather than converted to success or duplicate."
+    },
+    {
+      "capture": "high1.pcapng",
+      "capture_boundary": {
+        "near_four_gib": true,
+        "observed_device_failure": false
+      },
+      "correlation": {
+        "correlated": 35275,
+        "short_transfer_unknown": 35275,
+        "unmatched_completion": 0
+      },
+      "endpoints": {
+        "ep2_out_completions": 0,
+        "ep4_in_completions": 21137,
+        "ep6_in_completions": 14135,
+        "ep6_maximum_bytes": 4194304,
+        "ep6_minimum_bytes": 16384,
+        "ep6_rate_bytes_per_second": "100257426.523294",
+        "ep6_total_bytes": 4294967296
+      },
+      "evidence_sequence": [
+        {"frame": 31, "phase": "connect_observation"},
+        {"frame": 107508, "phase": "ep6_final_completion"},
+        {"frame": 107510, "phase": "ep4_successful_completion_after_final_ep6"},
+        {"frame": 146730, "phase": "close_observation"}
+      ],
+      "id": "high1",
+      "operator_context": "high 15:42",
+      "role": "representative sustained-high evidence"
+    },
+    {
+      "capture": "high2.pcapng",
+      "capture_boundary": {
+        "near_four_gib": true,
+        "observed_device_failure": false
+      },
+      "correlation": {
+        "correlated": 33933,
+        "short_transfer_unknown": 33933,
+        "unmatched_completion": 0
+      },
+      "endpoints": {
+        "ep2_out_completions": 0,
+        "ep4_in_completions": 20473,
+        "ep6_in_completions": 13457,
+        "ep6_maximum_bytes": 4063232,
+        "ep6_minimum_bytes": 16384,
+        "ep6_rate_bytes_per_second": "101006524.059890",
+        "ep6_total_bytes": 4294967296
+      },
+      "evidence_sequence": [
+        {"frame": 31, "phase": "connect_observation"},
+        {"frame": 104422, "phase": "ep6_final_completion"},
+        {"frame": 104424, "phase": "ep4_successful_completion_after_final_ep6"},
+        {"frame": 138248, "phase": "close_observation"}
+      ],
+      "id": "high2",
+      "operator_context": "high 15:45",
+      "role": "sustained-high corroboration"
+    },
+    {
+      "capture": "idle_180_1700.pcapng",
+      "correlation": {
+        "correlated": 18,
+        "short_transfer_unknown": 18,
+        "unmatched_completion": 0
+      },
+      "endpoints": {
+        "ep2_out_completions": 0,
+        "ep4_in_completions": 0,
+        "ep6_in_completions": 0,
+        "ep6_total_bytes": 0
+      },
+      "evidence_sequence": [
+        {"frame": 31, "phase": "connect_observation"},
+        {"frame": 89346, "phase": "close_observation"}
+      ],
+      "id": "idle_180_1700",
+      "operator_context": "app start/end idle capture",
+      "role": "control-only idle evidence",
+      "special_observation": "The target's last observed activity is relative 180.850791000 s, while the whole capture lasts 2000.963119 s. Last target activity is not proof of physical disconnect or process exit."
+    }
+  ],
+  "schema": "analogboard.phase0.usbpcap-scenarios",
+  "schema_version": 1
+}

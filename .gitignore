@@ -82,7 +82,13 @@ tasks/
 claudebox-codexbox-agmsg-setup.html
 data/
 goal.md
+goal.draft.md
 prompt.md
+
+# Python artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
 
 # Coverage artifacts
 coverage/
