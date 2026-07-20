@@ -7,12 +7,12 @@
 
 | Date | Feature | Log |
 |---|---|---|
-| 2026-07-20 | Phase 0 USBPcap analysis and corpus | [log](2026-07-20-usbpcap-corpus-log.md) |
 
 ## Archived Logs
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-20 | Phase 0 USBPcap analysis and corpus | [log](../archive/usb-protocol-analysis/2026-07-20-usbpcap-corpus-log.md) |
 | 2026-07-20 | Repository-maintenance closeout | [log](../archive/repository-maintenance/2026-07-20-repository-maintenance-closeout-log.md) |
 | 2026-07-20 | Repository closeout prompt copy-ready | [log](../archive/repository-maintenance/2026-07-20-repository-closeout-prompt-copyready-log.md) |
 | 2026-07-20 | Phase 0 USBPcap goal prompt setup | [log](../archive/goal-setup/2026-07-20-usbpcap-goal-setup-log.md) |

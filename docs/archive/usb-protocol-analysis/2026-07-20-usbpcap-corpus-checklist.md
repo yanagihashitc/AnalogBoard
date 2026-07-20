@@ -1,7 +1,7 @@
 # Phase 0 USBPcap解析・初期録画コーパス化 チェックリスト
 
 対象プラン: [AnalogBoard 再構築プラン](../../plans/260710-analogboard-rebuild-plan.html#p0-corpus-steps)
-プロセスログ: [Process Log](../../process_log/2026-07-20-usbpcap-corpus-log.md)
+プロセスログ: [Process Log](2026-07-20-usbpcap-corpus-log.md)
 作成日: 2026-07-20
 
 ## Batch 1 — P0-C1 analyzer contract and immutable manifest
@@ -24,11 +24,11 @@
 
 ## Batch 3 — P0-C3 corpus index and evidence closeout
 
-- [ ] Tracked README, manifest, scenarios, schemas, limits, and regeneration commands exist
-- [ ] Successful Type C baseline and missing failure trace limitations are explicit
-- [ ] Parent plan evidence/status cells are updated without changing P0-C1–P0-C4 acceptance text
-- [ ] AnalogBoard agent guidance is synchronized and central read-only handoff is recorded
-- [ ] Batch 3 checkpoint, commit, push, and `tasks/todo_archive.md` move are complete
+- [x] Tracked README, manifest, scenarios, schemas, limits, and regeneration commands exist
+- [x] Successful Type C baseline and missing failure trace limitations are explicit
+- [x] Parent plan evidence/status cells are updated without changing P0-C1–P0-C4 acceptance text
+- [x] AnalogBoard agent guidance is synchronized and central read-only handoff is recorded
+- [x] Batch 3 focused verification, refactor, review, and final-diff checks are complete
 
 ## Test perspectives (fixed before test code)
 
@@ -50,9 +50,9 @@
 
 ## Phase checkpoint
 
-- [ ] All focused tests and required live extractions pass
-- [ ] Six source hashes/sizes and Capinfos readability are reverified
-- [ ] Manifest and bounded summary are byte-identical across two runs
-- [ ] JSON, Markdown links, parent-plan HTML/anchors/links, and `git diff --check` pass
-- [ ] No capture/raw payload/large generated output is tracked or staged
+- [x] All focused tests and required live extractions pass
+- [x] Six source hashes/sizes and Capinfos readability are reverified
+- [x] Manifest and bounded summary are byte-identical across two runs
+- [x] JSON, Markdown links, parent-plan HTML/anchors/links, and `git diff --check` pass
+- [x] No capture/raw payload/large generated output is tracked or staged
 - [ ] Phase PR is created from `analysis/phase0-usbpcap-corpus` to `main`
