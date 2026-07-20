@@ -4,6 +4,15 @@
 workspaceとして実行する。AnalogBoard source planから中央mirror／roadmapへ一方向同期するための
 通常taskであり、`/goal`ではない。
 
+## AnalogBoard closeout handoff（2026-07-20）
+
+- Source plan: `docs/plans/260710-analogboard-rebuild-plan.html` Draft 3.6、Last Updated 2026-07-20、status=`in_progress`（Phase 0／次gate Frozen v1は不変）。
+- Source PR: [AnalogBoard PR #1](https://github.com/yanagihashitc/AnalogBoard/pull/1)、branch=`docs/branch-plan-refresh`、closeout commit=`9866494`＋同PRのfinal tracking commit。PR mergeはowner承認待ちで、同期時はPR headをreadbackする。
+- AnalogBoard merge commit: **未確定**。PR merge後にGitHub上のmerge commitをreadbackし、`origin/main`到達性とともに中央evidenceへ記録する。open PR／branch headをmerge evidenceとして代用しない。
+- Validation-source evidence: remote `origin/validation/win11-driver-r7-acq` commit `d760e90`にfinal field diagnostic source、focused tests、pinned x64 `CyAPI.lib`、build／finalize scriptsを保全。公開時のnative全suite 0 failed／Release x64 rebuild PassはAnalogBoard trackingに記録済み。
+- Closeout validation: final PRの現存58 documents、4 HTML parse、duplicate ID 0、TOC 37 anchors、repo-local links 215、plan metadata、D1〜D23／gate status不変、`git diff --check`、staged scope／secret signatureをPass。既存historical absolute references 2件は別集計。PR head `9866494`のinitial checkは1/1 greenで、final tracking commit後にも再確認する。
+- Central read-only result: AnalogBoard parent mirrorはDraft 3.5→3.6でDRIFT、downstream mirrorはOK、sys_app mirrorは既存unrelated DRIFT。task_management worktreeは既存dirtyのため、本workspaceからwriteしていない。
+
 ## Copyable prompt
 
 `task_management` repositoryでAnalogBoardのsource plan mirrorとcross-repo roadmapを同期して

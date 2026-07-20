@@ -5,12 +5,13 @@
 
 ## Active Logs
 
-- [Repository-maintenance closeout](2026-07-20-repository-maintenance-closeout-log.md)
+現在、activeなprocess logはありません。
 
 ## Archived Logs
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-20 | Repository-maintenance closeout | [log](../archive/repository-maintenance/2026-07-20-repository-maintenance-closeout-log.md) |
 | 2026-07-20 | Repository closeout prompt copy-ready | [log](../archive/repository-maintenance/2026-07-20-repository-closeout-prompt-copyready-log.md) |
 | 2026-07-20 | Phase 0 USBPcap goal prompt setup | [log](../archive/goal-setup/2026-07-20-usbpcap-goal-setup-log.md) |
 | 2026-07-19 | Branch plan refresh | [log](../archive/repository-maintenance/2026-07-19-branch-plan-refresh-log.md) |

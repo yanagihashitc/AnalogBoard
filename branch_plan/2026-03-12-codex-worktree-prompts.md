@@ -1,6 +1,6 @@
 # Codex Branch Prompts
 
-作成日: 2026-03-12  
+作成日: 2026-03-12
 最終更新: 2026-07-19
 
 最新`main`起点の短命task branch、r7参照、remote branch退役監査を依頼するときの雛形。旧baseline／lab／dev worktree向けpromptは廃止した。

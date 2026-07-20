@@ -46,6 +46,7 @@
 - [Field session runbook revision summary](archive/field-session/2026-07-14-runbook-revision-summary.md)
 - [Field artifact and worktree cleanup](archive/repository-maintenance/2026-07-19-field-artifact-worktree-cleanup-checklist.md)
 - [Branch plan refresh](archive/repository-maintenance/2026-07-19-branch-plan-refresh-checklist.md)
+- [Repository-maintenance closeout](archive/repository-maintenance/2026-07-20-repository-maintenance-closeout-checklist.md)
 - [Historical USB acquisition stability plan](archive/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
 - [Historical USB acquisition stability checklist](archive/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-checklist.md)
 - [Historical baseline next](archive/usb-acquisition-stability/baseline_next.md)

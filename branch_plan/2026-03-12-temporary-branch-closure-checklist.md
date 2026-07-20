@@ -1,6 +1,6 @@
 # Remote Branch Retirement Checklist
 
-作成日: 2026-03-12  
+作成日: 2026-03-12
 最終更新: 2026-07-19
 
 対象roadmap: [Branch Strategy and Retirement Roadmap](./2026-03-12-two-branch-convergence-roadmap.md)
