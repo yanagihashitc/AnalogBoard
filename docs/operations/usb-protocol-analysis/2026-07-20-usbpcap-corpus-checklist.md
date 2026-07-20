@@ -15,12 +15,12 @@
 
 ## Batch 2 — P0-C2 deterministic extraction
 
-- [ ] Full extraction completes for `low_mid`, `idle_180_1700`, and representative `high1`
-- [ ] Endpoint/direction and URB request/completion classification remains distinct
-- [ ] Lifecycle evidence frames and bounded EP6 throughput/cadence summaries are generated
-- [ ] All six captures have endpoint/status/length summaries
-- [ ] Repeated extraction is byte-identical
-- [ ] Batch 2 checkpoint, commit, push, and `tasks/todo_archive.md` move are complete
+- [x] Full extraction completes for `low_mid`, `idle_180_1700`, and representative `high1`
+- [x] Endpoint/direction and URB request/completion classification remains distinct
+- [x] Lifecycle evidence frames and bounded EP6 throughput/cadence summaries are generated
+- [x] All six captures have endpoint/status/length summaries
+- [x] Repeated extraction is byte-identical
+- [x] Batch 2 focused verification, refactor, review, and final-diff checks are complete
 
 ## Batch 3 — P0-C3 corpus index and evidence closeout
 

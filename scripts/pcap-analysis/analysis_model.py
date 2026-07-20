@@ -82,6 +82,22 @@ class CorrelationTracker:
             "truncated": 0,
         }
         self._status_counts = {"success": 0, "cancelled": 0, "non_success": 0, "unknown": 0}
+        self._evidence_frames: dict[str, list[int]] = {
+            "cancelled_status": [],
+            "duplicate_active_request": [],
+            "duplicate_recent_completion": [],
+            "non_success_status": [],
+            "short_transfer": [],
+            "truncated": [],
+            "unknown_event": [],
+            "unknown_status": [],
+            "unmatched_completion": [],
+        }
+
+    def _record_evidence(self, category: str, frame_number: int) -> None:
+        frames = self._evidence_frames[category]
+        if len(frames) < 8:
+            frames.append(frame_number)
 
     def _remember_completion(self, irp_id: int) -> None:
         if irp_id in self._recent_set:
@@ -93,20 +109,27 @@ class CorrelationTracker:
             self._recent_set.remove(expired)
 
     def consume(self, row: UsbRow) -> None:
-        self._status_counts[classify_usbd_status(row.usbd_status)] += 1
+        status = classify_usbd_status(row.usbd_status)
+        self._status_counts[status] += 1
+        if status != "success":
+            self._record_evidence(f"{status}_status", row.frame_number)
         if row.is_truncated:
             self._counts["truncated"] += 1
+            self._record_evidence("truncated", row.frame_number)
         if row.event_kind == "request":
             if row.irp_id is None:
                 self._counts["unknown_event"] += 1
+                self._record_evidence("unknown_event", row.frame_number)
             elif row.irp_id in self._pending:
                 self._counts["duplicate_active_request"] += 1
+                self._record_evidence("duplicate_active_request", row.frame_number)
             else:
                 self._pending[row.irp_id] = row
             return
         if row.event_kind == "completion":
             if row.irp_id is None:
                 self._counts["unknown_event"] += 1
+                self._record_evidence("unknown_event", row.frame_number)
                 return
             request = self._pending.pop(row.irp_id, None)
             if request is not None:
@@ -118,17 +141,26 @@ class CorrelationTracker:
                     self._counts["short_transfer_evaluable"] += 1
                 if request.requested_length is not None and actual_length is not None and actual_length < request.requested_length:
                     self._counts["short_transfer"] += 1
+                    self._record_evidence("short_transfer", row.frame_number)
             elif row.irp_id in self._recent_set:
                 self._counts["duplicate_recent_completion"] += 1
+                self._record_evidence("duplicate_recent_completion", row.frame_number)
             else:
                 self._counts["unmatched_completion"] += 1
+                self._record_evidence("unmatched_completion", row.frame_number)
             self._remember_completion(row.irp_id)
             return
         self._counts["unknown_event"] += 1
+        self._record_evidence("unknown_event", row.frame_number)
 
     def finish(self) -> dict[str, Any]:
+        unmatched_request_frames = sorted(row.frame_number for row in self._pending.values())[:8]
         return {
             **self._counts,
+            "evidence_frames": {
+                **{key: list(value) for key, value in self._evidence_frames.items()},
+                "unmatched_request": unmatched_request_frames,
+            },
             "unmatched_request": len(self._pending),
             "status_counts": dict(self._status_counts),
             "recent_completion_window": self._recent_limit,
@@ -287,13 +319,27 @@ class _DeviceAccumulator:
         self.interface_numbers: set[int] = set()
         self.first_frame: int | None = None
         self.last_frame: int | None = None
+        self.first_epoch_seconds: str | None = None
+        self.last_epoch_seconds: str | None = None
+        self.first_relative_seconds: str | None = None
+        self.last_relative_seconds: str | None = None
         self.descriptor_frames: list[int] = []
+        self.ep2_set_completion_frame: int | None = None
+        self.ep4_completion_after_set_frame: int | None = None
+        self.ep6_completion_after_set_frame: int | None = None
+        self.last_ep6_completion_frame: int | None = None
+        self.ep4_first_completion_after_final_ep6_frame: int | None = None
+        self.ep4_successful_completion_after_final_ep6_frame: int | None = None
         self._max_length_buckets = max_length_buckets
 
     def consume(self, row: UsbRow) -> None:
         if self.first_frame is None:
             self.first_frame = row.frame_number
+            self.first_epoch_seconds = row.epoch_seconds
+            self.first_relative_seconds = row.relative_seconds
         self.last_frame = row.frame_number
+        self.last_epoch_seconds = row.epoch_seconds
+        self.last_relative_seconds = row.relative_seconds
         if row.vendor_id is not None:
             self.vendor_ids.add(row.vendor_id)
             if len(self.descriptor_frames) < 8:
@@ -308,6 +354,26 @@ class _DeviceAccumulator:
                 _EndpointAccumulator(max_length_buckets=self._max_length_buckets),
             )
             endpoint.consume(row)
+        if row.event_kind == "completion":
+            if row.endpoint == 0x02 and self.ep2_set_completion_frame is None:
+                self.ep2_set_completion_frame = row.frame_number
+            elif row.endpoint == 0x84:
+                if self.ep2_set_completion_frame is not None and self.ep4_completion_after_set_frame is None:
+                    self.ep4_completion_after_set_frame = row.frame_number
+                if self.last_ep6_completion_frame is not None:
+                    self.ep4_first_completion_after_final_ep6_frame = (
+                        self.ep4_first_completion_after_final_ep6_frame or row.frame_number
+                    )
+                    if classify_usbd_status(row.usbd_status) == "success":
+                        self.ep4_successful_completion_after_final_ep6_frame = (
+                            self.ep4_successful_completion_after_final_ep6_frame or row.frame_number
+                        )
+            elif row.endpoint == 0x86:
+                if self.ep2_set_completion_frame is not None and self.ep6_completion_after_set_frame is None:
+                    self.ep6_completion_after_set_frame = row.frame_number
+                self.last_ep6_completion_frame = row.frame_number
+                self.ep4_first_completion_after_final_ep6_frame = None
+                self.ep4_successful_completion_after_final_ep6_frame = None
         self.correlation.consume(row)
 
     @property
@@ -327,7 +393,13 @@ class _DeviceAccumulator:
             "descriptor_frames": sorted(set(self.descriptor_frames)),
             "device_address": self.device_address,
             "expected_endpoint_coverage": self.expected_endpoint_coverage,
+            "first_epoch_seconds": self.first_epoch_seconds,
+            "first_frame": self.first_frame,
+            "first_relative_seconds": self.first_relative_seconds,
             "interface_numbers": sorted(self.interface_numbers),
+            "last_epoch_seconds": self.last_epoch_seconds,
+            "last_frame": self.last_frame,
+            "last_relative_seconds": self.last_relative_seconds,
             "observed_endpoints": [f"0x{endpoint:02x}" for endpoint in sorted(self.endpoints)],
             "observed_row_count": self.observed_row_count,
             "product_ids": [f"0x{value:04x}" for value in sorted(self.product_ids)],
@@ -422,6 +494,36 @@ class CaptureAccumulator:
         near_four_gib = abs(self.source_size_bytes - 2**32) <= int((2**32) * Decimal("0.05"))
         first_device_frame = selected.first_frame
         last_device_frame = selected.last_frame
+        tail_ep4_phase = (
+            "ep4_successful_completion_after_final_ep6"
+            if selected.ep4_successful_completion_after_final_ep6_frame is not None
+            else "ep4_completion_after_final_ep6"
+        )
+        tail_ep4_frame = (
+            selected.ep4_successful_completion_after_final_ep6_frame
+            or selected.ep4_first_completion_after_final_ep6_frame
+        )
+        sequence_candidates = (
+            ("connect_observation", first_device_frame),
+            ("ep2_set_completion", selected.ep2_set_completion_frame),
+            ("ep4_completion_after_set", selected.ep4_completion_after_set_frame),
+            ("ep6_completion_after_set", selected.ep6_completion_after_set_frame),
+            ("ep6_final_completion", selected.last_ep6_completion_frame),
+            (tail_ep4_phase, tail_ep4_frame),
+            ("close_observation", last_device_frame),
+        )
+        evidence_sequence = [
+            {"frame": frame, "phase": phase}
+            for _, (phase, frame) in sorted(
+                (
+                    (order, (phase, frame))
+                    for order, (phase, frame) in enumerate(sequence_candidates)
+                    if frame is not None
+                ),
+                key=lambda item: (item[1][1], item[0]),
+            )
+        ]
+        successful_tail_poll_observed = selected.ep4_successful_completion_after_final_ep6_frame is not None
         return {
             "capture": self.capture_name,
             "capture_boundary": {
@@ -444,9 +546,19 @@ class CaptureAccumulator:
                 "connect_observation": {
                     "classification": "first_observed_target_device_activity",
                     "descriptor_frames": sorted(set(selected.descriptor_frames)),
+                    "first_epoch_seconds": selected.first_epoch_seconds,
                     "first_frame": first_device_frame,
+                    "first_relative_seconds": selected.first_relative_seconds,
                     "limitation": "capture start or first observation is not proof of a physical reconnect",
                 },
+                "close_observation": {
+                    "classification": "last_observed_target_device_activity",
+                    "last_epoch_seconds": selected.last_epoch_seconds,
+                    "last_frame": last_device_frame,
+                    "last_relative_seconds": selected.last_relative_seconds,
+                    "limitation": "last observation is not proof of a physical disconnect or process exit",
+                },
+                "evidence_sequence": evidence_sequence,
                 "ep2_set_candidate": self._endpoint_lifecycle(
                     endpoint_summaries["0x02_out"],
                     classification="EP2 OUT application Set candidate",
@@ -463,12 +575,25 @@ class CaptureAccumulator:
                     limitation="measurement bytes are not extracted or exported",
                 ),
                 "stop_drain_graceful_close_observation": {
-                    "classification": "capture-tail ordering observation",
+                    "classification": (
+                        "successful EP4 completion observed after final EP6 completion"
+                        if successful_tail_poll_observed
+                        else "capture-tail ordering observation incomplete"
+                    ),
+                    "ep2_set_completion_frame": selected.ep2_set_completion_frame,
+                    "ep4_first_completion_after_final_ep6_frame": (
+                        selected.ep4_first_completion_after_final_ep6_frame
+                    ),
+                    "ep4_completion_after_set_frame": selected.ep4_completion_after_set_frame,
+                    "ep4_successful_completion_after_final_ep6_frame": (
+                        selected.ep4_successful_completion_after_final_ep6_frame
+                    ),
+                    "ep6_completion_after_set_frame": selected.ep6_completion_after_set_frame,
                     "last_device_frame": last_device_frame,
                     "last_ep2_frame": endpoint_summaries["0x02_out"]["last_frame"],
                     "last_ep4_frame": endpoint_summaries["0x84_in"]["last_frame"],
                     "last_ep6_frame": endpoint_summaries["0x86_in"]["last_frame"],
-                    "limitation": "successful Type C context supports a baseline; payload-free USB evidence alone does not prove host drain state",
+                    "limitation": "successful Type C context supports a baseline; payload-free USB evidence cannot prove DDR drain bits or host cleanup state",
                 },
             },
             "rows_without_device_identity": self._rows_without_device,

@@ -282,6 +282,7 @@ class CorrelationTests(unittest.TestCase):
         self.assertEqual(result["duplicate_active_request"], 1)
         self.assertEqual(result["duplicate_recent_completion"], 1)
         self.assertEqual(result["unmatched_completion"], 1)
+        self.assertEqual(result["evidence_frames"]["unmatched_completion"], [3])
 
     def test_counts_unknown_event_and_non_success_status_separately(self) -> None:
         # Given: One row with an unknown URB type and non-success USBD status.
@@ -349,6 +350,21 @@ class CaptureAggregationTests(unittest.TestCase):
                 )
             )
             frame += 10
+        rows.append(
+            replace(
+                base,
+                frame_number=40,
+                relative_seconds="40",
+                device_address=50,
+                endpoint=0x84,
+                irp_id=5,
+                urb_type="",
+                irp_direction=0,
+                data_length=0,
+                requested_length=512,
+            )
+        )
+        rows.append(replace(rows[-1], frame_number=41, relative_seconds="41", irp_direction=1, data_length=512))
         accumulator = pa.CaptureAccumulator(
             capture_name="low.pcapng",
             source_size_bytes=408817408,
@@ -362,11 +378,73 @@ class CaptureAggregationTests(unittest.TestCase):
         self.assertEqual(summary["selected_device"]["bus_id"], 1)
         self.assertEqual(summary["selected_device"]["device_address"], 50)
         self.assertEqual(summary["endpoints"]["0x02_out"]["completion_count"], 1)
-        self.assertEqual(summary["endpoints"]["0x84_in"]["completion_count"], 1)
+        self.assertEqual(summary["endpoints"]["0x84_in"]["completion_count"], 2)
         self.assertEqual(summary["endpoints"]["0x86_in"]["data_length"]["total_bytes"], 65536)
         self.assertEqual(summary["lifecycle"]["ep2_set_candidate"]["first_frame"], 10)
         self.assertEqual(summary["lifecycle"]["ep6_bulk"]["first_frame"], 30)
+        sequence = summary["lifecycle"]["evidence_sequence"]
+        self.assertEqual(
+            [(event["phase"], event["frame"]) for event in sequence],
+            [
+                ("connect_observation", 10),
+                ("ep2_set_completion", 11),
+                ("ep4_completion_after_set", 21),
+                ("ep6_completion_after_set", 31),
+                ("ep6_final_completion", 31),
+                ("ep4_successful_completion_after_final_ep6", 41),
+                ("close_observation", 41),
+            ],
+        )
         self.assertNotIn('"payload":', stable_json_text(summary).lower())
+
+    def test_binds_tail_success_to_the_ep4_completion_not_unrelated_status(self) -> None:
+        # Given: An earlier failed control row, then EP6 followed by a successful EP4 completion.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        rows = [
+            replace(base, frame_number=1, endpoint=0x00, usbd_status=0xC0000001),
+            replace(base, frame_number=2, endpoint=0x86, urb_type="", irp_direction=1, data_length=65536),
+            replace(base, frame_number=3, endpoint=0x84, urb_type="", irp_direction=1, data_length=512),
+        ]
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="1" * 64,
+        )
+        # When: The bounded lifecycle evidence is finalized.
+        for row in rows:
+            accumulator.consume(row)
+        tail = accumulator.finish()["lifecycle"]["stop_drain_graceful_close_observation"]
+        # Then: The successful EP4 fact is retained despite an unrelated earlier failure.
+        self.assertEqual(tail["classification"], "successful EP4 completion observed after final EP6 completion")
+        self.assertEqual(tail["ep4_successful_completion_after_final_ep6_frame"], 3)
+
+    def test_does_not_call_a_failed_tail_ep4_completion_successful(self) -> None:
+        # Given: EP6 followed only by a failed EP4 completion.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        rows = [
+            replace(base, frame_number=1, endpoint=0x86, urb_type="", irp_direction=1, data_length=65536),
+            replace(
+                base,
+                frame_number=2,
+                endpoint=0x84,
+                urb_type="",
+                irp_direction=1,
+                usbd_status=0xC0000001,
+            ),
+        ]
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="2" * 64,
+        )
+        # When: The bounded lifecycle evidence is finalized.
+        for row in rows:
+            accumulator.consume(row)
+        tail = accumulator.finish()["lifecycle"]["stop_drain_graceful_close_observation"]
+        # Then: The first tail poll is recorded, but no successful tail poll is claimed.
+        self.assertEqual(tail["classification"], "capture-tail ordering observation incomplete")
+        self.assertEqual(tail["ep4_first_completion_after_final_ep6_frame"], 2)
+        self.assertIsNone(tail["ep4_successful_completion_after_final_ep6_frame"])
 
     def test_rejects_ambiguous_device_discovery(self) -> None:
         # Given: Two devices with identical endpoint coverage and no descriptor tie-breaker.
@@ -442,6 +520,35 @@ class CaptureAggregationTests(unittest.TestCase):
         # Then: File boundary and observed device failure remain distinct.
         self.assertTrue(boundary["near_four_gib"])
         self.assertFalse(boundary["observed_device_failure"])
+
+    def test_records_control_only_connect_and_close_observations(self) -> None:
+        # Given: A descriptor/control-only target device such as the idle capture.
+        row = pa.parse_tshark_record(
+            pa.ROW_FIELDS,
+            valid_cells(**{"usb.endpoint_address": "0x00", "usb.urb_type": "", "usb.irp_info.direction": "0x00"}),
+            "idle_180_1700.pcapng",
+        )
+        accumulator = pa.CaptureAccumulator(
+            capture_name="idle_180_1700.pcapng",
+            source_size_bytes=1,
+            source_sha256="f" * 64,
+        )
+        accumulator.consume(row)
+        accumulator.consume(
+            replace(
+                row,
+                frame_number=2,
+                relative_seconds="180.0",
+                epoch_seconds="1784270499.0",
+                irp_direction=1,
+            )
+        )
+        # When: The control-only stream is finalized.
+        lifecycle = accumulator.finish()["lifecycle"]
+        # Then: Connect/close observations retain frame/time while data endpoints remain absent.
+        self.assertEqual(lifecycle["connect_observation"]["first_frame"], 1)
+        self.assertEqual(lifecycle["close_observation"]["last_frame"], 2)
+        self.assertEqual(lifecycle["close_observation"]["last_relative_seconds"], "180.0")
 
 
 def stable_json_text(value: object) -> str:
