@@ -54,3 +54,10 @@
 - Result: Closed all three previously optional findings. Added a historical correction below the Batch 3 checklist claim, indexed both the tracked corpus and analyzer documentation, and pinned `.gitignore` to LF with a narrow `.gitattributes` rule. All 13 review findings are now resolved; none remain deferred.
 - Verification: Pass — 48/48 focused tests, Python compilation, 8/8 independent-root JSON identity and tracked hashes, 85 local Markdown links across the changed documentation set, parent HTML IDs/hrefs, `git check-attr` (`text: set`, `eol: lf`), AGENTS/CLAUDE parity, and `git diff --check`.
 - Authority boundary: Changes remain uncommitted and unpushed; no GitHub thread or PR comment was modified.
+
+## 2026-07-21 02:55 JST — Publication
+
+- Authority: The owner explicitly requested committing and pushing all review-fix changes.
+- Result: Created commit `68dcc32a3b6e5d07f8ea4881d735576f45a77240` (`fix(pcap-analysis): address PR review findings`) and pushed it to `origin/analysis/phase0-usbpcap-corpus`.
+- Verification: Remote branch SHA matched the local commit after push. The published scope contains 14 files, including the two new non-executable documentation/configuration files; no ignored capture, generated analysis, raw payload, or `tasks/` file was added.
+- Remaining authority boundary: No GitHub review thread was resolved and no PR comment, central mirror, downstream repository, driver, registry, or firmware state was changed.
