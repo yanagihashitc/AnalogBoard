@@ -1,5 +1,7 @@
 # USB Acquisition Stability Field Reference
 
+> **Historical reference（archived 2026-07-19）**: Type A/B/C分類と過去sessionの参照用です。記載されたactive task／runbookは再開しません。
+
 対象プラン: [USB データ取得・書き込み安定性改善プラン](./2026-03-02-usb-acquisition-stability.md)
 
 この文書は field gate / failure signature / next session bundle をまとめる。日々の進行判定は checklist を参照する。
@@ -95,4 +97,4 @@ Representative logs:
 - active tasks: [USB acquisition stability checklist](./2026-03-02-usb-acquisition-stability-checklist.md)
 - release-track next task: [baseline_next.md](./baseline_next.md)
 - lab support next task: [lab_next.md](./lab_next.md)
-- evidence history: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- evidence history: [process log](./2026-03-02-usb-acquisition-stability-log.md)

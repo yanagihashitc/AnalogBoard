@@ -1,6 +1,8 @@
 # Baseline Next
 
-対象 branch: `dev`
+> **Superseded／archived（2026-07-19）**：r18は実機4/4 `queue_full_timeout`でD4採用gate不成立。D4はr7移植例外で閉鎖済み。本メモは履歴参照専用であり、記載runを実行しない。新規開発は[branch plan](../../../branch_plan/README.md)に従い最新`main`からtask branchを作る。
+
+対象 branch（履歴）: `dev`
 
 ## Purpose
 
@@ -11,7 +13,7 @@
 - 全体方針: [2026-03-02-usb-acquisition-stability.md](./2026-03-02-usb-acquisition-stability.md)
 - active checklist: [2026-03-02-usb-acquisition-stability-checklist.md](./2026-03-02-usb-acquisition-stability-checklist.md)
 - field signature: [2026-03-02-usb-acquisition-stability-field-reference.md](./2026-03-02-usb-acquisition-stability-field-reference.md)
-- 履歴: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- 履歴: [process log](./2026-03-02-usb-acquisition-stability-log.md)
 
 ## Goal
 

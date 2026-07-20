@@ -4,7 +4,7 @@
 
 - [監査報告](2026-07-14-new-pc-high3-audit.md)
 - [チェックリスト](2026-07-14-new-pc-high3-audit-checklist.md)
-- [実機確認runbook](../../260706-field-session-runbook.html)
+- [実機確認runbook](./260706-field-session-runbook.html)
 
 ## Entries
 

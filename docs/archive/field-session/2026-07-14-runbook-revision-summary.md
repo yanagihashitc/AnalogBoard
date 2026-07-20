@@ -2,7 +2,7 @@
 
 更新日: 2026-07-14  
 状態: 完了済み履歴（2026-07-19 archive）  
-対象: [実機確認runbook](../../260706-field-session-runbook.html) Draft 2.3
+対象: [実機確認runbook](./260706-field-session-runbook.html) Draft 2.3
 
 ## 結論
 

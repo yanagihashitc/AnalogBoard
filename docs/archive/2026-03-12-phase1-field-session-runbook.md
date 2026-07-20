@@ -3,7 +3,7 @@
 対象 branch / build: `baseline/0.1.4-hw-recovery`, `Release|x64`
 
 関連:
-- [USB acquisition stability checklist](../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-checklist.md)
+- [USB acquisition stability checklist](./usb-acquisition-stability/2026-03-02-usb-acquisition-stability-checklist.md)
 - [Host-FPGA Acquisition Reference](./2026-03-12-host-fpga-acquisition-reference.md)
 
 ## Goal

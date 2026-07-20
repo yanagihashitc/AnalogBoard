@@ -2,7 +2,7 @@
 
 ## 対象プラン
 
-- [USB データ取得・書き込み安定性改善プラン](../../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
+- [USB データ取得・書き込み安定性改善プラン](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
 - [チェックリスト](2026-03-09-review-followups-checklist.md)
 
 ## 記入ルール

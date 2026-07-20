@@ -1,10 +1,12 @@
 # USB データ取得・書き込み安定性改善 タスクチェックリスト
 
+> **履歴チェックリスト（2026-07-19 にarchive）**: 実機 gate は決着済みで、未チェック項目をこの文書から再開しません。以下の `dev`／旧 feature branch／専用 worktree の指示は当時の記録です。現行の branch 運用は [Branch Strategy](../../../branch_plan/README.md)、現在の phase／gate は [AnalogBoard 再構築プラン](../../plans/260710-analogboard-rebuild-plan.html) を正本とします。
+
 対象プラン: [USB データ取得・書き込み安定性改善プラン](./2026-03-02-usb-acquisition-stability.md)
 architecture: [Architecture Notes](./2026-03-02-usb-acquisition-stability-architecture.md)
 execution: [Execution Notes](./2026-03-02-usb-acquisition-stability-execution.md)
 field: [Field Reference](./2026-03-02-usb-acquisition-stability-field-reference.md)
-process log: [Process Log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+process log: [Process Log](./2026-03-02-usb-acquisition-stability-log.md)
 作成日: 2026-03-05
 最終同期: 2026-03-19
 

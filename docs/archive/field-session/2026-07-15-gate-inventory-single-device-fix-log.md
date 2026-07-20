@@ -3,7 +3,7 @@
 ## References
 
 - [Checklist](2026-07-15-gate-inventory-single-device-fix-checklist.md)
-- [Runbook](../../260706-field-session-runbook.html)
+- [Runbook](./260706-field-session-runbook.html)
 
 ## Entries
 

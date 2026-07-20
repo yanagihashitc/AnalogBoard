@@ -106,7 +106,7 @@ sequenceDiagram
 
 ## 改善方針
 
-[USB データ取得・書き込み安定性改善プラン](../../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md) の Phase 2 で、「作業員を 2 人にする」改善を計画しています。
+[USB データ取得・書き込み安定性改善プラン](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md) の Phase 2 で、「作業員を 2 人にする」改善を計画しています。
 
 ```mermaid
 flowchart LR
@@ -132,4 +132,4 @@ flowchart LR
 
 ## 関連資料
 
-- [USB データ取得・書き込み安定性改善プラン](../../operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
+- [USB データ取得・書き込み安定性改善プラン](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)

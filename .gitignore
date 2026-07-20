@@ -76,6 +76,7 @@ data/*
 !data/sim_scenarios/*.json
 memo.md
 branch_plan/*
+!branch_plan/*.md
 FX3/
 tasks/
 claudebox-codexbox-agmsg-setup.html

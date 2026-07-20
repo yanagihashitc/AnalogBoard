@@ -2,7 +2,7 @@
 
 監査日: 2026-07-14  
 状態: 完了済み履歴（2026-07-19 archive）  
-対象runbook: [実機確認runbook](../../260706-field-session-runbook.html)  
+対象runbook: [実機確認runbook](./260706-field-session-runbook.html)
 データ: `260714/`（元保存先 `D:\Analyzer_data\260714\`）  
 ログ: `runbook_revision_bundle_260714/evidence/new_pc/2607141608.log`  
 代表SHA-256: [manifest](2026-07-14-new-pc-high3-representative-sha256.txt)

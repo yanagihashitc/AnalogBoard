@@ -1751,7 +1751,7 @@ LTM9008-14 → ADC_IF → ADC_SYNC_CTRL → ADC_DECIMATION → ADC_DATA_SEL → 
 
 - `docs/reference/knowledge_inventory.md`
 - `docs/reference/project_direction.md`
-- `docs/operations/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md`
+- `docs/archive/usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md`
 
 | 制約 | 値 / 条件 | 備考 |
 |---|---|---|

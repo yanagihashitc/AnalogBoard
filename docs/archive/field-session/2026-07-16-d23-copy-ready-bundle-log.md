@@ -4,7 +4,7 @@
 
 - Package: `r7-driver-ep4-polling-20260715T1618JST-source-package`
 - READY: `TELEMETRY_CSV_READY_1314`
-- Canonical operation: `docs/260706-field-session-runbook.html` Draft 2.6
+- Canonical operation: `docs/archive/field-session/260706-field-session-runbook.html` Draft 2.6
 
 ## Entries
 

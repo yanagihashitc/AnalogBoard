@@ -1,5 +1,7 @@
 # USB Acquisition Stability Execution Notes
 
+> **Historical reference（archived 2026-07-19）**: 以下は完了済み調査の実行記録であり、現在のrunbookではありません。現在の作業は`docs/plans/260710-analogboard-rebuild-plan.html`を参照してください。
+
 対象プラン: [USB データ取得・書き込み安定性改善プラン](./2026-03-02-usb-acquisition-stability.md)
 
 この文書は phase / PR / test / rollback の実行詳細をまとめる。現在どこを進めるかは checklist / next docs を参照する。
@@ -87,4 +89,4 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat AnalogBoard_UnitTest\build_test.bat"
 
 - architecture and contracts: [USB acquisition stability architecture notes](./2026-03-02-usb-acquisition-stability-architecture.md)
 - field signatures and session bundle: [USB acquisition stability field reference](./2026-03-02-usb-acquisition-stability-field-reference.md)
-- execution status and history: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- execution status and history: [process log](./2026-03-02-usb-acquisition-stability-log.md)

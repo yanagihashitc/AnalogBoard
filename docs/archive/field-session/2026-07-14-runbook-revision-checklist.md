@@ -12,7 +12,7 @@
 
 ## Phase 2: 文書改訂
 
-- [x] `docs/260706-field-session-runbook.html` を残作業中心へ改訂する
+- [x] `docs/archive/field-session/260706-field-session-runbook.html` を残作業中心へ改訂する
 - [x] 親プランへ実測結果、未成立gate、phase 0の残作業を反映する
 - [x] 改訂概要と実行順を作成する
 - [x] plan由来のagent guidance driftを同期する
