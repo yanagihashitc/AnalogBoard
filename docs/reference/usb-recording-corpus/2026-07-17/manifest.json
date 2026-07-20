@@ -2,17 +2,22 @@
   "analysis_root": "artifacts/field-session/2026-07-17-characterization/analysis",
   "bounded_summary": {
     "byte_identity_runs": 2,
+    "capture_summary_schema_version": 2,
     "path": "artifacts/field-session/2026-07-17-characterization/analysis/bounded_summary.json",
-    "sha256": "07c31d74a51dfe43fbb823ceccb04c6915154c1ccd8aaa0b7dabada7e4eab4e7",
-    "size_bytes": 85314
+    "schema": "analogboard.phase0.usbpcap-extraction-bundle",
+    "schema_version": 1,
+    "sha256": "5a6dfe750d341f4d1a96aa5029c366fd522893e8b459804ab8736edf84218e5a",
+    "size_bytes": 89581
   },
   "captured_date": "2026-07-17",
   "captures": [
     {
       "analysis": {
         "path": "artifacts/field-session/2026-07-17-characterization/analysis/low_mid.summary.json",
-        "sha256": "aef06d4e23596ee7f60b9c5a2ed121dde6433d6b063223f8b14259b4bcf8f725",
-        "size_bytes": 12793
+        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+        "schema_version": 2,
+        "sha256": "9f1a5f63f76a769688cc53c61130f46b8c7f7761a89bda4829286249e2d5cd95",
+        "size_bytes": 13443
       },
       "duration_seconds": "311.218160",
       "earliest_packet_time": "2026-07-17 15:28:48.619238",
@@ -25,8 +30,10 @@
     {
       "analysis": {
         "path": "artifacts/field-session/2026-07-17-characterization/analysis/mid.summary.json",
-        "sha256": "b7a5dab2a3b914c29a4a784225c91a2ca25f4d763fd7bb0eb2c91809e75bb972",
-        "size_bytes": 12418
+        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+        "schema_version": 2,
+        "sha256": "0a76ca19a6ee00bb4672e697b6cf5268661c15156a58d25a4242c8b88fa0d088",
+        "size_bytes": 13055
       },
       "duration_seconds": "154.218938",
       "earliest_packet_time": "2026-07-17 15:34:34.610678",
@@ -39,8 +46,10 @@
     {
       "analysis": {
         "path": "artifacts/field-session/2026-07-17-characterization/analysis/low.summary.json",
-        "sha256": "d7648fe43582fe292d72985336ecbc3f3d5d4d557f32953b0f1d3f683b77058a",
-        "size_bytes": 12019
+        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+        "schema_version": 2,
+        "sha256": "2bd44d1bbd7dff7a4eabe3756d8aef003c73dde6cc1b655e0020b0fd18d0a83e",
+        "size_bytes": 12656
       },
       "duration_seconds": "148.438122",
       "earliest_packet_time": "2026-07-17 15:38:39.394438",
@@ -53,8 +62,10 @@
     {
       "analysis": {
         "path": "artifacts/field-session/2026-07-17-characterization/analysis/high1.summary.json",
-        "sha256": "831eec6dd7731b4cca14db042155d24a9a552e6e1f152a80b04ece68535f6c03",
-        "size_bytes": 12487
+        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+        "schema_version": 2,
+        "sha256": "aa566367830c9421fb571de4451bf02ee9f01b17559c212acb68b4271ef6f2a3",
+        "size_bytes": 13124
       },
       "duration_seconds": "149.831911",
       "earliest_packet_time": "2026-07-17 15:41:25.076067",
@@ -67,8 +78,10 @@
     {
       "analysis": {
         "path": "artifacts/field-session/2026-07-17-characterization/analysis/high2.summary.json",
-        "sha256": "b0af5e3deaf49e34feb105abb81dd81d6fd4acc41f111c542052eaddd1da89bc",
-        "size_bytes": 12466
+        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+        "schema_version": 2,
+        "sha256": "bdbdb1253533af11e01916f4c7502288ad591aa5afa3b275a23864f222111747",
+        "size_bytes": 13103
       },
       "duration_seconds": "150.774543",
       "earliest_packet_time": "2026-07-17 15:44:30.057300",
@@ -81,8 +94,10 @@
     {
       "analysis": {
         "path": "artifacts/field-session/2026-07-17-characterization/analysis/idle_180_1700.summary.json",
-        "sha256": "746bfd5ce338d81eb884c93ff290456f0cd239027622cbbb4a355d426c207d36",
-        "size_bytes": 11224
+        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+        "schema_version": 2,
+        "sha256": "30dce4b443fcfff14db5919acab3a5e229390409f1d151d8439200ea4cbedf06",
+        "size_bytes": 11861
       },
       "duration_seconds": "2000.963119",
       "earliest_packet_time": "2026-07-17 13:06:42.937619",

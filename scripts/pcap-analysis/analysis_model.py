@@ -123,6 +123,7 @@ class CorrelationTracker:
             elif row.irp_id in self._pending:
                 self._counts["duplicate_active_request"] += 1
                 self._record_evidence("duplicate_active_request", row.frame_number)
+                self._pending[row.irp_id] = row
             else:
                 self._pending[row.irp_id] = row
             return
@@ -167,11 +168,21 @@ class CorrelationTracker:
         }
 EXPECTED_ENDPOINTS = (0x02, 0x84, 0x86)
 ENDPOINT_LABELS = {0x02: "0x02_out", 0x84: "0x84_in", 0x86: "0x86_in"}
+TAIL_EVIDENCE_LIMIT = 8
 
 
 def _format_decimal(value: Decimal, places: int = 6) -> str:
     quantum = Decimal(1).scaleb(-places)
     return format(value.quantize(quantum), "f")
+
+
+def _data_length_basis(endpoint: int) -> dict[str, str]:
+    endpoint_direction = "in" if endpoint & 0x80 else "out"
+    return {
+        "endpoint_direction": endpoint_direction,
+        "row_event_kind": "completion" if endpoint_direction == "in" else "request",
+        "source_field": "usb.data_len",
+    }
 
 
 class _LengthDistribution:
@@ -220,13 +231,14 @@ class _LengthDistribution:
 
 
 class _EndpointAccumulator:
-    def __init__(self, *, max_length_buckets: int) -> None:
+    def __init__(self, *, data_length_basis: dict[str, str], max_length_buckets: int) -> None:
         self.request_count = 0
         self.completion_count = 0
         self.unknown_event_count = 0
         self.truncated_count = 0
         self.status_counts = {"success": 0, "cancelled": 0, "non_success": 0, "unknown": 0}
         self.data_lengths = _LengthDistribution(max_buckets=max_length_buckets)
+        self._data_length_basis = dict(data_length_basis)
         self.first_frame: int | None = None
         self.last_frame: int | None = None
         self.first_relative: Decimal | None = None
@@ -258,10 +270,10 @@ class _EndpointAccumulator:
         self.status_counts[classify_usbd_status(row.usbd_status)] += 1
         if row.is_truncated:
             self.truncated_count += 1
+        if row.event_kind == self._data_length_basis["row_event_kind"] and row.data_length is not None:
+            self.data_lengths.consume(row.data_length)
         if row.event_kind != "completion":
             return
-        if row.data_length is not None:
-            self.data_lengths.consume(row.data_length)
         if self._last_completion_relative is not None:
             gap = relative - self._last_completion_relative
             if gap < 0:
@@ -291,6 +303,7 @@ class _EndpointAccumulator:
         return {
             "completion_count": self.completion_count,
             "data_length": self.data_lengths.finish(),
+            "data_length_basis": dict(self._data_length_basis),
             "first_frame": self.first_frame,
             "first_relative_seconds": str(self.first_relative) if self.first_relative is not None else None,
             "gap_buckets": dict(self.gap_buckets),
@@ -330,6 +343,8 @@ class _DeviceAccumulator:
         self.last_ep6_completion_frame: int | None = None
         self.ep4_first_completion_after_final_ep6_frame: int | None = None
         self.ep4_successful_completion_after_final_ep6_frame: int | None = None
+        self.ep4_non_success_completion_after_final_ep6_count = 0
+        self.ep4_non_success_completion_after_final_ep6_evidence: list[dict[str, Any]] = []
         self._max_length_buckets = max_length_buckets
 
     def consume(self, row: UsbRow) -> None:
@@ -351,7 +366,10 @@ class _DeviceAccumulator:
         if row.endpoint is not None:
             endpoint = self.endpoints.setdefault(
                 row.endpoint,
-                _EndpointAccumulator(max_length_buckets=self._max_length_buckets),
+                _EndpointAccumulator(
+                    data_length_basis=_data_length_basis(row.endpoint),
+                    max_length_buckets=self._max_length_buckets,
+                ),
             )
             endpoint.consume(row)
         if row.event_kind == "completion":
@@ -364,16 +382,31 @@ class _DeviceAccumulator:
                     self.ep4_first_completion_after_final_ep6_frame = (
                         self.ep4_first_completion_after_final_ep6_frame or row.frame_number
                     )
-                    if classify_usbd_status(row.usbd_status) == "success":
+                    status = classify_usbd_status(row.usbd_status)
+                    if status == "success":
                         self.ep4_successful_completion_after_final_ep6_frame = (
                             self.ep4_successful_completion_after_final_ep6_frame or row.frame_number
                         )
+                    else:
+                        self.ep4_non_success_completion_after_final_ep6_count += 1
+                        if len(self.ep4_non_success_completion_after_final_ep6_evidence) < TAIL_EVIDENCE_LIMIT:
+                            self.ep4_non_success_completion_after_final_ep6_evidence.append(
+                                {
+                                    "frame": row.frame_number,
+                                    "status": status,
+                                    "usbd_status": (
+                                        f"0x{row.usbd_status:08x}" if row.usbd_status is not None else None
+                                    ),
+                                }
+                            )
             elif row.endpoint == 0x86:
                 if self.ep2_set_completion_frame is not None and self.ep6_completion_after_set_frame is None:
                     self.ep6_completion_after_set_frame = row.frame_number
                 self.last_ep6_completion_frame = row.frame_number
                 self.ep4_first_completion_after_final_ep6_frame = None
                 self.ep4_successful_completion_after_final_ep6_frame = None
+                self.ep4_non_success_completion_after_final_ep6_count = 0
+                self.ep4_non_success_completion_after_final_ep6_evidence = []
         self.correlation.consume(row)
 
     @property
@@ -482,7 +515,10 @@ class CaptureAccumulator:
         endpoint_summaries = {
             ENDPOINT_LABELS[endpoint]: selected.endpoints.get(
                 endpoint,
-                _EndpointAccumulator(max_length_buckets=self._max_length_buckets),
+                _EndpointAccumulator(
+                    data_length_basis=_data_length_basis(endpoint),
+                    max_length_buckets=self._max_length_buckets,
+                ),
             ).finish()
             for endpoint in EXPECTED_ENDPOINTS
         }
@@ -494,24 +530,29 @@ class CaptureAccumulator:
         near_four_gib = abs(self.source_size_bytes - 2**32) <= int((2**32) * Decimal("0.05"))
         first_device_frame = selected.first_frame
         last_device_frame = selected.last_frame
-        tail_ep4_phase = (
-            "ep4_successful_completion_after_final_ep6"
-            if selected.ep4_successful_completion_after_final_ep6_frame is not None
-            else "ep4_completion_after_final_ep6"
-        )
-        tail_ep4_frame = (
-            selected.ep4_successful_completion_after_final_ep6_frame
-            or selected.ep4_first_completion_after_final_ep6_frame
-        )
-        sequence_candidates = (
+        first_tail_ep4_frame = selected.ep4_first_completion_after_final_ep6_frame
+        successful_tail_ep4_frame = selected.ep4_successful_completion_after_final_ep6_frame
+        tail_ep4_candidates: list[tuple[str, int | None]] = []
+        if first_tail_ep4_frame is not None:
+            first_tail_phase = (
+                "ep4_successful_completion_after_final_ep6"
+                if first_tail_ep4_frame == successful_tail_ep4_frame
+                else "ep4_completion_after_final_ep6"
+            )
+            tail_ep4_candidates.append((first_tail_phase, first_tail_ep4_frame))
+        if successful_tail_ep4_frame is not None and successful_tail_ep4_frame != first_tail_ep4_frame:
+            tail_ep4_candidates.append(
+                ("ep4_successful_completion_after_final_ep6", successful_tail_ep4_frame)
+            )
+        sequence_candidates = [
             ("connect_observation", first_device_frame),
             ("ep2_set_completion", selected.ep2_set_completion_frame),
             ("ep4_completion_after_set", selected.ep4_completion_after_set_frame),
             ("ep6_completion_after_set", selected.ep6_completion_after_set_frame),
             ("ep6_final_completion", selected.last_ep6_completion_frame),
-            (tail_ep4_phase, tail_ep4_frame),
+            *tail_ep4_candidates,
             ("close_observation", last_device_frame),
-        )
+        ]
         evidence_sequence = [
             {"frame": frame, "phase": phase}
             for _, (phase, frame) in sorted(
@@ -524,6 +565,17 @@ class CaptureAccumulator:
             )
         ]
         successful_tail_poll_observed = selected.ep4_successful_completion_after_final_ep6_frame is not None
+        non_success_tail_poll_count = selected.ep4_non_success_completion_after_final_ep6_count
+        if non_success_tail_poll_count > 0 and successful_tail_poll_observed:
+            tail_classification = (
+                "non-success EP4 completion followed by successful EP4 completion after final EP6 completion"
+            )
+        elif non_success_tail_poll_count > 0:
+            tail_classification = "non-success EP4 completion observed after final EP6 completion"
+        elif successful_tail_poll_observed:
+            tail_classification = "successful EP4 completion observed after final EP6 completion"
+        else:
+            tail_classification = "capture-tail ordering observation incomplete"
         return {
             "capture": self.capture_name,
             "capture_boundary": {
@@ -575,16 +627,17 @@ class CaptureAccumulator:
                     limitation="measurement bytes are not extracted or exported",
                 ),
                 "stop_drain_graceful_close_observation": {
-                    "classification": (
-                        "successful EP4 completion observed after final EP6 completion"
-                        if successful_tail_poll_observed
-                        else "capture-tail ordering observation incomplete"
-                    ),
+                    "classification": tail_classification,
                     "ep2_set_completion_frame": selected.ep2_set_completion_frame,
                     "ep4_first_completion_after_final_ep6_frame": (
                         selected.ep4_first_completion_after_final_ep6_frame
                     ),
                     "ep4_completion_after_set_frame": selected.ep4_completion_after_set_frame,
+                    "ep4_non_success_completion_after_final_ep6_count": non_success_tail_poll_count,
+                    "ep4_non_success_completion_after_final_ep6_evidence": list(
+                        selected.ep4_non_success_completion_after_final_ep6_evidence
+                    ),
+                    "ep4_non_success_completion_evidence_limit": TAIL_EVIDENCE_LIMIT,
                     "ep4_successful_completion_after_final_ep6_frame": (
                         selected.ep4_successful_completion_after_final_ep6_frame
                     ),
@@ -598,7 +651,7 @@ class CaptureAccumulator:
             },
             "rows_without_device_identity": self._rows_without_device,
             "schema": "analogboard.phase0.usbpcap-bounded-summary",
-            "schema_version": 1,
+            "schema_version": 2,
             "selected_device": {
                 **selected.candidate_summary(),
                 "selection_basis": "per-capture VID 0x04b4/PID 0xfff2 evidence, then EP2 OUT/EP4 IN/EP6 IN coverage; evidence ties fail",

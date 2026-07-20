@@ -9,8 +9,13 @@ This directory contains the provisional, payload-free Phase 0 analyzer for the s
 - Uses per-capture bus/device/descriptor/endpoint evidence; no device address is shared across captures.
 - Correlates USBPcap IRPs using `usb.irp_id` and the observed `usb.irp_info.direction` request/completion marker. `usb.urb_type` is retained but is empty in the current USBPcap files.
 - Keeps frame captured/reported length, USB data length, USBD status, truncation, cancellation, short transfer, duplicate, and unmatched categories distinct. NT status is recorded as unavailable because Wireshark 4.6.7 exposes no USBPcap NT-status field.
+- Aggregates observed transfer bytes from `usb.data_len` on the direction-appropriate row: request for OUT endpoints (including EP2 `0x02`) and completion for IN endpoints (EP4 `0x84` and EP6 `0x86`). Every endpoint summary emits this choice as `data_length_basis`; no payload bytes are exported.
+- Computes `rate_bytes_per_second` from those selected lengths over the first-to-last observed endpoint-row window. It is a capture-window aggregate, not wire throughput or proven unique application payload, and duplicate/unmatched rows remain visible through correlation counters.
+- Retains both a non-success EP4 completion after final EP6 and a later successful EP4 completion in frame order. The stop/drain observation reports the total non-success count plus at most the first eight `{frame, status, usbd_status}` evidence entries, so a later success cannot turn the sequence into an unqualified clean result. `usbd_status` is a payload-free lowercase `0x` plus eight-digit value such as `0xc0000011`, or JSON `null` when the field is unavailable.
 - Requests no `usb.capdata` field. Generated JSON contains bounded counters and evidence frame numbers, not EP6 measurement bytes.
 - Verifies source SHA-256 and size before and after each extraction.
+
+The bounded-summary schema is version 2. Version 2 changes the existing endpoint `data_length` meaning for OUT traffic from completion-row-only to direction-appropriate `usb.data_len`, declares the basis explicitly, and adds bounded tail EP4 non-success evidence with both classified and raw USBD status. Consumers must check `schema_version` before interpreting these fields.
 
 ## Commands
 
@@ -36,4 +41,4 @@ Generated output is regenerable and ignored under the capture-local `analysis/` 
 ## Test execution
 
 - Command: `python3 -m unittest discover -s scripts/pcap-analysis -p 'test_*.py' -v`
-- Coverage target: all branches represented in the checklist test-perspective table. The environment does not have `coverage.py`, so no percentage is claimed; the focused suite explicitly covers missing/NULL/empty/malformed inputs, 0/min/-1 boundaries, external-tool failures, path safety, deterministic JSON, USBPcap request/completion correlation, device ambiguity, zero-duration rate handling, and bounded distributions.
+- Coverage target: all branches represented in the checklist test-perspective table. The environment does not have `coverage.py`, so no percentage is claimed; the focused suite explicitly covers missing/NULL/empty/malformed inputs, 0/min/-1 boundaries, external-tool failures, path safety, deterministic JSON, USBPcap request/completion correlation, device ambiguity, direction-appropriate transfer lengths, bounded tail evidence, zero/single/negative completion gaps, the 1/10/100/1000 ms gap edges, the 4 GiB tolerance edges, zero-duration rate handling, and bounded distributions.

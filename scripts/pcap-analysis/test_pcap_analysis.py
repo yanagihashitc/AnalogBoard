@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
@@ -16,11 +17,35 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import pcap_analysis as pa  # noqa: E402
 
 
+FIELD_INVENTORY_METADATA = {
+    "frame.number": ("Frame Number", "FT_UINT32", "frame"),
+    "frame.time_epoch": ("Epoch Arrival Time", "FT_ABSOLUTE_TIME", "frame"),
+    "frame.time_relative": ("Time since reference or first frame", "FT_RELATIVE_TIME", "frame"),
+    "frame.cap_len": ("Capture Length", "FT_UINT32", "frame"),
+    "frame.len": ("Frame Length", "FT_UINT32", "frame"),
+    "usb.bus_id": ("URB bus id", "FT_UINT16", "usb"),
+    "usb.device_address": ("Device", "FT_UINT32", "usb"),
+    "usb.irp_id": ("IRP ID", "FT_UINT64", "usb"),
+    "usb.urb_type": ("URB type", "FT_CHAR", "usb"),
+    "usb.irp_info.direction": ("Direction", "FT_UINT8", "usb"),
+    "usb.function": ("URB Function", "FT_UINT16", "usb"),
+    "usb.transfer_type": ("URB transfer type", "FT_UINT8", "usb"),
+    "usb.endpoint_address": ("Endpoint", "FT_UINT8", "usb"),
+    "usb.usbd_status": ("IRP USBD_STATUS", "FT_UINT32", "usb"),
+    "usb.urb_len": ("URB length [bytes]", "FT_UINT32", "usb"),
+    "usb.data_len": ("Data length [bytes]", "FT_UINT32", "usb"),
+    "usb.idVendor": ("idVendor", "FT_UINT16", "usb"),
+    "usb.idProduct": ("idProduct", "FT_UINT16", "usb"),
+    "usb.bInterfaceNumber": ("bInterfaceNumber", "FT_UINT8", "usb"),
+}
+
+
 def field_inventory(*, missing: str | None = None) -> str:
     lines = []
-    for name in pa.REQUIRED_TSHARK_FIELDS:
-        if name != missing:
-            lines.append(f"F\t{name}\t{name}\tFT_STRING\tprotocol\t\t0x0\t")
+    for abbreviation in pa.REQUIRED_TSHARK_FIELDS:
+        if abbreviation != missing:
+            name, field_type, protocol = FIELD_INVENTORY_METADATA[abbreviation]
+            lines.append(f"F\t{name}\t{abbreviation}\t{field_type}\t{protocol}\t\t0x0\t")
     return "\n".join(lines)
 
 
@@ -73,13 +98,20 @@ def valid_cells(**overrides: str) -> list[str]:
 
 class FieldInventoryTests(unittest.TestCase):
     def test_accepts_complete_required_field_inventory(self) -> None:
-        # Given: A complete synthetic TShark field inventory.
+        # Given: A complete field inventory using real TShark names, abbreviations, types, and protocols.
         text = field_inventory()
         # When: The inventory is parsed and validated.
         fields = pa.parse_field_inventory(text)
         pa.validate_required_fields(fields)
-        # Then: Required fields are retained in deterministic order.
+        # Then: Distinct metadata columns are parsed instead of being tautologically equal.
         self.assertEqual(tuple(fields[name].abbreviation for name in pa.REQUIRED_TSHARK_FIELDS), pa.REQUIRED_TSHARK_FIELDS)
+        for abbreviation, (expected_name, expected_type, expected_protocol) in FIELD_INVENTORY_METADATA.items():
+            with self.subTest(abbreviation=abbreviation):
+                info = fields[abbreviation]
+                self.assertEqual(info.name, expected_name)
+                self.assertEqual(info.abbreviation, abbreviation)
+                self.assertEqual(info.field_type, expected_type)
+                self.assertEqual(info.protocol, expected_protocol)
 
     def test_rejects_one_missing_required_field(self) -> None:
         # Given: A field inventory missing exactly one required field.
@@ -284,6 +316,24 @@ class CorrelationTests(unittest.TestCase):
         self.assertEqual(result["unmatched_completion"], 1)
         self.assertEqual(result["evidence_frames"]["unmatched_completion"], [3])
 
+    def test_supersedes_active_request_when_irp_pointer_is_reused(self) -> None:
+        # Given: An IRP pointer is reused for a shorter request before the stale request completes.
+        stale_request = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        current_request = replace(stale_request, frame_number=2, requested_length=8192)
+        completion = replace(current_request, frame_number=3, urb_type="C", data_length=8192)
+        tracker = pa.CorrelationTracker()
+        # When: The reused request and its completion are consumed in capture order.
+        tracker.consume(stale_request)
+        tracker.consume(current_request)
+        tracker.consume(completion)
+        result = tracker.finish()
+        # Then: Completion pairs with the current request and supersession stays bounded and observable.
+        self.assertEqual(result["correlated"], 1)
+        self.assertEqual(result["short_transfer"], 0)
+        self.assertEqual(result["unmatched_request"], 0)
+        self.assertEqual(result["duplicate_active_request"], 1)
+        self.assertEqual(result["evidence_frames"]["duplicate_active_request"], [2])
+
     def test_counts_unknown_event_and_non_success_status_separately(self) -> None:
         # Given: One row with an unknown URB type and non-success USBD status.
         row = pa.parse_tshark_record(
@@ -319,6 +369,24 @@ class CorrelationTests(unittest.TestCase):
 
 
 class CaptureAggregationTests(unittest.TestCase):
+    @staticmethod
+    def _summarize_ep6_completion_times(relative_seconds: tuple[str, ...]) -> dict[str, object]:
+        base = pa.parse_tshark_record(
+            pa.ROW_FIELDS,
+            valid_cells(**{"usb.urb_type": "", "usb.irp_info.direction": "0x01", "usb.data_len": "1"}),
+            "low.pcapng",
+        )
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="9" * 64,
+        )
+        for index, relative in enumerate(relative_seconds, start=1):
+            accumulator.consume(
+                replace(base, frame_number=index, irp_id=index, relative_seconds=relative)
+            )
+        return accumulator.finish()["endpoints"]["0x86_in"]
+
     def test_discovers_target_device_and_builds_bounded_lifecycle_summary(self) -> None:
         # Given: Unrelated EP4 traffic and one device covering EP2/EP4/EP6.
         base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
@@ -429,7 +497,7 @@ class CaptureAggregationTests(unittest.TestCase):
                 endpoint=0x84,
                 urb_type="",
                 irp_direction=1,
-                usbd_status=0xC0000001,
+                usbd_status=0xC0000011,
             ),
         ]
         accumulator = pa.CaptureAccumulator(
@@ -442,9 +510,251 @@ class CaptureAggregationTests(unittest.TestCase):
             accumulator.consume(row)
         tail = accumulator.finish()["lifecycle"]["stop_drain_graceful_close_observation"]
         # Then: The first tail poll is recorded, but no successful tail poll is claimed.
-        self.assertEqual(tail["classification"], "capture-tail ordering observation incomplete")
+        self.assertEqual(tail["classification"], "non-success EP4 completion observed after final EP6 completion")
         self.assertEqual(tail["ep4_first_completion_after_final_ep6_frame"], 2)
         self.assertIsNone(tail["ep4_successful_completion_after_final_ep6_frame"])
+        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_count"], 1)
+
+    def test_retains_non_success_and_recovery_tail_ep4_evidence_in_order(self) -> None:
+        # Given: Final EP6 is followed by a failed EP4 completion and then a successful EP4 completion.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        rows = [
+            replace(base, frame_number=1, endpoint=0x86, urb_type="", irp_direction=1, data_length=65536),
+            replace(
+                base,
+                frame_number=2,
+                endpoint=0x84,
+                urb_type="",
+                irp_direction=1,
+                usbd_status=0xC0000011,
+            ),
+            replace(base, frame_number=3, endpoint=0x84, urb_type="", irp_direction=1, data_length=512),
+        ]
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="3" * 64,
+        )
+        # When: The bounded lifecycle evidence is finalized.
+        for row in rows:
+            accumulator.consume(row)
+        lifecycle = accumulator.finish()["lifecycle"]
+        tail = lifecycle["stop_drain_graceful_close_observation"]
+        # Then: Both distinct frames remain ordered and the tail is not classified as an unqualified clean sequence.
+        self.assertEqual(
+            [(event["phase"], event["frame"]) for event in lifecycle["evidence_sequence"]],
+            [
+                ("connect_observation", 1),
+                ("ep6_final_completion", 1),
+                ("ep4_completion_after_final_ep6", 2),
+                ("ep4_successful_completion_after_final_ep6", 3),
+                ("close_observation", 3),
+            ],
+        )
+        self.assertEqual(
+            tail["classification"],
+            "non-success EP4 completion followed by successful EP4 completion after final EP6 completion",
+        )
+        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_count"], 1)
+        self.assertEqual(
+            tail["ep4_non_success_completion_after_final_ep6_evidence"],
+            [{"frame": 2, "status": "non_success", "usbd_status": "0xc0000011"}],
+        )
+
+    def test_retains_unknown_tail_ep4_status_as_null_raw_evidence(self) -> None:
+        # Given: Final EP6 is followed by an EP4 completion whose USBD status field is unavailable.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="7" * 64,
+        )
+        accumulator.consume(
+            replace(base, frame_number=1, endpoint=0x86, urb_type="", irp_direction=1, data_length=65536)
+        )
+        # When: The unknown-status tail completion is consumed and summarized.
+        accumulator.consume(
+            replace(
+                base,
+                frame_number=2,
+                endpoint=0x84,
+                urb_type="",
+                irp_direction=1,
+                usbd_status=None,
+            )
+        )
+        tail = accumulator.finish()["lifecycle"]["stop_drain_graceful_close_observation"]
+        # Then: Classification remains unknown and raw status remains explicit JSON null rather than guessed success.
+        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_count"], 1)
+        self.assertEqual(
+            tail["ep4_non_success_completion_after_final_ep6_evidence"],
+            [{"frame": 2, "status": "unknown", "usbd_status": None}],
+        )
+
+    def test_uses_direction_appropriate_usb_data_len_for_endpoint_bytes(self) -> None:
+        # Given: EP2 OUT exposes payload length on its request while EP6 IN exposes it on completion.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        rows = [
+            replace(
+                base,
+                frame_number=1,
+                relative_seconds="0",
+                endpoint=0x02,
+                irp_id=1,
+                urb_type="",
+                irp_direction=0,
+                data_length=16,
+            ),
+            replace(
+                base,
+                frame_number=2,
+                relative_seconds="1",
+                endpoint=0x02,
+                irp_id=1,
+                urb_type="",
+                irp_direction=1,
+                data_length=0,
+            ),
+            replace(
+                base,
+                frame_number=3,
+                relative_seconds="2",
+                endpoint=0x86,
+                irp_id=2,
+                urb_type="",
+                irp_direction=0,
+                data_length=0,
+            ),
+            replace(
+                base,
+                frame_number=4,
+                relative_seconds="3",
+                endpoint=0x86,
+                irp_id=2,
+                urb_type="",
+                irp_direction=1,
+                data_length=65536,
+            ),
+        ]
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="4" * 64,
+        )
+        # When: Endpoint byte distributions and rates are aggregated.
+        for row in rows:
+            accumulator.consume(row)
+        endpoints = accumulator.finish()["endpoints"]
+        # Then: Each direction uses the USBPcap row carrying transfer bytes and declares that basis without payload.
+        self.assertEqual(endpoints["0x02_out"]["data_length"]["total_bytes"], 16)
+        self.assertEqual(
+            endpoints["0x02_out"]["data_length_basis"],
+            {"endpoint_direction": "out", "row_event_kind": "request", "source_field": "usb.data_len"},
+        )
+        self.assertEqual(endpoints["0x86_in"]["data_length"]["total_bytes"], 65536)
+        self.assertEqual(
+            endpoints["0x86_in"]["data_length_basis"],
+            {"endpoint_direction": "in", "row_event_kind": "completion", "source_field": "usb.data_len"},
+        )
+        self.assertNotIn('"payload":', stable_json_text(endpoints).lower())
+
+    def test_bounds_tail_ep4_non_success_evidence_while_counting_all_completions(self) -> None:
+        # Given: Final EP6 is followed by more failed EP4 completions than the evidence limit.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="5" * 64,
+        )
+        accumulator.consume(
+            replace(base, frame_number=1, endpoint=0x86, urb_type="", irp_direction=1, data_length=65536)
+        )
+        # When: Ten non-success tail completions are consumed and summarized.
+        for frame in range(2, 12):
+            accumulator.consume(
+                replace(
+                    base,
+                    frame_number=frame,
+                    endpoint=0x84,
+                    urb_type="",
+                    irp_direction=1,
+                    usbd_status=0xC0000001,
+                )
+            )
+        tail = accumulator.finish()["lifecycle"]["stop_drain_graceful_close_observation"]
+        # Then: The complete count remains visible while only the first eight status/frame facts are retained.
+        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_count"], 10)
+        self.assertEqual(tail["ep4_non_success_completion_evidence_limit"], 8)
+        self.assertEqual(
+            tail["ep4_non_success_completion_after_final_ep6_evidence"],
+            [
+                {"frame": frame, "status": "non_success", "usbd_status": "0xc0000001"}
+                for frame in range(2, 10)
+            ],
+        )
+
+    def test_classifies_completion_gap_bucket_boundaries_and_adjacent_values(self) -> None:
+        # Given: Zero plus values immediately below, at, and above every 1/10/100/1000 ms boundary.
+        cases = (
+            ("0", "lte_1ms"),
+            ("0.000999", "lte_1ms"),
+            ("0.001", "lte_1ms"),
+            ("0.001001", "lte_10ms"),
+            ("0.009999", "lte_10ms"),
+            ("0.010", "lte_10ms"),
+            ("0.010001", "lte_100ms"),
+            ("0.099999", "lte_100ms"),
+            ("0.100", "lte_100ms"),
+            ("0.100001", "lte_1000ms"),
+            ("0.999999", "lte_1000ms"),
+            ("1.000", "lte_1000ms"),
+            ("1.000001", "gt_1000ms"),
+        )
+        # When: Each value is the only gap between two EP6 completions.
+        for gap_seconds, expected_bucket in cases:
+            with self.subTest(gap_seconds=gap_seconds):
+                endpoint = self._summarize_ep6_completion_times(("0", gap_seconds))
+                expected_buckets = {
+                    "lte_1ms": 0,
+                    "lte_10ms": 0,
+                    "lte_100ms": 0,
+                    "lte_1000ms": 0,
+                    "gt_1000ms": 0,
+                }
+                expected_buckets[expected_bucket] = 1
+                # Then: Exactly the inclusive upper-bound bucket is incremented and max preserves the gap.
+                self.assertEqual(endpoint["gap_buckets"], expected_buckets)
+                self.assertEqual(
+                    endpoint["maximum_gap_seconds"],
+                    format(Decimal(gap_seconds).quantize(Decimal("0.000000001")), "f"),
+                )
+
+    def test_excludes_negative_completion_gap_from_buckets_and_maximum(self) -> None:
+        # Given: One positive completion gap followed by a timestamp regression.
+        # When: Completion gaps are aggregated in capture order.
+        endpoint = self._summarize_ep6_completion_times(("0", "1", "-1"))
+        # Then: The regression is counted but does not change the positive maximum or any bucket.
+        self.assertEqual(endpoint["negative_gap_count"], 1)
+        self.assertEqual(endpoint["maximum_gap_seconds"], "1.000000000")
+        self.assertEqual(
+            endpoint["gap_buckets"],
+            {
+                "lte_1ms": 0,
+                "lte_10ms": 0,
+                "lte_100ms": 0,
+                "lte_1000ms": 1,
+                "gt_1000ms": 0,
+            },
+        )
+
+    def test_reports_no_completion_gap_for_single_completion(self) -> None:
+        # Given: Exactly one EP6 completion.
+        # When: Endpoint timing is finalized.
+        endpoint = self._summarize_ep6_completion_times(("0",))
+        # Then: No gap, bucket, negative count, or maximum is invented.
+        self.assertIsNone(endpoint["maximum_gap_seconds"])
+        self.assertEqual(endpoint["negative_gap_count"], 0)
+        self.assertEqual(endpoint["gap_buckets"], {key: 0 for key in endpoint["gap_buckets"]})
 
     def test_rejects_ambiguous_device_discovery(self) -> None:
         # Given: Two devices with identical endpoint coverage and no descriptor tie-breaker.
@@ -521,6 +831,44 @@ class CaptureAggregationTests(unittest.TestCase):
         self.assertTrue(boundary["near_four_gib"])
         self.assertFalse(boundary["observed_device_failure"])
 
+    def test_classifies_four_gib_tolerance_boundaries_and_adjacent_bytes(self) -> None:
+        # Given: The exact 4 GiB size plus both inclusive tolerance edges and their adjacent outside bytes.
+        four_gib = 2**32
+        tolerance = int(Decimal(four_gib) * Decimal("0.05"))
+        cases = (
+            (four_gib, True),
+            (four_gib - tolerance, True),
+            (four_gib - tolerance - 1, False),
+            (four_gib + tolerance, True),
+            (four_gib + tolerance + 1, False),
+        )
+        row = pa.parse_tshark_record(
+            pa.ROW_FIELDS,
+            valid_cells(**{"usb.urb_type": "", "usb.irp_info.direction": "0x01"}),
+            "high1.pcapng",
+        )
+        # When: Each capture-file size is interpreted independently from successful USB traffic.
+        for size_bytes, expected_near in cases:
+            with self.subTest(size_bytes=size_bytes):
+                accumulator = pa.CaptureAccumulator(
+                    capture_name="high1.pcapng",
+                    source_size_bytes=size_bytes,
+                    source_sha256="6" * 64,
+                )
+                accumulator.consume(row)
+                boundary = accumulator.finish()["capture_boundary"]
+                # Then: The flag and human interpretation use the same inclusive tolerance rule.
+                self.assertEqual(boundary["near_four_gib"], expected_near)
+                self.assertFalse(boundary["observed_device_failure"])
+                self.assertEqual(
+                    boundary["interpretation"],
+                    (
+                        "capture file is near the 4 GiB boundary; this is not device/acquisition failure evidence"
+                        if expected_near
+                        else "capture file size and observed USB status are reported independently"
+                    ),
+                )
+
     def test_records_control_only_connect_and_close_observations(self) -> None:
         # Given: A descriptor/control-only target device such as the idle capture.
         row = pa.parse_tshark_record(
@@ -586,6 +934,52 @@ class CommandAndSerializationTests(unittest.TestCase):
         ):
             pa.run_checked(["tool"], stage="field extraction", capture_name="low.pcapng")
 
+    def test_stream_surfaces_nonzero_exit_after_valid_rows_and_drains_stderr(self) -> None:
+        # Given: TShark emits a valid header and row, then exits 2 with multiline stderr.
+        header = "\t".join(pa.ROW_FIELDS)
+        record = "\t".join(valid_cells())
+        process = mock.Mock()
+        process.stdout = io.StringIO(f"{header}\n{record}\n")
+        process.stderr = io.StringIO("bad capture\npacket 2 malformed\n")
+        process.wait.return_value = 2
+        # When/Then: Exhausting rows raises the analyzer error with exit status and drained stderr.
+        with mock.patch("pcap_analysis.subprocess.Popen", return_value=process), self.assertRaisesRegex(
+            pa.AnalyzerError,
+            r"low\.pcapng: TShark field extraction failed \(exit 2\): bad capture\npacket 2 malformed",
+        ):
+            list(pa.stream_tshark_rows(Path("tshark"), Path("low.pcapng")))
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
+
+    def test_stream_cleans_up_process_when_consumer_raises(self) -> None:
+        # Given: A running TShark process has yielded one valid row to a consumer.
+        header = "\t".join(pa.ROW_FIELDS)
+        record = "\t".join(valid_cells())
+        process = mock.Mock()
+        process.stdout = io.StringIO(f"{header}\n{record}\n")
+        process.stderr = io.StringIO("")
+        process.poll.return_value = None
+        process.wait.return_value = 0
+        stderr_thread = mock.Mock()
+
+        def make_thread(*, target: object, **_: object) -> mock.Mock:
+            stderr_thread.start.side_effect = target
+            return stderr_thread
+
+        with mock.patch("pcap_analysis.subprocess.Popen", return_value=process), mock.patch(
+            "pcap_analysis.threading.Thread", side_effect=make_thread
+        ):
+            rows = pa.stream_tshark_rows(Path("tshark"), Path("low.pcapng"))
+            next(rows)
+            # When/Then: The consumer exception is preserved after process/thread cleanup.
+            with self.assertRaisesRegex(ValueError, "consumer stopped"):
+                rows.throw(ValueError("consumer stopped"))
+        process.terminate.assert_called_once_with()
+        process.wait.assert_called_once_with()
+        stderr_thread.join.assert_called_once_with()
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
+
     def test_stable_json_is_byte_identical_and_ordered(self) -> None:
         # Given: Equivalent data with intentionally unsorted mapping insertion.
         data = {"z": 1, "a": {"d": 4, "b": 2}}
@@ -595,6 +989,38 @@ class CommandAndSerializationTests(unittest.TestCase):
         # Then: Bytes match and keys use a stable lexical order.
         self.assertEqual(first, second)
         self.assertLess(first.index(b'"a"'), first.index(b'"z"'))
+
+    def test_stable_json_write_failures_remove_temp_and_preserve_destination(self) -> None:
+        # Given: An existing destination and failures at each write/flush/fsync/replace boundary.
+        real_named_temporary_file = tempfile.NamedTemporaryFile
+        for stage in ("write", "flush", "fsync", "replace"):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as temp_dir:
+                destination = Path(temp_dir) / "result.json"
+                destination.write_bytes(b"original\n")
+
+                def failing_named_temporary_file(*args: object, **kwargs: object) -> object:
+                    stream = real_named_temporary_file(*args, **kwargs)
+                    if stage in {"write", "flush"}:
+                        setattr(stream, stage, mock.Mock(side_effect=OSError(f"{stage} failed")))
+                    return stream
+
+                named_temp_patch = mock.patch(
+                    "pcap_analysis.tempfile.NamedTemporaryFile",
+                    side_effect=failing_named_temporary_file,
+                )
+                fsync_patch = mock.patch(
+                    "pcap_analysis.os.fsync",
+                    side_effect=OSError("fsync failed") if stage == "fsync" else None,
+                )
+                replace_patch = mock.patch(
+                    "pcap_analysis.os.replace",
+                    side_effect=OSError("replace failed") if stage == "replace" else None,
+                )
+                # When/Then: The original exception survives and no delete=False temp is leaked.
+                with named_temp_patch, fsync_patch, replace_patch, self.assertRaisesRegex(OSError, f"{stage} failed"):
+                    pa.write_stable_json(destination, {"new": True})
+                self.assertEqual(destination.read_bytes(), b"original\n")
+                self.assertEqual(list(destination.parent.glob(f".{destination.name}.*")), [])
 
     def test_parses_quoted_tshark_stream_with_exact_header(self) -> None:
         # Given: A TShark tab stream with an exact header and one quoted record.

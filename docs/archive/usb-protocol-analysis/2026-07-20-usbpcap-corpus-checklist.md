@@ -27,6 +27,7 @@
 - [x] Tracked README, manifest, scenarios, schemas, limits, and regeneration commands exist
 - [x] Successful Type C baseline and missing failure trace limitations are explicit
 - [x] Parent plan evidence/status cells are updated without changing P0-C1–P0-C4 acceptance text
+  - Historical correction: the 2026-07-21 review-findings batch later narrowed the P0-C2 acceptance wording to observable USB traffic and recorded the limitation in the Draft 4.0 revision note; P0-C1, P0-C3, and P0-C4 acceptance text remained unchanged.
 - [x] AnalogBoard agent guidance is synchronized and central read-only handoff is recorded
 - [x] Batch 3 focused verification, refactor, review, and final-diff checks are complete
 

@@ -464,6 +464,7 @@ def stream_tshark_rows(tshark: Path, capture: Path) -> Iterable[UsbRow]:
             process.terminate()
         process.wait()
         stderr_thread.join()
+        process.stderr.close()
         raise
     finally:
         process.stdout.close()
@@ -615,15 +616,21 @@ def write_stable_json(path: Path, value: Any) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     data = stable_json_bytes(value)
-    with tempfile.NamedTemporaryFile(dir=destination.parent, prefix=f".{destination.name}.", delete=False) as stream:
-        temporary = Path(stream.name)
-        stream.write(data)
-        stream.flush()
-        os.fsync(stream.fileno())
+    temporary: Path | None = None
     try:
+        with tempfile.NamedTemporaryFile(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.replace(temporary, destination)
     except BaseException:
-        temporary.unlink(missing_ok=True)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
         raise
 
 
