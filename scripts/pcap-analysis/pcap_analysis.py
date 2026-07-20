@@ -63,6 +63,8 @@ ROW_FIELDS = (
 )
 
 REQUIRED_TSHARK_FIELDS = ROW_FIELDS
+SOURCE_MANIFEST_SCHEMA = "analogboard.phase0.usbpcap-source-manifest"
+SOURCE_MANIFEST_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -281,16 +283,19 @@ def sha256_file(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
 
 
 def run_checked(args: Sequence[str], *, stage: str, capture_name: str | None = None) -> str:
-    completed = subprocess.run(
-        list(args),
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    subject = capture_name or "tool"
+    try:
+        completed = subprocess.run(
+            list(args),
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as error:
+        raise AnalyzerError(f"{subject}: {stage} failed to start: {error}") from error
     if completed.returncode != 0:
-        subject = capture_name or "tool"
         stderr = completed.stderr.strip() or "no stderr"
         raise AnalyzerError(f"{subject}: {stage} failed (exit {completed.returncode}): {stderr}")
     return completed.stdout.replace("\r", "")
@@ -302,6 +307,13 @@ def tool_version(tool: Path, label: str) -> str:
     if not first_line:
         raise AnalyzerError(f"{label}: empty version output")
     return first_line
+
+
+def validate_tool_file(path: Path, label: str) -> Path:
+    resolved = Path(path).resolve()
+    if not resolved.is_file():
+        raise AnalyzerError(f"{label} executable is required: {resolved}")
+    return resolved
 
 
 def _path_for_tool(tool: Path, path: Path) -> str:
@@ -502,8 +514,14 @@ def load_source_manifest(path: Path) -> dict[str, Any]:
         value = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise AnalyzerError(f"source manifest unreadable: {manifest_path}: {error}") from error
-    if not isinstance(value, dict) or value.get("schema") != "analogboard.phase0.usbpcap-source-manifest":
+    if not isinstance(value, dict) or value.get("schema") != SOURCE_MANIFEST_SCHEMA:
         raise AnalyzerError(f"source manifest has unexpected schema: {manifest_path}")
+    schema_version = value.get("schema_version")
+    if type(schema_version) is not int or schema_version != SOURCE_MANIFEST_SCHEMA_VERSION:
+        raise AnalyzerError(
+            "source manifest has unsupported schema version: "
+            f"{manifest_path}: expected {SOURCE_MANIFEST_SCHEMA_VERSION}, got {schema_version!r}"
+        )
     captures = value.get("captures")
     if not isinstance(captures, list):
         raise AnalyzerError(f"source manifest has invalid captures: {manifest_path}")
@@ -574,7 +592,7 @@ def build_extraction_bundle(
     if len(requested) != len(capture_names):
         raise AnalyzerError("capture names must not contain duplicates")
 
-    tshark_path = Path(tshark).resolve()
+    tshark_path = validate_tool_file(tshark, "TShark")
     current_version = tool_version(tshark_path, "TShark")
     expected_version = manifest.get("tools", {}).get("tshark", {}).get("version")
     if current_version != expected_version:
@@ -649,12 +667,10 @@ def build_source_manifest(
     capinfos: Path,
 ) -> dict[str, Any]:
     source = validate_source_root(source_root)
-    tshark_path = Path(tshark).resolve()
-    capinfos_path = Path(capinfos).resolve()
+    tshark_path = validate_tool_file(tshark, "TShark")
+    capinfos_path = validate_tool_file(capinfos, "Capinfos")
     if tshark_path.parent != capinfos_path.parent:
         raise AnalyzerError("TShark and Capinfos must come from the same install root")
-    if not tshark_path.is_file() or not capinfos_path.is_file():
-        raise AnalyzerError("TShark and Capinfos executables are required")
 
     tshark_version = tool_version(tshark_path, "TShark")
     capinfos_version = tool_version(capinfos_path, "Capinfos")
@@ -718,8 +734,8 @@ def build_source_manifest(
             for name in REQUIRED_TSHARK_FIELDS
         ],
         "provisional": True,
-        "schema": "analogboard.phase0.usbpcap-source-manifest",
-        "schema_version": 1,
+        "schema": SOURCE_MANIFEST_SCHEMA,
+        "schema_version": SOURCE_MANIFEST_SCHEMA_VERSION,
         "source_root": _portable_path(source),
         "timestamp_basis": "pcapng packet timestamps rendered by Capinfos; timezone is not declared by the report",
         "tools": {

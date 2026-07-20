@@ -101,9 +101,10 @@ class CorrelationTracker:
 
     def _remember_completion(self, irp_id: int) -> None:
         if irp_id in self._recent_set:
-            return
+            self._recent_order.remove(irp_id)
+        else:
+            self._recent_set.add(irp_id)
         self._recent_order.append(irp_id)
-        self._recent_set.add(irp_id)
         if len(self._recent_order) > self._recent_limit:
             expired = self._recent_order.popleft()
             self._recent_set.remove(expired)
@@ -217,6 +218,21 @@ class _LengthDistribution:
         elif length not in self._overflow_values:
             self._overflow_saturated = True
 
+    def copy(self) -> _LengthDistribution:
+        duplicate = _LengthDistribution(
+            max_buckets=self._max_buckets,
+            max_overflow_values=self._max_overflow_values,
+        )
+        duplicate._counts = dict(self._counts)
+        duplicate._overflow_values = set(self._overflow_values)
+        duplicate._overflow_observations = self._overflow_observations
+        duplicate._overflow_saturated = self._overflow_saturated
+        duplicate.count = self.count
+        duplicate.total_bytes = self.total_bytes
+        duplicate.minimum = self.minimum
+        duplicate.maximum = self.maximum
+        return duplicate
+
     def finish(self) -> dict[str, Any]:
         return {
             "count": self.count,
@@ -270,7 +286,9 @@ class _EndpointAccumulator:
         self.status_counts[classify_usbd_status(row.usbd_status)] += 1
         if row.is_truncated:
             self.truncated_count += 1
-        if row.event_kind == self._data_length_basis["row_event_kind"] and row.data_length is not None:
+        is_selected_data_row = row.event_kind == self._data_length_basis["row_event_kind"]
+        is_deferred_out_request = self._data_length_basis["endpoint_direction"] == "out" and row.irp_id is not None
+        if is_selected_data_row and not is_deferred_out_request and row.data_length is not None:
             self.data_lengths.consume(row.data_length)
         if row.event_kind != "completion":
             return
@@ -293,16 +311,22 @@ class _EndpointAccumulator:
                     self.gap_buckets["gt_1000ms"] += 1
         self._last_completion_relative = relative
 
-    def finish(self) -> dict[str, Any]:
+    def record_correlated_out_length(self, length: int) -> None:
+        self.data_lengths.consume(length)
+
+    def finish(self, *, pending_out_lengths: tuple[int, ...] = ()) -> dict[str, Any]:
         completion_duration: Decimal | None = None
         if self.first_relative is not None and self.last_relative is not None:
             completion_duration = self.last_relative - self.first_relative
+        final_data_lengths = self.data_lengths.copy()
+        for length in pending_out_lengths:
+            final_data_lengths.consume(length)
         rate: str | None = None
         if completion_duration is not None and completion_duration > 0:
-            rate = _format_decimal(Decimal(self.data_lengths.total_bytes) / completion_duration)
+            rate = _format_decimal(Decimal(final_data_lengths.total_bytes) / completion_duration)
         return {
             "completion_count": self.completion_count,
-            "data_length": self.data_lengths.finish(),
+            "data_length": final_data_lengths.finish(),
             "data_length_basis": dict(self._data_length_basis),
             "first_frame": self.first_frame,
             "first_relative_seconds": str(self.first_relative) if self.first_relative is not None else None,
@@ -345,6 +369,8 @@ class _DeviceAccumulator:
         self.ep4_successful_completion_after_final_ep6_frame: int | None = None
         self.ep4_non_success_completion_after_final_ep6_count = 0
         self.ep4_non_success_completion_after_final_ep6_evidence: list[dict[str, Any]] = []
+        self.ep4_unknown_completion_after_final_ep6_count = 0
+        self._pending_out_data_lengths: dict[int, tuple[int, int]] = {}
         self._max_length_buckets = max_length_buckets
 
     def consume(self, row: UsbRow) -> None:
@@ -372,6 +398,15 @@ class _DeviceAccumulator:
                 ),
             )
             endpoint.consume(row)
+        if row.event_kind == "request" and row.irp_id is not None:
+            self._pending_out_data_lengths.pop(row.irp_id, None)
+            if row.endpoint is not None and (row.endpoint & 0x80) == 0 and row.data_length is not None:
+                self._pending_out_data_lengths[row.irp_id] = (row.endpoint, row.data_length)
+        elif row.event_kind == "completion" and row.irp_id is not None:
+            pending_out_data = self._pending_out_data_lengths.pop(row.irp_id, None)
+            if pending_out_data is not None:
+                endpoint_address, data_length = pending_out_data
+                self.endpoints[endpoint_address].record_correlated_out_length(data_length)
         if row.event_kind == "completion":
             if row.endpoint == 0x02 and self.ep2_set_completion_frame is None:
                 self.ep2_set_completion_frame = row.frame_number
@@ -387,6 +422,8 @@ class _DeviceAccumulator:
                         self.ep4_successful_completion_after_final_ep6_frame = (
                             self.ep4_successful_completion_after_final_ep6_frame or row.frame_number
                         )
+                    elif status == "unknown":
+                        self.ep4_unknown_completion_after_final_ep6_count += 1
                     else:
                         self.ep4_non_success_completion_after_final_ep6_count += 1
                         if len(self.ep4_non_success_completion_after_final_ep6_evidence) < TAIL_EVIDENCE_LIMIT:
@@ -407,6 +444,7 @@ class _DeviceAccumulator:
                 self.ep4_successful_completion_after_final_ep6_frame = None
                 self.ep4_non_success_completion_after_final_ep6_count = 0
                 self.ep4_non_success_completion_after_final_ep6_evidence = []
+                self.ep4_unknown_completion_after_final_ep6_count = 0
         self.correlation.consume(row)
 
     @property
@@ -512,6 +550,9 @@ class CaptureAccumulator:
 
     def finish(self) -> dict[str, Any]:
         selected = self._select_device()
+        pending_out_lengths: dict[int, list[int]] = {}
+        for endpoint, length in selected._pending_out_data_lengths.values():
+            pending_out_lengths.setdefault(endpoint, []).append(length)
         endpoint_summaries = {
             ENDPOINT_LABELS[endpoint]: selected.endpoints.get(
                 endpoint,
@@ -519,7 +560,7 @@ class CaptureAccumulator:
                     data_length_basis=_data_length_basis(endpoint),
                     max_length_buckets=self._max_length_buckets,
                 ),
-            ).finish()
+            ).finish(pending_out_lengths=tuple(pending_out_lengths.get(endpoint, ())))
             for endpoint in EXPECTED_ENDPOINTS
         }
         correlation = selected.correlation.finish()
@@ -566,12 +607,15 @@ class CaptureAccumulator:
         ]
         successful_tail_poll_observed = selected.ep4_successful_completion_after_final_ep6_frame is not None
         non_success_tail_poll_count = selected.ep4_non_success_completion_after_final_ep6_count
+        unknown_tail_poll_count = selected.ep4_unknown_completion_after_final_ep6_count
         if non_success_tail_poll_count > 0 and successful_tail_poll_observed:
             tail_classification = (
                 "non-success EP4 completion followed by successful EP4 completion after final EP6 completion"
             )
         elif non_success_tail_poll_count > 0:
             tail_classification = "non-success EP4 completion observed after final EP6 completion"
+        elif unknown_tail_poll_count > 0:
+            tail_classification = "capture-tail EP4 status observation incomplete"
         elif successful_tail_poll_observed:
             tail_classification = "successful EP4 completion observed after final EP6 completion"
         else:

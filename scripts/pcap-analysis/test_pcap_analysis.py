@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
 import io
+import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -334,6 +335,23 @@ class CorrelationTests(unittest.TestCase):
         self.assertEqual(result["duplicate_active_request"], 1)
         self.assertEqual(result["evidence_frames"]["duplicate_active_request"], [2])
 
+    def test_refreshes_duplicate_completion_recency_when_irp_pointer_is_reused(self) -> None:
+        # Given: A recent window where A is duplicated between newer B and C completions.
+        request_a = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        completion_a = replace(request_a, frame_number=2, urb_type="C")
+        completion_b = replace(completion_a, frame_number=3, irp_id=0xB)
+        completion_c = replace(completion_a, frame_number=5, irp_id=0xC)
+        tracker = pa.CorrelationTracker(recent_limit=2)
+        # When: A is completed, duplicated, and then seen again after C advances the window.
+        for row in (request_a, completion_a, completion_b, replace(completion_a, frame_number=4), completion_c):
+            tracker.consume(row)
+        tracker.consume(replace(completion_a, frame_number=6))
+        result = tracker.finish()
+        # Then: The first duplicate refreshed A, so the final A remains duplicate rather than unmatched.
+        self.assertEqual(result["duplicate_recent_completion"], 2)
+        self.assertEqual(result["unmatched_completion"], 2)
+        self.assertEqual(result["evidence_frames"]["duplicate_recent_completion"], [4, 6])
+
     def test_counts_unknown_event_and_non_success_status_separately(self) -> None:
         # Given: One row with an unknown URB type and non-success USBD status.
         row = pa.parse_tshark_record(
@@ -561,7 +579,7 @@ class CaptureAggregationTests(unittest.TestCase):
             [{"frame": 2, "status": "non_success", "usbd_status": "0xc0000011"}],
         )
 
-    def test_retains_unknown_tail_ep4_status_as_null_raw_evidence(self) -> None:
+    def test_classifies_unknown_tail_ep4_status_as_incomplete(self) -> None:
         # Given: Final EP6 is followed by an EP4 completion whose USBD status field is unavailable.
         base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
         accumulator = pa.CaptureAccumulator(
@@ -583,13 +601,14 @@ class CaptureAggregationTests(unittest.TestCase):
                 usbd_status=None,
             )
         )
-        tail = accumulator.finish()["lifecycle"]["stop_drain_graceful_close_observation"]
-        # Then: Classification remains unknown and raw status remains explicit JSON null rather than guessed success.
-        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_count"], 1)
-        self.assertEqual(
-            tail["ep4_non_success_completion_after_final_ep6_evidence"],
-            [{"frame": 2, "status": "unknown", "usbd_status": None}],
-        )
+        summary = accumulator.finish()
+        tail = summary["lifecycle"]["stop_drain_graceful_close_observation"]
+        # Then: Unknown remains independently counted and the lifecycle is incomplete, not a known failure.
+        self.assertEqual(tail["classification"], "capture-tail EP4 status observation incomplete")
+        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_count"], 0)
+        self.assertEqual(tail["ep4_non_success_completion_after_final_ep6_evidence"], [])
+        self.assertEqual(summary["correlation"]["status_counts"]["unknown"], 1)
+        self.assertEqual(summary["correlation"]["evidence_frames"]["unknown_status"], [2])
 
     def test_uses_direction_appropriate_usb_data_len_for_endpoint_bytes(self) -> None:
         # Given: EP2 OUT exposes payload length on its request while EP6 IN exposes it on completion.
@@ -657,6 +676,59 @@ class CaptureAggregationTests(unittest.TestCase):
             {"endpoint_direction": "in", "row_event_kind": "completion", "source_field": "usb.data_len"},
         )
         self.assertNotIn('"payload":', stable_json_text(endpoints).lower())
+
+    def test_excludes_superseded_out_request_bytes_when_irp_pointer_is_reused(self) -> None:
+        # Given: One OUT IRP is resubmitted with 8 bytes before its stale 16-byte request completes.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        stale_request = replace(
+            base,
+            endpoint=0x02,
+            urb_type="",
+            irp_direction=0,
+            requested_length=16,
+            data_length=16,
+        )
+        current_request = replace(stale_request, frame_number=2, requested_length=8, data_length=8)
+        completion = replace(current_request, frame_number=3, irp_direction=1, data_length=0)
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="8" * 64,
+        )
+        # When: Both requests and the current request's completion are aggregated.
+        for row in (stale_request, current_request, completion):
+            accumulator.consume(row)
+        summary = accumulator.finish()
+        # Then: Only the effective request contributes transfer bytes while reuse remains observable.
+        data_length = summary["endpoints"]["0x02_out"]["data_length"]
+        self.assertEqual(data_length["count"], 1)
+        self.assertEqual(data_length["total_bytes"], 8)
+        self.assertEqual(summary["correlation"]["duplicate_active_request"], 1)
+
+    def test_retains_latest_unmatched_out_request_bytes_at_capture_end(self) -> None:
+        # Given: A final OUT request with observed bytes but no completion before capture end.
+        base = pa.parse_tshark_record(pa.ROW_FIELDS, valid_cells(), "low.pcapng")
+        request = replace(
+            base,
+            endpoint=0x02,
+            urb_type="",
+            irp_direction=0,
+            requested_length=16,
+            data_length=16,
+        )
+        accumulator = pa.CaptureAccumulator(
+            capture_name="low.pcapng",
+            source_size_bytes=1,
+            source_sha256="6" * 64,
+        )
+        # When: The capture is finalized without a matching completion.
+        accumulator.consume(request)
+        summary = accumulator.finish()
+        # Then: The latest request remains in observed byte totals and correlation reports it unmatched.
+        data_length = summary["endpoints"]["0x02_out"]["data_length"]
+        self.assertEqual(data_length["count"], 1)
+        self.assertEqual(data_length["total_bytes"], 16)
+        self.assertEqual(summary["correlation"]["unmatched_request"], 1)
 
     def test_bounds_tail_ep4_non_success_evidence_while_counting_all_completions(self) -> None:
         # Given: Final EP6 is followed by more failed EP4 completions than the evidence limit.
@@ -934,6 +1006,18 @@ class CommandAndSerializationTests(unittest.TestCase):
         ):
             pa.run_checked(["tool"], stage="field extraction", capture_name="low.pcapng")
 
+    def test_converts_external_tool_launch_oserror_to_analyzer_error(self) -> None:
+        # Given: An executable that disappears or cannot be launched at the dependency boundary.
+        # When/Then: The exact stage and OS error are surfaced without leaking OSError.
+        with mock.patch(
+            "pcap_analysis.subprocess.run",
+            side_effect=PermissionError("permission denied"),
+        ), self.assertRaisesRegex(
+            pa.AnalyzerError,
+            r"tool: field inventory failed to start: permission denied",
+        ):
+            pa.run_checked(["tool"], stage="field inventory")
+
     def test_stream_surfaces_nonzero_exit_after_valid_rows_and_drains_stderr(self) -> None:
         # Given: TShark emits a valid header and row, then exits 2 with multiline stderr.
         header = "\t".join(pa.ROW_FIELDS)
@@ -1057,6 +1141,81 @@ class CommandAndSerializationTests(unittest.TestCase):
             self.assertEqual(verified["sha256"], entry["sha256"])
             with self.assertRaisesRegex(pa.AnalyzerError, "low.pcapng: source SHA-256 differs from immutable manifest"):
                 pa.verify_capture_identity(capture, invalid)
+
+    def test_accepts_only_supported_source_manifest_schema_version(self) -> None:
+        # Given: A source manifest using the supported integer schema version 1.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "source_manifest.json"
+            pa.write_stable_json(
+                manifest_path,
+                {
+                    "captures": [],
+                    "schema": "analogboard.phase0.usbpcap-source-manifest",
+                    "schema_version": 1,
+                },
+            )
+            # When: The manifest is loaded.
+            manifest = pa.load_source_manifest(manifest_path)
+            # Then: Version 1 is accepted unchanged.
+            self.assertEqual(manifest["schema_version"], 1)
+
+    def test_rejects_missing_unsupported_and_non_integer_source_manifest_versions(self) -> None:
+        # Given: Missing, boundary, future, string, boolean, and NULL schema versions.
+        invalid_versions = (
+            ("missing", None),
+            ("null", None),
+            ("zero", 0),
+            ("future", 2),
+            ("string", "1"),
+            ("boolean", True),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            # When/Then: Every incompatible value fails with expected/actual version context.
+            for name, version in invalid_versions:
+                with self.subTest(name=name, version=version):
+                    manifest_path = root / f"{name}.json"
+                    manifest = {
+                        "captures": [],
+                        "schema": "analogboard.phase0.usbpcap-source-manifest",
+                    }
+                    if name != "missing":
+                        manifest["schema_version"] = version
+                    pa.write_stable_json(manifest_path, manifest)
+                    with self.assertRaisesRegex(
+                        pa.AnalyzerError,
+                        r"source manifest has unsupported schema version: .*expected 1, got",
+                    ):
+                        pa.load_source_manifest(manifest_path)
+
+    def test_extract_rejects_missing_tshark_before_launch(self) -> None:
+        # Given: A valid version-1 manifest and a missing TShark executable path.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            source.mkdir()
+            manifest_path = root / "source_manifest.json"
+            pa.write_stable_json(
+                manifest_path,
+                {
+                    "captures": [{"filename": name} for name in pa.CAPTURE_NAMES],
+                    "schema": "analogboard.phase0.usbpcap-source-manifest",
+                    "schema_version": 1,
+                },
+            )
+            missing_tshark = root / "missing-tshark"
+            # When/Then: Extraction rejects the path as AnalyzerError before subprocess launch.
+            with self.assertRaisesRegex(
+                pa.AnalyzerError,
+                rf"TShark executable is required: {re.escape(str(missing_tshark))}",
+            ):
+                pa.build_extraction_bundle(
+                    source_root=source,
+                    output_root=root / "output",
+                    source_manifest_path=manifest_path,
+                    tshark=missing_tshark,
+                    capture_names=pa.CAPTURE_NAMES,
+                )
 
 
 if __name__ == "__main__":
