@@ -1,7 +1,7 @@
 # 次の実機確認タスク
 
 更新日: 2026-07-14  
-正本: [実機確認runbook](../../260706-field-session-runbook.html) Draft 2.3
+正本: [実機確認runbook](./260706-field-session-runbook.html) Draft 2.3
 
 ## 現在地
 

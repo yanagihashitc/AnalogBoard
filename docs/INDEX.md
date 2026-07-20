@@ -11,6 +11,8 @@
 ## Current Operations
 
 - Phase 0のcurrent workと次gateは[AnalogBoard rebuild plan](plans/260710-analogboard-rebuild-plan.html)および[Cross-repo execution roadmap](../../task_management/260710-cross-repo-execution-roadmap.html)を参照。
+- [Repository closeout prompt](operations/repository-maintenance/2026-07-20-repository-closeout-prompt.md)
+- [task_management synchronization prompt](operations/repository-maintenance/2026-07-20-task-management-sync-prompt.md)
 
 ## Guides
 
@@ -37,7 +39,7 @@
 
 完了済みチェックリスト、古い process log、過去プランは [archive/](archive/) に置く。進行中の判断根拠は [process_log/INDEX.md](process_log/INDEX.md) から辿る。
 
-- [Completed field session runbook](260706-field-session-runbook.html)
+- [Completed field session runbook](archive/field-session/260706-field-session-runbook.html)
 - [NoDfx dual-driver session (2026-07-16〜17)](archive/field-session/2026-07-16-nodfx-dual-driver-session.html)
 - [New-driver fail-fast task — superseded](archive/field-session/2026-07-15-new-driver-fail-fast-next-task.html)
 - [New-PC high3 data audit](archive/field-session/2026-07-14-new-pc-high3-audit.md)

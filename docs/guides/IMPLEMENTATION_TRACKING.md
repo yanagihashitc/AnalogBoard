@@ -8,7 +8,9 @@ Use checklists and process logs to track implementation work.
 docs/
   BUILD.md                    # Root guide kept at docs root
   INDEX.md                    # Docs entry point
-  260706-field-session-runbook.html
+  archive/                    # Archived old runbooks, checklists & process logs
+    field-session/
+      260706-field-session-runbook.html
   guides/                     # Long-lived guides
   templates/                  # All templates
     implementation_checklist_TEMPLATE.md
@@ -20,7 +22,6 @@ docs/
     INDEX.md                  # Index of all process logs
     YYYY-MM-DD-feature-name-log.md
     YYYY-MM-DD-feature-name-log-02.md  # Split file (when log exceeds 100 lines)
-  archive/                    # Archived old checklists & process logs
 ```
 
 ## Usage Rules

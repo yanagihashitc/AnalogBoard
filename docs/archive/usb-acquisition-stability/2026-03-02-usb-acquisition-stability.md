@@ -23,7 +23,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 この plan は「なぜその順番で進めるか」「各 branch が何を担うか」を判断するための正本とする。
 
 - 実装の進捗と exit gate は [チェックリスト](./2026-03-02-usb-acquisition-stability-checklist.md) を見る
-- 判断の根拠、実機ログ、Red/Green/field validation の履歴は [process_log](../../process_log/2026-03-02-usb-acquisition-stability-log.md) を見る
+- 判断の根拠、実機ログ、Red/Green/field validation の履歴は [process_log](./2026-03-02-usb-acquisition-stability-log.md) を見る
 - `dev` の次タスクは [baseline_next.md](./baseline_next.md) を見る
 - `lab/0.2.2-engine-semantics` の次タスクは [lab_next.md](./lab_next.md) を見る
 - `feature/win11-driver-compat` の次タスクは [driver_next.md](./driver_next.md) を見る
@@ -135,7 +135,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 
 ## 実施ログ運用（process_log）
 
-- 本プランの進捗・判断・計測結果は、`docs/process_log/2026-03-02-usb-acquisition-stability-log.md` に**逐次追記**する（Phase 0 着手時に新規作成）
+- 本プランの進捗・判断・計測結果は、`docs/archive/usb-acquisition-stability/2026-03-02-usb-acquisition-stability-log.md` に**逐次追記**する（Phase 0 着手時に新規作成）
 - 各 Phase の着手時/完了時に最低1エントリを記録する
 - 記録項目は「日時、Phase/PR、実施内容、結果、課題/次アクション」を必須とする
 - Phase 1 以降の判断は process_log 上の Phase 0 計測結果（baseline）を参照して実施する
@@ -171,7 +171,7 @@ branch / worktree を最終的に `main` + 開発用 branch 1 本へ収束させ
 - lab support 次タスク:
   [lab_next.md](./lab_next.md)
 - 実施履歴:
-  [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+  [process log](./2026-03-02-usb-acquisition-stability-log.md)
 - archive:
   [USB データ取得・書き込み安定性改善プラン（FPGA ソース不要版）](../plans/2026-03-04-usb-stability-without-fpga-source.md)
   [Wave Output Format Handover (2026-03-02)](../plans/2026-03-02-wave-output-handover.md)

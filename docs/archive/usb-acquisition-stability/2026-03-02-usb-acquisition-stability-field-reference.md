@@ -97,4 +97,4 @@ Representative logs:
 - active tasks: [USB acquisition stability checklist](./2026-03-02-usb-acquisition-stability-checklist.md)
 - release-track next task: [baseline_next.md](./baseline_next.md)
 - lab support next task: [lab_next.md](./lab_next.md)
-- evidence history: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- evidence history: [process log](./2026-03-02-usb-acquisition-stability-log.md)

@@ -866,7 +866,7 @@ $tmp = @($files | Where-Object { $_.Name -like '*.tmp' -or $_.Name -like '*.tmp.
       <h2>B leg：旧driver <code>1.2.3.20</code>によるGate B閉鎖（driver原状回復後）</h2>
       <div class="callout callout-info"><div class="callout-title">N leg＋R（原状回復）の後に実施する必達leg</div><p>N legと同一のtelemetry graceful-stop build（同一EXE/DLL hash）を旧driver <code>1.2.3.20</code>で使い、不足しているFL/FH data integrityとre-arm telemetry baselineを閉じる。これがGate B正式証跡＝D4 owner gateの前提。<strong>N legがFail・打ち切りでもB legは実施する</strong>（旧driverは34/34 Type Cの既知安定構成）。</p></div>
       <h3>B0：read-only inventory（測定開始前）</h3>
-      <p>固定package同梱の<a href="../scripts/field-session/collect_gate_inventory.ps1"><code>collect_gate_inventory.ps1</code></a>を管理者権限なしで実行する。これはevidenceを書くだけで、driver、device、電源設定、アプリ、測定データを変更しない。</p>
+      <p>固定package同梱の<a href="../../../scripts/field-session/collect_gate_inventory.ps1"><code>collect_gate_inventory.ps1</code></a>を管理者権限なしで実行する。これはevidenceを書くだけで、driver、device、電源設定、アプリ、測定データを変更しない。</p>
       <div class="callout callout-info"><div class="callout-title">default_config.csvは可変設定</div><p>AnalogBoardは正常終了時に現在の設定を<code>default_config.csv</code>へ書き戻す。保存先などの正当な変更を妨げないため、collectorはこのファイルの<strong>存在だけ</strong>を確認し、hashの検証やinventoryへの記録は行わない。固定hashの対象はEXEとDLLである。</p></div>
       <pre><code>powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\collect_gate_inventory.ps1 `
   -Stage GateB `

@@ -1,7 +1,7 @@
 # D17既存証跡クローズ チェックリスト
 
 対象プラン: [AnalogBoard再構築プラン](../../plans/260710-analogboard-rebuild-plan.html)  
-対象runbook: [実機確認runbook](../../260706-field-session-runbook.html)  
+対象runbook: [実機確認runbook](./260706-field-session-runbook.html)
 プロセスログ: [Process Log](2026-07-14-d17-closure-log.md)  
 作成日: 2026-07-14
 

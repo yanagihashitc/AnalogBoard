@@ -368,4 +368,4 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat x64\Debug\AnalogBoard_UnitTest.exe"
 - [元プラン: USB データ取得・書き込み安定性改善プラン（全体版）](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability.md)
 - データ取得中断・タイムアウト安定化プラン: このリポジトリ snapshot には未収録
 - [Wave Output Format Handover (2026-03-02)](./2026-03-02-wave-output-handover.md)
-- [USB Data Acquisition Stability Process Log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- [USB Data Acquisition Stability Process Log](../usb-acquisition-stability/2026-03-02-usb-acquisition-stability-log.md)

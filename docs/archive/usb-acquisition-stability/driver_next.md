@@ -15,7 +15,7 @@
 - 全体方針: [2026-03-02-usb-acquisition-stability.md](./2026-03-02-usb-acquisition-stability.md)
 - active checklist: [2026-03-02-usb-acquisition-stability-checklist.md](./2026-03-02-usb-acquisition-stability-checklist.md)
 - architecture: [2026-03-02-usb-acquisition-stability-architecture.md](./2026-03-02-usb-acquisition-stability-architecture.md)
-- 履歴: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log-02.md)
+- 履歴: [process log](./2026-03-02-usb-acquisition-stability-log-02.md)
 
 ## Goal
 
@@ -34,7 +34,7 @@
 1. [2026-03-02-usb-acquisition-stability.md](./2026-03-02-usb-acquisition-stability.md)
 2. [2026-03-02-usb-acquisition-stability-checklist.md](./2026-03-02-usb-acquisition-stability-checklist.md)
 3. [2026-03-02-usb-acquisition-stability-architecture.md](./2026-03-02-usb-acquisition-stability-architecture.md)
-4. [process_log/2026-03-02-usb-acquisition-stability-log-02.md](../../process_log/2026-03-02-usb-acquisition-stability-log-02.md)
+4. [process_log/2026-03-02-usb-acquisition-stability-log-02.md](./2026-03-02-usb-acquisition-stability-log-02.md)
 
 ## Do Next
 

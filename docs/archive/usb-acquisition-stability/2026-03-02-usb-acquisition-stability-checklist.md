@@ -6,7 +6,7 @@
 architecture: [Architecture Notes](./2026-03-02-usb-acquisition-stability-architecture.md)
 execution: [Execution Notes](./2026-03-02-usb-acquisition-stability-execution.md)
 field: [Field Reference](./2026-03-02-usb-acquisition-stability-field-reference.md)
-process log: [Process Log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+process log: [Process Log](./2026-03-02-usb-acquisition-stability-log.md)
 作成日: 2026-03-05
 最終同期: 2026-03-19
 

@@ -1,6 +1,6 @@
 # 実機セッション用スクリプト
 
-`docs/260706-field-session-runbook.html` Draft 2.6 のD23 NoDfx dual-driver sessionで使用したスクリプト群。sessionは2026-07-16〜17に完了し、Gate Bは条件付きPass、D4はr7移植例外でowner gate通過済み。新driverを再導入する場合のD23 provisioning／readbackと、履歴証跡の再現用に保持する。判定buildは`r7-driver-telemetry-graceful-stop-20260716T1314JST`。
+`docs/archive/field-session/260706-field-session-runbook.html` Draft 2.6 のD23 NoDfx dual-driver sessionで使用したスクリプト群。sessionは2026-07-16〜17に完了し、Gate Bは条件付きPass、D4はr7移植例外でowner gate通過済み。新driverを再導入する場合のD23 provisioning／readbackと、履歴証跡の再現用に保持する。判定buildは`r7-driver-telemetry-graceful-stop-20260716T1314JST`。
 
 ## Gate B/C inventory collector
 

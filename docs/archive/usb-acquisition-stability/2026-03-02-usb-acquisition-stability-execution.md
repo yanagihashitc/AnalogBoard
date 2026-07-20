@@ -89,4 +89,4 @@ cmd /d /c "scripts\run_with_vsdevcmd.bat AnalogBoard_UnitTest\build_test.bat"
 
 - architecture and contracts: [USB acquisition stability architecture notes](./2026-03-02-usb-acquisition-stability-architecture.md)
 - field signatures and session bundle: [USB acquisition stability field reference](./2026-03-02-usb-acquisition-stability-field-reference.md)
-- execution status and history: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- execution status and history: [process log](./2026-03-02-usb-acquisition-stability-log.md)

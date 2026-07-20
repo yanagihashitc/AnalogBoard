@@ -13,7 +13,7 @@
 - 全体方針: [2026-03-02-usb-acquisition-stability.md](./2026-03-02-usb-acquisition-stability.md)
 - active checklist: [2026-03-02-usb-acquisition-stability-checklist.md](./2026-03-02-usb-acquisition-stability-checklist.md)
 - field signature: [2026-03-02-usb-acquisition-stability-field-reference.md](./2026-03-02-usb-acquisition-stability-field-reference.md)
-- 履歴: [process log](../../process_log/2026-03-02-usb-acquisition-stability-log.md)
+- 履歴: [process log](./2026-03-02-usb-acquisition-stability-log.md)
 
 ## Goal
 

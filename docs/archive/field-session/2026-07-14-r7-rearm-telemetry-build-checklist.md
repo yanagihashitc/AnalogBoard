@@ -1,7 +1,7 @@
 # R7 driver + re-arm telemetry validation build チェックリスト
 
 対象プラン: [AnalogBoard 再構築プラン](../../plans/260710-analogboard-rebuild-plan.html)  
-対象runbook: [実機セッションrunbook](../../260706-field-session-runbook.html)  
+対象runbook: [実機セッションrunbook](./260706-field-session-runbook.html)
 プロセスログ: [Process Log](2026-07-14-r7-rearm-telemetry-build-log.md)  
 作成日: 2026-07-14
 
