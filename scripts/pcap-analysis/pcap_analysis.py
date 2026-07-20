@@ -312,7 +312,8 @@ def _path_for_tool(tool: Path, path: Path) -> str:
     if not match:
         raise AnalyzerError(f"{resolved}: path is not accessible to Windows tool {Path(tool).name}")
     drive, relative = match.groups()
-    return f"{drive.upper()}:\\{relative.replace('/', '\\')}"
+    windows_relative = relative.replace("/", "\\")
+    return f"{drive.upper()}:\\{windows_relative}"
 
 
 def build_capinfos_command(capinfos: Path, capture: Path) -> list[str]:
