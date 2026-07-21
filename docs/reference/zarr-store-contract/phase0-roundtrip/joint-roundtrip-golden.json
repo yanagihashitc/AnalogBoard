@@ -1,0 +1,71 @@
+{
+  "schema": "analogboard-p0-s-joint-golden-v1",
+  "generated_at": "2026-07-22",
+  "result": "pass",
+  "generator": {
+    "base_commit": "01103017c55aed109b450bc81b0af171726a6c91",
+    "command": "scripts/zarr-roundtrip/run-focused-verification.sh joint",
+    "source_sha256": {
+      "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h": "39c23fd9023b6aa82afd7ee8331b3ddcb88f09a069b9f8f2fc2dd9da4830d692",
+      "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h": "012df415d283da5a681a3eec85bf73257f0dfb0401b1e4fd848d72343c862252",
+      "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py": "221d9f0a4ee7a7b64c64d7b527cdea5050dca9d49c8a2f41717fde1a5b26a1cf",
+      "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "a045f18625a2e5995f3dce9ea5d0f9dc476860047365d7d7678ca9783d403369",
+      "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "2601b8ace177e3cebfc7ee25ea456b0aa7f2ef9d7cfbc3463783f77e0c5eb8e0",
+      "scripts/zarr-roundtrip/run-focused-verification.sh": "e7389b7150bd119f662ebd6826778c3f0a7750be62a05998539ae31959c8284d"
+    }
+  },
+  "gcsa": {
+    "commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+    "contract_id": "gcsa-store-a4a-rc1",
+    "package_tree_sha256": "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14",
+    "container_id": "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8",
+    "image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e"
+  },
+  "public_kat": {
+    "classification": "public-packaged-kat",
+    "sha256": "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
+  },
+  "joint_evidence": {
+    "content_policy": {
+      "encrypted_wire_bytes_included": false,
+      "measurement_payload_included": false,
+      "nonce_bytes_included": false,
+      "public_kat_only": true
+    },
+    "contract_id": "gcsa-store-a4a-rc1",
+    "fixture": {
+      "arrays": {
+        "fl_waveform": {
+          "dtype": "<u2",
+          "shape": [5, 8, 2400]
+        },
+        "gmi_waveform": {
+          "dtype": "<u2",
+          "shape": [5, 5, 2400]
+        },
+        "pulse_features": {
+          "dtype": "<f8",
+          "shape": [5, 24]
+        }
+      },
+      "dataset_id": "tube_1",
+      "event_count": 5,
+      "events_per_partition": [3, 2],
+      "global_events_by_partition": [[0, 2, 4], [1, 3]],
+      "n_partitions": 2,
+      "sharding": "round-robin"
+    },
+    "gcsa_snapshot_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+    "schema": "analogboard-p0-s-joint-evidence-v1",
+    "verification": {
+      "canonical_evidence_sha256": "b90427471da1d18618d4add37273903ce0376dc7eccb1eb682d4e1c42fa6b62d",
+      "encrypted_chunk_count": 6,
+      "encrypted_wires_differ": true,
+      "gcsa_recompute_mismatch": true,
+      "negative_checks": 35,
+      "nonce_sets_disjoint": true,
+      "positive_checks": 269,
+      "raw_zarr_reads_rejected": 6
+    }
+  }
+}

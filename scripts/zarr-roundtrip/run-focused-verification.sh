@@ -12,12 +12,15 @@ readonly GCSA_CONTAINER="gcsa-dev"
 readonly EXPECTED_GCSA_CONTAINER_ID="d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8"
 readonly EXPECTED_GCSA_IMAGE_ID="sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e"
 readonly GCSA_CONTAINER_SNAPSHOT="/tmp/gcsa-validation-20689a99-codex"
+readonly GCSA_CONTAINER_REPOSITORY_ROOT="/home/jupyter/AnalogBoard"
 readonly GCSA_CONTAINER_VALIDATOR_DIR="/home/jupyter/AnalogBoard/prototypes/zarr-store-roundtrip/scripts"
 readonly EXPECTED_GCSA_CONTRACT_ID="gcsa-store-a4a-rc1"
 readonly EXPECTED_GCSA_PACKAGE_SHA256="c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14"
+readonly JOINT_GOLDEN="${REPOSITORY_ROOT}/docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json"
+readonly JOINT_ARTIFACT_PARENT="${REPOSITORY_ROOT}/artifacts/phase0-zarr-roundtrip/focused"
 
 usage() {
-  echo "usage: $0 batch1|cpp|python|gcsa-kat" >&2
+  echo "usage: $0 batch1|cpp|python|gcsa-kat|joint" >&2
 }
 
 require_identity() {
@@ -53,7 +56,7 @@ run_python() {
     -p 'test_*.py' -v
 }
 
-run_gcsa_kat() {
+require_gcsa_container_identity() {
   local container_id
   local image_id
   container_id="$(docker inspect --format '{{.Id}}' "${GCSA_CONTAINER}")"
@@ -63,7 +66,9 @@ run_gcsa_kat() {
     echo "gcsa validation container identity mismatch" >&2
     return 1
   fi
+}
 
+run_gcsa_kat_checks() {
   docker exec "${GCSA_CONTAINER}" sh -lc \
     "cd '${GCSA_CONTAINER_SNAPSHOT}' && \
      test \"\$(sha256sum src/gcsa/store/data/aead_v1_kat.json | awk '{print \$1}')\" = '${EXPECTED_KAT_SHA256}' && \
@@ -74,6 +79,59 @@ run_gcsa_kat() {
        tests/test_zarr_aead.py::TestAeadCandidateWire::test_wire_exact_kat_encrypts_and_decrypts \
        tests/test_zarr_aead.py::TestAeadCandidateWire::test_kat_plaintext_is_the_declared_inner_blosc_frame"
 }
+
+run_gcsa_kat() {
+  require_gcsa_container_identity
+  run_gcsa_kat_checks
+}
+
+run_joint() (
+  if [[ ! -f "${JOINT_GOLDEN}" ]]; then
+    echo "tracked joint evidence golden is absent: ${JOINT_GOLDEN}" >&2
+    return 1
+  fi
+  local build_root="${PROTOTYPE_BUILD_ROOT}/release-approved"
+  local windows_build_root
+  windows_build_root="$(wslpath -w "${build_root}")"
+  "${BUILD_HELPER}" raw -- cmake --build "${windows_build_root}" \
+    --target p0s_store_generator --verbose
+
+  mkdir -p "${JOINT_ARTIFACT_PARENT}"
+  local run_root
+  run_root="$(mktemp -d "${JOINT_ARTIFACT_PARENT}/joint.XXXXXX")"
+  trap 'rm -rf -- "${run_root}"' EXIT
+
+  local finalized_a="${run_root}/finalized-a"
+  local finalized_b="${run_root}/finalized-b"
+  local open_store="${run_root}/open"
+  local generator="${build_root}/p0s_store_generator.exe"
+  local windows_generator
+  local windows_kat
+  windows_generator="$(wslpath -w "${generator}")"
+  windows_kat="$(wslpath -w "${ACCEPTED_KAT}")"
+
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${finalized_a}")" --sharding round-robin
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${finalized_b}")" --sharding round-robin
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${open_store}")" --open --sharding round-robin
+
+  local container_run_root
+  local repository_relative_run_root
+  repository_relative_run_root="${run_root#"${REPOSITORY_ROOT}/"}"
+  container_run_root="${GCSA_CONTAINER_REPOSITORY_ROOT}/${repository_relative_run_root}"
+  docker exec \
+    -e "PYTHONPATH=${GCSA_CONTAINER_SNAPSHOT}/src:${GCSA_CONTAINER_VALIDATOR_DIR}" \
+    -e PYTHONDONTWRITEBYTECODE=1 \
+    "${GCSA_CONTAINER}" python \
+    "${GCSA_CONTAINER_VALIDATOR_DIR}/validate_gcsa_roundtrip.py" \
+    --open-store "${container_run_root}/open" \
+    --finalized-store-a "${container_run_root}/finalized-a" \
+    --finalized-store-b "${container_run_root}/finalized-b" \
+    --expected-evidence \
+      "${GCSA_CONTAINER_REPOSITORY_ROOT}/docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json"
+)
 
 main() {
   if [[ $# -ne 1 ]]; then
@@ -95,6 +153,12 @@ main() {
       ;;
     gcsa-kat)
       run_gcsa_kat
+      ;;
+    joint)
+      run_python
+      require_gcsa_container_identity
+      run_gcsa_kat_checks
+      run_joint
       ;;
     *)
       usage

@@ -22,17 +22,17 @@
 - [x] Generalize the synthetic fixture to five events, two re-arm cycles, and two candidate sharding modes
 - [x] Implement multi-row/multi-chunk planning, committed-prefix min/max, 14-bit waveform values, nonce-safe replacement, and correct sealing
 - [x] Preserve the strict three-array Zarr v2/Blosc/AEAD/D21 contract
-- [ ] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
+- [x] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
 
 ## Batch 3: Pinned gcsa joint roundtrip and failure matrix
 
 依存: Batch 2
 
-- [ ] Validate ordered D21 snapshots and representative power-failure dispositions with accepted gcsa
-- [ ] Prove full/slice/gather value, bit, dtype, shape, order, no-recompute, and raw-zarr rejection
-- [ ] Cover required crypto/schema/visibility negatives and canonical two-run identity
-- [ ] Publish bounded payload-free golden evidence
-- [ ] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
+- [x] Validate ordered D21 metadata states and finalized-store metadata-lag cut dispositions with accepted gcsa
+- [x] Prove full/slice/gather value, bit, dtype, shape, order, no-recompute, and raw-zarr rejection
+- [x] Cover required crypto/schema/visibility negatives and canonical two-run identity
+- [x] Publish bounded payload-free golden evidence
+- [x] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
 
 ## Batch 4: Sharding decision and closeout
 
