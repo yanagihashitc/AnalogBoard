@@ -48,10 +48,17 @@ class FileHandle final {
   HANDLE handle_ = INVALID_HANDLE_VALUE;
 };
 
+bool FlushTemporaryFile(HANDLE handle,
+                        const AtomicFlushOperation& flush_operation) {
+  return flush_operation ? flush_operation() : FlushFileBuffers(handle) != 0;
+}
+
 }  // namespace
 
 void AtomicWriteFile(const std::filesystem::path& path,
-                     const std::vector<std::uint8_t>& bytes) {
+                     const std::vector<std::uint8_t>& bytes,
+                     const AtomicPublicationObserver& observer,
+                     const AtomicFlushOperation& flush_operation) {
   std::error_code filesystem_error;
   const bool parent_is_directory =
       std::filesystem::is_directory(path.parent_path(), filesystem_error);
@@ -89,12 +96,15 @@ void AtomicWriteFile(const std::filesystem::path& path,
       }
       offset += written;
     }
-    if (!FlushFileBuffers(handle.get())) {
+    if (!FlushTemporaryFile(handle.get(), flush_operation)) {
       const DWORD error = GetLastError();
       throw Error(ErrorCode::kFilesystem,
                   ErrorMessage("FlushFileBuffers for atomic temporary", error));
     }
     handle.CloseChecked();
+    if (observer) {
+      observer(AtomicPublicationObservation{path, temporary});
+    }
     if (!MoveFileExW(temporary.c_str(), path.c_str(),
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
       const DWORD error = GetLastError();
@@ -108,9 +118,12 @@ void AtomicWriteFile(const std::filesystem::path& path,
 }
 
 void AtomicWriteText(const std::filesystem::path& path,
-                     const std::string& text) {
+                     const std::string& text,
+                     const AtomicPublicationObserver& observer,
+                     const AtomicFlushOperation& flush_operation) {
   AtomicWriteFile(path,
-                  std::vector<std::uint8_t>(text.begin(), text.end()));
+                  std::vector<std::uint8_t>(text.begin(), text.end()), observer,
+                  flush_operation);
 }
 
 }  // namespace p0s

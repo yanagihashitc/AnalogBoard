@@ -311,10 +311,163 @@ std::filesystem::path AtomicTemporaryPath(std::filesystem::path path) {
   return path;
 }
 
+void CheckAtomicObserverRunsAfterFlushBeforeRename(
+    const std::filesystem::path& root) {
+  // Given: A published destination and a different complete replacement.
+  const auto destination = root / "observed_publication.json";
+  const auto temporary = AtomicTemporaryPath(destination);
+  p0s::AtomicWriteText(destination, "old payload");
+  int flush_calls = 0;
+  bool flushed = false;
+  bool observed = false;
+
+  // When: Atomic publication reaches its post-flush, pre-rename observer.
+  p0s::AtomicWriteText(
+      destination, "new payload",
+      [&flushed, &observed, &destination, &temporary](
+          const p0s::AtomicPublicationObservation& observation) {
+        observed = true;
+
+        // Then: The old target remains authoritative while the complete temp is
+        // available for deterministic inspection.
+        Require(flushed, "observer ran before the flush operation completed");
+        Require(observation.destination_path == destination,
+                "observer received an unexpected destination path");
+        Require(observation.temporary_path == temporary,
+                "observer received an unexpected temporary path");
+        Require(ReadText(observation.destination_path) == "old payload",
+                "observer ran after the destination was replaced");
+        Require(ReadText(observation.temporary_path) == "new payload",
+                "observer saw an incomplete temporary payload");
+      },
+      [&flush_calls, &flushed]() {
+        ++flush_calls;
+        flushed = true;
+        return true;
+      });
+
+  // Then: Normal publication completes and removes the temporary name.
+  Require(flush_calls == 1,
+          "successful atomic publication did not flush exactly once");
+  Require(observed, "atomic publication did not invoke its observer");
+  Require(ReadText(destination) == "new payload",
+          "atomic publication did not replace the destination");
+  Require(!std::filesystem::exists(temporary),
+          "successful atomic publication left its temporary file");
+}
+
+class AtomicObserverFailure final : public std::runtime_error {
+ public:
+  AtomicObserverFailure() : std::runtime_error("atomic observer failure") {}
+};
+
+void CheckAtomicObserverFailurePreservesExceptionAndCleansTemp(
+    const std::filesystem::path& root) {
+  // Given: An existing destination and an observer that fails before rename.
+  const auto destination = root / "observer_failure.json";
+  const auto temporary = AtomicTemporaryPath(destination);
+  p0s::AtomicWriteText(destination, "old payload");
+
+  // When: The observer throws its typed failure.
+  try {
+    p0s::AtomicWriteText(
+        destination, "new payload",
+        [](const p0s::AtomicPublicationObservation&) {
+          throw AtomicObserverFailure();
+        });
+  } catch (const AtomicObserverFailure& error) {
+    // Then: The original exception is preserved, the old target remains, and
+    // the unpublished temporary file is removed.
+    Require(std::string(error.what()) == "atomic observer failure",
+            "observer failure message changed during cleanup");
+    Require(ReadText(destination) == "old payload",
+            "observer failure replaced the destination");
+    Require(!std::filesystem::exists(temporary),
+            "observer failure left an atomic temporary file");
+    return;
+  }
+  throw std::runtime_error("atomic observer failure was not preserved");
+}
+
+void CheckAtomicFlushFailurePreventsObserverAndRename(
+    const std::filesystem::path& root) {
+  // Given: An existing target, an observer, and a deterministic flush failure.
+  const auto destination = root / "flush_failure.json";
+  const auto temporary = AtomicTemporaryPath(destination);
+  p0s::AtomicWriteText(destination, "old payload");
+  int flush_calls = 0;
+  bool observed = false;
+
+  // When: The injected flush operation reports a stable Windows failure.
+  try {
+    p0s::AtomicWriteText(
+        destination, "new payload",
+        [&observed](const p0s::AtomicPublicationObservation&) {
+          observed = true;
+        },
+        [&flush_calls]() {
+          ++flush_calls;
+          SetLastError(ERROR_WRITE_FAULT);
+          return false;
+        });
+  } catch (const p0s::Error& error) {
+    // Then: Flush precedes observation and rename, the old target remains
+    // authoritative, the temp is removed, and the typed error is stable.
+    Require(error.code() == p0s::ErrorCode::kFilesystem,
+            "flush failure returned an unexpected typed error");
+    Require(std::string(error.what()) ==
+                "FlushFileBuffers for atomic temporary failed with Windows "
+                "error " +
+                    std::to_string(ERROR_WRITE_FAULT),
+            "flush failure returned an unstable error message");
+    Require(flush_calls == 1,
+            "atomic publication did not invoke flush exactly once");
+    Require(!observed, "atomic publication observed an unflushed temporary");
+    Require(ReadText(destination) == "old payload",
+            "flush failure replaced the destination");
+    Require(!std::filesystem::exists(temporary),
+            "flush failure left an atomic temporary file");
+    return;
+  }
+  throw std::runtime_error("atomic publication accepted a flush failure");
+}
+
+void CheckAtomicWritePublishesEmptyPayload(const std::filesystem::path& root) {
+  // Given: A new destination and the minimum zero-byte payload.
+  const auto destination = root / "empty_payload.bin";
+  const auto temporary = AtomicTemporaryPath(destination);
+  bool observed = false;
+
+  // When: The empty payload reaches the post-flush, pre-rename observer.
+  p0s::AtomicWriteFile(
+      destination, {},
+      [&observed](const p0s::AtomicPublicationObservation& observation) {
+        observed = true;
+
+        // Then: The complete temporary file exists and is exactly empty.
+        Require(std::filesystem::is_regular_file(observation.temporary_path),
+                "empty publication observer did not receive a temporary file");
+        Require(std::filesystem::file_size(observation.temporary_path) == 0,
+                "empty publication temporary file was not zero bytes");
+        Require(!std::filesystem::exists(observation.destination_path),
+                "empty publication target became visible before rename");
+      });
+
+  // Then: The empty destination is atomically visible and no temp remains.
+  Require(observed, "empty publication did not invoke its observer");
+  Require(std::filesystem::is_regular_file(destination),
+          "empty atomic publication did not create its destination");
+  Require(std::filesystem::file_size(destination) == 0,
+          "empty atomic publication changed payload size");
+  Require(!std::filesystem::exists(temporary),
+          "empty atomic publication left its temporary file");
+}
+
 void CheckAtomicWriteRejectsMissingParent(
     const std::filesystem::path& root) {
   // Given: A destination whose parent directory does not exist.
   const auto destination = root / "missing" / "metadata.json";
+  const auto temporary = AtomicTemporaryPath(destination);
 
   // When: Atomic publication is attempted.
   try {
@@ -326,7 +479,7 @@ void CheckAtomicWriteRejectsMissingParent(
     Require(std::string(error.what()) ==
                 "Atomic file parent directory is absent",
             "missing parent returned an unstable error message");
-    Require(!std::filesystem::exists(AtomicTemporaryPath(destination)),
+    Require(!std::filesystem::exists(temporary),
             "missing-parent failure left an atomic temporary file");
     return;
   }
@@ -337,6 +490,7 @@ void CheckAtomicWriteCleansUpAfterMoveFailure(
     const std::filesystem::path& root) {
   // Given: An existing directory occupies the publication destination.
   const auto destination = root / "directory_destination";
+  const auto temporary = AtomicTemporaryPath(destination);
   if (!std::filesystem::create_directory(destination)) {
     throw std::runtime_error("cannot create atomic destination directory");
   }
@@ -355,7 +509,7 @@ void CheckAtomicWriteCleansUpAfterMoveFailure(
             "move failure returned an unstable error message");
     Require(std::filesystem::is_directory(destination),
             "move failure replaced the destination directory");
-    Require(!std::filesystem::exists(AtomicTemporaryPath(destination)),
+    Require(!std::filesystem::exists(temporary),
             "move failure left an atomic temporary file");
     return;
   }
@@ -374,6 +528,10 @@ int main(int argc, char** argv) {
     const auto second = temporary.path() / "store_b";
     const std::filesystem::path kat(argv[1]);
 
+    CheckAtomicObserverRunsAfterFlushBeforeRename(temporary.path());
+    CheckAtomicObserverFailurePreservesExceptionAndCleansTemp(temporary.path());
+    CheckAtomicFlushFailurePreventsObserverAndRename(temporary.path());
+    CheckAtomicWritePublishesEmptyPayload(temporary.path());
     CheckAtomicWriteRejectsMissingParent(temporary.path());
     CheckAtomicWriteCleansUpAfterMoveFailure(temporary.path());
 
