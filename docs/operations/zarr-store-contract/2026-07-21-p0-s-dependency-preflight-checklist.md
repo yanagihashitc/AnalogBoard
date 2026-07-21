@@ -22,7 +22,7 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 - [x] Audit the c-blosc source ZIP and reproduce upstream/static builds
 - [x] Implement thin c-blosc, strict JSON, and Windows CNG adapters by TDD
 - [x] Verify x64 objects, CRT directives, runtime DLLs, hashes, and behavior
-- [ ] Complete checkpoint review, commit, push, and archive the active batch
+- [x] Complete checkpoint review, commit, push, and archive the active batch
 
 ## Batch 3: KAT and boundary/negative matrix
 
