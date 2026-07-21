@@ -1,8 +1,9 @@
 # AnalogBoard P0-S dependency preparation evidence
 
-Status: in progress. This document records repository-local dependency and
-checkpoint preparation only. It does not close P0-S1/P0-S2, choose P0-S2
-sharding, declare A-4b/Frozen v1, or complete Phase 0.
+Status: technical validation complete; preparatory PR pending. This document
+records repository-local dependency and checkpoint preparation only. It does
+not close P0-S1/P0-S2, choose P0-S2 sharding, declare A-4b/Frozen v1, or
+complete Phase 0.
 
 ## Accepted identities
 
@@ -251,3 +252,36 @@ roundtrip are green; no approved golden changed. The preparatory blocker is not
 declared closed until this branch's checkpoint documents and evidence are
 human-merged. P0-S1/P0-S2, the P0-S2 sharding decision, A-4b, Frozen v1, and
 Phase 0 remain open.
+
+## Batch 5 clean verification
+
+The clean closeout rerun completed on 2026-07-21 at 18:58 JST from branch
+`chore/p0-s-dependency-preflight`, commit
+`4fddf2cee749986f06705526af433cf966cc9a12`, against unchanged
+`origin/main` `f4ea8ffb80e704a1064c268a13701be198766d07`.
+
+- Exact offline bundle validation and Windows artifact-report validation:
+  pass, exit 0; refreshed ignored deterministic evidence files.
+- Upstream c-blosc regression: 1626/1626 passed, exit 0.
+- Approved and reproduced Release/Debug prototype CTest: 3/3 in each of four
+  configurations, every exit 0.
+- Repository-local Python validators: 19/19 passed, exit 0.
+- Immutable gcsa snapshot focused suite: 328/328 passed in 5.72 seconds,
+  exit 0.
+- Fresh ignored open/finalized store generation: both pass, exit 0; gcsa
+  strict validator/reader: 84 positive checks and 9 negative/visibility
+  checks, exit 0.
+- Dependency manifest stable sorted serialization SHA-256:
+  `5adc55be5457a0d09e838938d7e78ce749b866b0cae326c1380acc6405eb1162`.
+- Zarr checkpoints: `.agent/refactor.md`
+  `e3ffb288c07566282dfd9b90a9310444f3b8f03198fa6beb212669df4714257a`;
+  `.agent/review.md`
+  `fe5958c6d50bc971b639df4d9175eb7b991b54fa6221e424ed088630fd4e7f58`.
+- Complete branch refactor/review plus read-only Claude review: Blocker 0,
+  Major 0, Minor 0. The branch contains no dependency binary/archive/header,
+  generated store, executable, secret, raw payload, production integration,
+  or sibling-repository change.
+
+The final evidence commit and preparatory PR URL are recorded in the process
+log after publication. A human merge remains mandatory before the dependency
+blocker can be handed back as closed.

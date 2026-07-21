@@ -41,15 +41,15 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 
 ## Batch 5: Evidence closeout and preparatory PR
 
-- [ ] Complete deterministic manifest/evidence with exact commands and results
-- [ ] Run clean full verification, refactor, review, and Claude review
-- [ ] Scan diff/staging for secrets, generated artifacts, and sibling changes
+- [x] Complete deterministic manifest/evidence with exact commands and results
+- [x] Run clean full verification, refactor, review, and Claude review
+- [x] Scan diff/staging for secrets, generated artifacts, and sibling changes
 - [ ] Commit/push final preparation evidence and archive the active batch
 - [ ] Open one non-merge preparatory PR to `main`
 
 ## Scope-wide gate
 
-- [ ] `.agent/refactor.md` and `.agent/review.md` match Zarr preparation scope
-- [ ] No sibling repository, production hot path, WPF, real data, or current goal changed
-- [ ] No archive/header/library/executable/store/secret/raw payload is tracked
-- [ ] A-4b, Frozen v1, Phase 0, P0-S1, and P0-S2 remain open
+- [x] `.agent/refactor.md` and `.agent/review.md` match Zarr preparation scope
+- [x] No sibling repository, production hot path, WPF, real data, or current goal changed
+- [x] No archive/header/library/executable/store/secret/raw payload is tracked
+- [x] A-4b, Frozen v1, Phase 0, P0-S1, and P0-S2 remain open
