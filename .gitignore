@@ -90,6 +90,13 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# P0-S immutable offline dependency cache and generated prototype artifacts
+/.deps/p0-s/
+/prototypes/zarr-store-roundtrip/.build/
+/prototypes/zarr-store-roundtrip/build-*/
+/prototypes/zarr-store-roundtrip/generated/
+/artifacts/phase0-zarr-roundtrip/
+
 # Coverage artifacts
 coverage/
 

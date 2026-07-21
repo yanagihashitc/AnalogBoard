@@ -7,6 +7,7 @@
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-21 | P0-S dependency preflight | [log](2026-07-21-p0-s-dependency-preflight-log.md) |
 
 ## Archived Logs
 
