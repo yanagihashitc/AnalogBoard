@@ -19,9 +19,9 @@
 
 依存: Batch 1
 
-- [ ] Generalize the synthetic fixture to five events, two re-arm cycles, and two candidate sharding modes
-- [ ] Implement multi-row/multi-chunk planning, committed-prefix min/max, 14-bit waveform values, nonce-safe replacement, and correct sealing
-- [ ] Preserve the strict three-array Zarr v2/Blosc/AEAD/D21 contract
+- [x] Generalize the synthetic fixture to five events, two re-arm cycles, and two candidate sharding modes
+- [x] Implement multi-row/multi-chunk planning, committed-prefix min/max, 14-bit waveform values, nonce-safe replacement, and correct sealing
+- [x] Preserve the strict three-array Zarr v2/Blosc/AEAD/D21 contract
 - [ ] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
 
 ## Batch 3: Pinned gcsa joint roundtrip and failure matrix

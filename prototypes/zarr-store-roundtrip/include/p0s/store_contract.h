@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 namespace p0s {
@@ -10,9 +11,26 @@ inline constexpr std::string_view kSyntheticDatasetId = "tube_1";
 inline constexpr std::string_view kAcceptedKatSha256 =
     "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa";
 inline constexpr std::size_t kSyntheticPartitionCount = 2;
+inline constexpr std::size_t kSyntheticEventCount = 5;
+inline constexpr std::array<std::size_t, 2> kSyntheticRearmBatchSizes{2, 3};
 inline constexpr std::size_t kWaveformSamples = 2400;
+inline constexpr std::uint16_t kAdcMinimum = 0;
+inline constexpr std::uint16_t kAdcMaximum = 16383;
 static_assert(kSyntheticPartitionCount == 2,
-              "The minimum append fixture and publication events pin two partitions");
+              "The sharding comparison fixture pins two partitions");
+static_assert(kSyntheticRearmBatchSizes[0] + kSyntheticRearmBatchSizes[1] ==
+                  kSyntheticEventCount,
+              "The re-arm batches must cover the five-event fixture");
+
+enum class ShardingMode : std::uint8_t {
+  kRoundRobin,
+  kAppendSequential,
+};
+
+struct SyntheticEventLocation {
+  std::size_t partition;
+  std::size_t row;
+};
 
 inline constexpr std::array<std::string_view, 24> kPulseFeatureColumns{
     "FSC_A", "FSC_H", "FSC_W", "SSC_A", "SSC_H", "SSC_W",
