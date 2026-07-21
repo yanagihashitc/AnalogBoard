@@ -26,10 +26,10 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 
 ## Batch 3: KAT and boundary/negative matrix
 
-- [ ] Prove byte-exact Blosc/AES wire in Release and Debug
-- [ ] Cover the required size/typesize/data-pattern/full-chunk matrix
-- [ ] Cover all codec and AEAD negative cases with stable typed errors
-- [ ] Complete checkpoint review, commit, push, and archive the active batch
+- [x] Prove byte-exact Blosc/AES wire in Release and Debug
+- [x] Cover the required size/typesize/data-pattern/full-chunk matrix
+- [x] Cover all codec and AEAD negative cases with stable typed errors
+- [x] Complete checkpoint review, commit, push, and archive the active batch
 
 ## Batch 4: Minimal encrypted Zarr and gcsa roundtrip
 
