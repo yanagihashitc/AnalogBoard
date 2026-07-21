@@ -100,6 +100,28 @@ class KeyHandle final {
   std::vector<std::uint8_t> key_object_;
 };
 
+class ScopedAesKey final {
+ public:
+  ScopedAesKey() = default;
+  ~ScopedAesKey() noexcept {
+    SecureZeroMemory(bytes_.data(), bytes_.size());
+  }
+
+  ScopedAesKey(const ScopedAesKey&) = delete;
+  ScopedAesKey& operator=(const ScopedAesKey&) = delete;
+  [[nodiscard]] std::array<std::uint8_t, kAes256KeySize>& mutable_bytes()
+      noexcept {
+    return bytes_;
+  }
+  [[nodiscard]] const std::array<std::uint8_t, kAes256KeySize>& bytes()
+      const noexcept {
+    return bytes_;
+  }
+
+ private:
+  std::array<std::uint8_t, kAes256KeySize> bytes_{};
+};
+
 ULONG CheckedUlong(std::size_t value, const char* field) {
   if (value > std::numeric_limits<ULONG>::max()) {
     throw Error(ErrorCode::kSizeOverflow,
@@ -392,13 +414,14 @@ std::vector<std::uint8_t> DecryptAead(const std::vector<std::uint8_t>& wire,
   const KeyProvider& keys) {
   ValidateContext(context);
   const AeadWireView parsed = ParseAeadWire(wire);
-  std::array<std::uint8_t, kAes256KeySize> key{};
-  if (parsed.key_id == 0 || !keys.Lookup(parsed.key_id, key)) {
+  ScopedAesKey key;
+  if (parsed.key_id == 0 ||
+      !keys.Lookup(parsed.key_id, key.mutable_bytes())) {
     throw Error(ErrorCode::kAeadUnknownKey,
                 "Encrypted chunk references an unknown key_id");
   }
-  return DecryptCng(parsed.ciphertext, parsed.ciphertext_size, context.Aad(), key,
-                    parsed.nonce, parsed.tag);
+  return DecryptCng(parsed.ciphertext, parsed.ciphertext_size, context.Aad(),
+                    key.bytes(), parsed.nonce, parsed.tag);
 }
 
 }  // namespace p0s

@@ -29,6 +29,9 @@ class StrictSax final : public nlohmann::json_sax<Json> {
   bool string(string_t&) override { return true; }
   bool binary(binary_t&) override { return true; }
   bool start_object(std::size_t) override {
+    if (!StartContainer()) {
+      return false;
+    }
     object_keys_.emplace_back();
     return true;
   }
@@ -52,10 +55,10 @@ class StrictSax final : public nlohmann::json_sax<Json> {
       return false;
     }
     object_keys_.pop_back();
-    return true;
+    return EndContainer();
   }
-  bool start_array(std::size_t) override { return true; }
-  bool end_array() override { return true; }
+  bool start_array(std::size_t) override { return StartContainer(); }
+  bool end_array() override { return EndContainer(); }
   bool parse_error(std::size_t,
                    const std::string&,
                    const nlohmann::detail::exception& error) override {
@@ -68,7 +71,29 @@ class StrictSax final : public nlohmann::json_sax<Json> {
   [[nodiscard]] const std::string& message() const noexcept { return message_; }
 
  private:
+  bool StartContainer() {
+    if (nesting_depth_ == kMaxJsonNestingDepth) {
+      failure_ = ErrorCode::kJsonParse;
+      message_ = "JSON nesting depth exceeds limit of " +
+                 std::to_string(kMaxJsonNestingDepth);
+      return false;
+    }
+    ++nesting_depth_;
+    return true;
+  }
+
+  bool EndContainer() {
+    if (nesting_depth_ == 0) {
+      failure_ = ErrorCode::kJsonParse;
+      message_ = "JSON container nesting is invalid";
+      return false;
+    }
+    --nesting_depth_;
+    return true;
+  }
+
   std::vector<std::unordered_set<std::string>> object_keys_;
+  std::size_t nesting_depth_ = 0;
   ErrorCode failure_ = ErrorCode::kJsonParse;
   std::string message_ = "JSON parse failed";
 };
@@ -107,11 +132,7 @@ Json ParseStrictJson(std::string_view text) {
     throw Error(sax.failure(), sax.message());
   }
   try {
-    Json parsed = Json::parse(text.begin(), text.end(), nullptr, true, false);
-    RejectNonFinite(parsed);
-    return parsed;
-  } catch (const Error&) {
-    throw;
+    return Json::parse(text.begin(), text.end(), nullptr, true, false);
   } catch (const nlohmann::json::exception& error) {
     throw Error(ErrorCode::kJsonParse,
                 std::string("JSON parse failed: ") + error.what());

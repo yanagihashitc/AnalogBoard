@@ -1,4 +1,5 @@
 #include "p0s/aead_store.h"
+#include "p0s/atomic_file.h"
 #include "p0s/error.h"
 #include "p0s/minimal_zarr_writer.h"
 #include "p0s/store_contract.h"
@@ -305,6 +306,62 @@ void CheckExistingRootFails(const std::filesystem::path& root,
   throw std::runtime_error("existing output root did not fail loud");
 }
 
+std::filesystem::path AtomicTemporaryPath(std::filesystem::path path) {
+  path += L".p0s.tmp";
+  return path;
+}
+
+void CheckAtomicWriteRejectsMissingParent(
+    const std::filesystem::path& root) {
+  // Given: A destination whose parent directory does not exist.
+  const auto destination = root / "missing" / "metadata.json";
+
+  // When: Atomic publication is attempted.
+  try {
+    p0s::AtomicWriteText(destination, "{}\n");
+  } catch (const p0s::Error& error) {
+    // Then: The typed failure is stable and no temporary file remains.
+    Require(error.code() == p0s::ErrorCode::kFilesystem,
+            "missing parent returned an unexpected typed error");
+    Require(std::string(error.what()) ==
+                "Atomic file parent directory is absent",
+            "missing parent returned an unstable error message");
+    Require(!std::filesystem::exists(AtomicTemporaryPath(destination)),
+            "missing-parent failure left an atomic temporary file");
+    return;
+  }
+  throw std::runtime_error("atomic write accepted an absent parent directory");
+}
+
+void CheckAtomicWriteCleansUpAfterMoveFailure(
+    const std::filesystem::path& root) {
+  // Given: An existing directory occupies the publication destination.
+  const auto destination = root / "directory_destination";
+  if (!std::filesystem::create_directory(destination)) {
+    throw std::runtime_error("cannot create atomic destination directory");
+  }
+
+  // When: The temporary file is written but atomic replacement cannot publish.
+  try {
+    p0s::AtomicWriteText(destination, "{}\n");
+  } catch (const p0s::Error& error) {
+    // Then: The move failure is preserved and the closed temporary is removed.
+    Require(error.code() == p0s::ErrorCode::kFilesystem,
+            "move failure returned an unexpected typed error");
+    const std::string message(error.what());
+    Require(message.rfind("MoveFileExW for atomic publication failed with "
+                          "Windows error ",
+                          0) == 0,
+            "move failure returned an unstable error message");
+    Require(std::filesystem::is_directory(destination),
+            "move failure replaced the destination directory");
+    Require(!std::filesystem::exists(AtomicTemporaryPath(destination)),
+            "move failure left an atomic temporary file");
+    return;
+  }
+  throw std::runtime_error("atomic write replaced a destination directory");
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -316,6 +373,9 @@ int main(int argc, char** argv) {
     const auto first = temporary.path() / "store_a";
     const auto second = temporary.path() / "store_b";
     const std::filesystem::path kat(argv[1]);
+
+    CheckAtomicWriteRejectsMissingParent(temporary.path());
+    CheckAtomicWriteCleansUpAfterMoveFailure(temporary.path());
 
     p0s::GenerateSyntheticStore(
         {first, kat, true},

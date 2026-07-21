@@ -369,6 +369,30 @@ void TestAeadNegatives() {
   const auto wire =
       p0s::EncryptAead(plaintext, context, 3, key, nonce, nonces);
 
+  // Given: An otherwise valid frame whose magic does not match the contract.
+  auto invalid_magic = wire;
+  invalid_magic[0] ^= 1;
+  p0s::TestKeyProvider keys;
+  keys.Add(3, key);
+  // When: The frame is decrypted.
+  // Then: Framing validation fails without publishing plaintext.
+  RequireDecryptErrorNoOutput(
+      p0s::ErrorCode::kAeadFormat,
+      "Encrypted chunk has invalid GCSA magic", invalid_magic, context, keys,
+      "encrypted chunk invalid magic");
+
+  // Given: An otherwise valid frame with an unsupported format version.
+  auto unsupported_version = wire;
+  unsupported_version[p0s::kAeadMagicSize] =
+      static_cast<std::uint8_t>(p0s::kAeadFormatVersion + 1);
+  // When: The frame is decrypted.
+  // Then: Version validation fails without publishing plaintext.
+  RequireDecryptErrorNoOutput(
+      p0s::ErrorCode::kAeadVersion,
+      "Encrypted chunk has an unsupported format version",
+      unsupported_version, context, keys,
+      "encrypted chunk unsupported version");
+
   auto wrong_key = key;
   wrong_key[0] ^= 0x80;
   p0s::TestKeyProvider wrong_keys;
@@ -378,8 +402,6 @@ void TestAeadNegatives() {
       "Encrypted chunk authentication failed", wire, context, wrong_keys,
       "wrong AES key");
 
-  p0s::TestKeyProvider keys;
-  keys.Add(3, key);
   auto tag_mutation = wire;
   tag_mutation.back() ^= 1;
   RequireDecryptErrorNoOutput(
@@ -429,6 +451,48 @@ void TestAeadNegatives() {
                "nonce reuse");
 }
 
+void TestAeadContextNegatives() {
+  struct InvalidContextCase {
+    const char* dataset_id;
+    const char* array_relative_path;
+    const char* chunk_key;
+    std::size_t expected_chunk_rank;
+    const char* expected_message;
+    const char* label;
+  };
+  const std::array<InvalidContextCase, 5> cases{{
+      {"", "pulse_features/partition_0.zarr", "0.0", 2,
+       "dataset_id must be one non-empty valid UTF-8 path component",
+       "empty dataset_id"},
+      {"ds/context", "pulse_features/partition_0.zarr", "0.0", 2,
+       "dataset_id must be one non-empty valid UTF-8 path component",
+       "slash-containing dataset_id"},
+      {"ds_context", "other/partition_0.zarr", "0.0", 2,
+       "array_relative_path is not a canonical measurement array path",
+       "invalid array_relative_path"},
+      {"ds_context", "pulse_features/partition_0.zarr", "0.0", 0,
+       "chunk_key rank does not match the expected Zarr rank",
+       "zero expected chunk rank"},
+      {"ds_context", "pulse_features/partition_0.zarr", "0.0", 3,
+       "chunk_key rank does not match the expected Zarr rank",
+       "mismatched expected chunk rank"},
+  }};
+
+  for (const auto& test_case : cases) {
+    // Given: One invalid context field and otherwise canonical context data.
+    // When: The immutable AEAD context is constructed.
+    // Then: Context validation reports the stable code and field-specific message.
+    RequireError(
+        p0s::ErrorCode::kAeadContext, test_case.expected_message,
+        [&] {
+          static_cast<void>(p0s::AeadChunkContext(
+              test_case.dataset_id, test_case.array_relative_path,
+              test_case.chunk_key, test_case.expected_chunk_rank));
+        },
+        test_case.label);
+  }
+}
+
 }  // namespace
 
 int main(int argument_count, char** arguments) {
@@ -440,6 +504,7 @@ int main(int argument_count, char** arguments) {
     TestBoundaryMatrix();
     TestBloscNegatives();
     TestAeadNegatives();
+    TestAeadContextNegatives();
     std::cout << "kat_matrix_checks=" << checks << " kat_checks=" << kat_checks
               << " boundary_cases=" << boundary_cases
               << " negative_cases=" << negative_cases

@@ -75,6 +75,61 @@ with mock.patch.dict(sys.modules, stubs):
     SPEC.loader.exec_module(validator)
 
 
+class ChecksTests(unittest.TestCase):
+    def test_require_failure_accepts_only_the_expected_exception(self) -> None:
+        # Given: A negative check whose action raises the expected failure type.
+        checks = validator.Checks()
+
+        def raise_expected() -> None:
+            raise ValueError("authentication failed")
+
+        # When: The expected failure is required.
+        checks.require_failure(
+            "wrong key",
+            raise_expected,
+            (ValueError,),
+        )
+
+        # Then: The negative case is counted exactly once.
+        self.assertEqual(checks.negative, 1)
+
+    def test_require_failure_rejects_an_action_that_returns(self) -> None:
+        # Given: A negative check whose action accepts invalid input.
+        checks = validator.Checks()
+
+        # When: The action returns instead of raising.
+        with self.assertRaises(validator.CheckFailure) as raised:
+            checks.require_failure("wrong key", lambda: None, (ValueError,))
+
+        # Then: The exact fail-loud error is raised without counting the case.
+        self.assertIs(type(raised.exception), validator.CheckFailure)
+        self.assertEqual(str(raised.exception), "wrong key: accepted invalid input")
+        self.assertEqual(checks.negative, 0)
+
+    def test_require_failure_reports_and_preserves_an_unexpected_exception(
+        self,
+    ) -> None:
+        # Given: A negative check whose action raises a different failure type.
+        checks = validator.Checks()
+        unexpected = TypeError("malformed chunk")
+
+        def raise_unexpected() -> None:
+            raise unexpected
+
+        # When: The mismatched failure is required.
+        with self.assertRaises(validator.CheckFailure) as raised:
+            checks.require_failure("wrong key", raise_unexpected, (ValueError,))
+
+        # Then: The exact type/message is reported and the cause is retained.
+        self.assertIs(type(raised.exception), validator.CheckFailure)
+        self.assertEqual(
+            str(raised.exception),
+            "wrong key: unexpected failure type TypeError: malformed chunk",
+        )
+        self.assertIs(raised.exception.__cause__, unexpected)
+        self.assertEqual(checks.negative, 0)
+
+
 class GcsaSnapshotDigestTests(unittest.TestCase):
     def test_snapshot_root_fails_without_a_package_file(self) -> None:
         # Given: A gcsa module without a filesystem-backed package location.

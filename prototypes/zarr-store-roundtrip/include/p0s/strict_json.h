@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -10,6 +11,8 @@
 namespace p0s {
 
 using Json = nlohmann::json;
+
+inline constexpr std::size_t kMaxJsonNestingDepth = 64;
 
 [[nodiscard]] Json ParseStrictJson(std::string_view text);
 [[nodiscard]] std::string DumpDeterministicJson(const Json& value);

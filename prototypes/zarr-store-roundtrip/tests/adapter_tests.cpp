@@ -26,17 +26,30 @@ void Require(bool condition, const char* message) {
 }
 
 template <typename Action>
-void RequireError(p0s::ErrorCode code, Action action, const char* message) {
+void RequireError(p0s::ErrorCode code,
+                  Action action,
+                  const char* message,
+                  const char* expected_error_message = nullptr) {
   ++checks;
   try {
     action();
   } catch (const p0s::Error& error) {
-    if (error.code() == code) {
-      return;
+    if (error.code() != code) {
+      throw std::runtime_error(std::string(message) +
+                               ": unexpected error code");
     }
-    throw std::runtime_error(std::string(message) + ": unexpected error code");
+    if (expected_error_message != nullptr &&
+        std::string(error.what()) != expected_error_message) {
+      throw std::runtime_error(std::string(message) +
+                               ": unexpected error message");
+    }
+    return;
   }
   throw std::runtime_error(std::string(message) + ": no error");
+}
+
+std::string NestedArrays(std::size_t depth) {
+  return std::string(depth, '[') + "0" + std::string(depth, ']');
 }
 
 void TestDependencyIdentity() {
@@ -132,6 +145,23 @@ void TestStrictJson() {
   RequireError(p0s::ErrorCode::kJsonParse,
                [] { static_cast<void>(p0s::ParseStrictJson("{} trailing")); },
                "trailing JSON data must fail");
+
+  // Given: JSON nested exactly to the strict contract boundary.
+  // When: The document is parsed.
+  const auto boundary =
+      p0s::ParseStrictJson(NestedArrays(p0s::kMaxJsonNestingDepth));
+  // Then: The boundary document remains accepted.
+  Require(boundary.is_array(), "maximum JSON nesting depth must succeed");
+
+  // Given: JSON nested one level beyond the strict contract boundary.
+  const std::string too_deep =
+      NestedArrays(p0s::kMaxJsonNestingDepth + 1);
+  // When: The document is parsed.
+  // Then: Parsing fails with the stable contract error code and message.
+  RequireError(p0s::ErrorCode::kJsonParse,
+               [&] { static_cast<void>(p0s::ParseStrictJson(too_deep)); },
+               "excessive JSON nesting must fail cleanly",
+               "JSON nesting depth exceeds limit of 64");
 }
 
 void TestAeadRoundTrip() {

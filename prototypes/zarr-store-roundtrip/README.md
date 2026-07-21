@@ -73,8 +73,8 @@ The required digest is
 CMake rejects any other bytes and copies the verified vector into the build
 tree so the test cannot race a later sibling-worktree change. `ctest -V` runs
 the same strict KAT and matrix against approved and locally reproduced
-Release/Debug libraries. A passing run reports 88 checks, including 42 KAT
-checks, 33 boundary cases, and 13 negative cases. The matrix includes all three
+Release/Debug libraries. A passing run reports 95 checks, including 42 KAT
+checks, 33 boundary cases, and 20 negative cases. The matrix includes all three
 full chunk sizes. A zero-byte source may form a Blosc frame, but the zero
 decoded return fails loud; a zero-row partition therefore publishes
 metadata/manifest state and no chunk file.
