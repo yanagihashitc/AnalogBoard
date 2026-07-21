@@ -14,7 +14,7 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 - [x] Add ignored offline-cache/generated-artifact boundaries
 - [x] Replace stale checkpoint documents with Zarr scope
 - [x] Verify deterministic manifest, hashes, links, and repository scope
-- [ ] Complete checkpoint review, commit, push, and archive the active batch
+- [x] Complete checkpoint review, commit, push, and archive the active batch
 
 ## Batch 2: Dependency adapters and Windows verification
 
