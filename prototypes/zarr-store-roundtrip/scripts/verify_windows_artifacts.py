@@ -161,24 +161,26 @@ def _report_record(path: Path, result: dict[str, object]) -> dict[str, object]:
 def _write_json_atomic(path: Path, document: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        newline="\n",
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        delete=False,
-    ) as stream:
-        stream.write(serialized)
-        stream.flush()
-        os.fsync(stream.fileno())
-        temporary = Path(stream.name)
+    temporary: Path | None = None
     try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(serialized)
+            stream.flush()
+            os.fsync(stream.fileno())
         temporary.replace(path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def verify_from_args(arguments: argparse.Namespace) -> dict[str, object]:

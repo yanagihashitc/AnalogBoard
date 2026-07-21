@@ -42,6 +42,10 @@ GCSA_SNAPSHOT_EXCLUDED_DIRECTORIES = frozenset(
     {"__pycache__", ".git", ".hg", ".svn"}
 )
 GCSA_SNAPSHOT_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
+EXPECTED_GCSA_SNAPSHOT_COMMIT = "20689a991697217518ec2ff15aaaa2533b169eb0"
+EXPECTED_GCSA_PACKAGE_TREE_SHA256 = (
+    "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14"
+)
 
 
 class CheckFailure(RuntimeError):
@@ -135,6 +139,18 @@ def gcsa_snapshot_digest(root: Path) -> str:
     return tree_digest(root, exclude=excluded)
 
 
+def require_accepted_gcsa_snapshot(root: Path) -> str:
+    """Require the imported package to match the accepted gcsa source tree."""
+    actual = gcsa_snapshot_digest(root)
+    if actual != EXPECTED_GCSA_PACKAGE_TREE_SHA256:
+        raise CheckFailure(
+            "gcsa snapshot identity mismatch: expected commit "
+            f"{EXPECTED_GCSA_SNAPSHOT_COMMIT} package digest "
+            f"{EXPECTED_GCSA_PACKAGE_TREE_SHA256}, got {actual}"
+        )
+    return actual
+
+
 def feature_bits() -> np.ndarray:
     """Return the exact two-event float64 fixture as uint64 bit patterns."""
     bits = np.empty((2, 24), dtype=np.uint64)
@@ -196,7 +212,7 @@ def context(array_name: str, partition: int) -> AeadChunkContext:
 def validate_positive(open_root: Path, finalized_root: Path, checks: Checks) -> None:
     """Validate strict schema, product visibility, and original-bit reads."""
     snapshot_root = gcsa_snapshot_root()
-    before_snapshot = gcsa_snapshot_digest(snapshot_root)
+    before_snapshot = require_accepted_gcsa_snapshot(snapshot_root)
     before_open = tree_digest(open_root)
     before_finalized = tree_digest(finalized_root)
 

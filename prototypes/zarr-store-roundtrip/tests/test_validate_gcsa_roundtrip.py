@@ -207,6 +207,86 @@ class GcsaSnapshotDigestTests(unittest.TestCase):
             # Then: The existing before/after mutation check remains effective.
             self.assertNotEqual(after, before)
 
+    def test_snapshot_identity_accepts_the_exact_pinned_package_tree(self) -> None:
+        # Given: A package tree whose digest is the explicitly accepted identity.
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "gcsa"
+            package.mkdir()
+            (package / "module.py").write_text(
+                "accepted = True\n", encoding="utf-8"
+            )
+            accepted_digest = validator.gcsa_snapshot_digest(package)
+
+            # When: Runtime identity validation checks that exact tree.
+            with mock.patch.object(
+                validator,
+                "EXPECTED_GCSA_PACKAGE_TREE_SHA256",
+                accepted_digest,
+            ):
+                actual = validator.require_accepted_gcsa_snapshot(package)
+
+            # Then: The verified digest is returned for the mutation guard.
+            self.assertEqual(actual, accepted_digest)
+
+    def test_snapshot_identity_rejects_an_unapproved_package_tree(self) -> None:
+        # Given: A package tree whose source differs from the accepted snapshot.
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "gcsa"
+            package.mkdir()
+            (package / "module.py").write_text(
+                "accepted = False\n", encoding="utf-8"
+            )
+            actual_digest = validator.gcsa_snapshot_digest(package)
+
+            # When: Runtime identity validation compares it with the fixed pin.
+            with mock.patch.object(
+                validator,
+                "EXPECTED_GCSA_PACKAGE_TREE_SHA256",
+                "0" * 64,
+            ), self.assertRaises(validator.CheckFailure) as raised:
+                validator.require_accepted_gcsa_snapshot(package)
+
+            # Then: The failure identifies both the accepted commit and actual tree.
+            self.assertIs(type(raised.exception), validator.CheckFailure)
+            self.assertIn("gcsa snapshot identity mismatch", str(raised.exception))
+            self.assertIn(
+                "20689a991697217518ec2ff15aaaa2533b169eb0",
+                str(raised.exception),
+            )
+            self.assertIn(actual_digest, str(raised.exception))
+
+    def test_positive_validation_rejects_snapshot_before_reading_store_trees(
+        self,
+    ) -> None:
+        # Given: Runtime gcsa identity validation rejects the imported package.
+        identity_failure = validator.CheckFailure("snapshot mismatch")
+        with mock.patch.object(
+            validator,
+            "gcsa_snapshot_root",
+            return_value=Path("/unapproved/gcsa"),
+        ), mock.patch.object(
+            validator,
+            "require_accepted_gcsa_snapshot",
+            side_effect=identity_failure,
+            create=True,
+        ) as require_identity, mock.patch.object(
+            validator,
+            "tree_digest",
+            side_effect=AssertionError("store tree was inspected"),
+        ) as tree_digest:
+            # When: Positive roundtrip validation begins.
+            with self.assertRaises(validator.CheckFailure) as raised:
+                validator.validate_positive(
+                    Path("/ignored/open"),
+                    Path("/ignored/finalized"),
+                    validator.Checks(),
+                )
+
+        # Then: It stops on identity before either store tree is inspected.
+        self.assertIs(raised.exception, identity_failure)
+        require_identity.assert_called_once_with(Path("/unapproved/gcsa"))
+        tree_digest.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
