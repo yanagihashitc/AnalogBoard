@@ -35,9 +35,28 @@ and must never be committed.
   dataset/array/chunk context as AAD, requires an explicit key provider and
   nonce registry, and never logs key bytes.
 
-The current unit checks exercise adapter behavior only. Byte-exact KAT and the
-full boundary/negative matrix belong to Batch 3; generated-store/gcsa
-roundtrip belongs to Batch 4.
+The test target includes adapter checks plus the byte-exact accepted gcsa KAT
+and the full boundary/negative matrix. Generated-store/gcsa roundtrip remains
+Batch 4 scope.
+
+## KAT and matrix
+
+Before configuration, verify the read-only accepted vector:
+
+```bash
+sha256sum ../gcsa/src/gcsa/store/data/aead_v1_kat.json
+```
+
+The required digest is
+`cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa`;
+CMake rejects any other bytes and copies the verified vector into the build
+tree so the test cannot race a later sibling-worktree change. `ctest -V` runs
+the same strict KAT and matrix against approved and locally reproduced
+Release/Debug libraries. A passing run reports 88 checks, including 42 KAT
+checks, 33 boundary cases, and 13 negative cases. The matrix includes all three
+full chunk sizes. A zero-byte source may form a Blosc frame, but the zero
+decoded return fails loud; a zero-row partition therefore publishes
+metadata/manifest state and no chunk file.
 
 ## Windows build
 
@@ -65,8 +84,8 @@ ctest --test-dir <build-path> --output-on-failure
 ```
 
 The CMake configure checks the archive, both c-blosc headers, json header,
-selected library, configuration-specific CRT, and approved artifact hash. A
-local source rebuild may be selected with `P0S_BLOSC_ROOT` and
+accepted gcsa KAT, selected library, configuration-specific CRT, and approved
+artifact hash. A local source rebuild may be selected with `P0S_BLOSC_ROOT` and
 `P0S_BLOSC_LIBRARY`; set `P0S_EXPECT_APPROVED_BLOSC_HASHES=OFF` only for that
 explicitly reproduced artifact because COFF timestamps change its byte hash.
 All other identities remain pinned.

@@ -188,10 +188,12 @@
       "status": "pass"
     },
     "boundary_matrix": {
-      "command": null,
-      "count": null,
-      "exit": null,
-      "status": "pending"
+      "assertions": 88,
+      "boundary_cases": 33,
+      "command": ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir <prototype-build> -V -R p0s_kat_matrix_tests",
+      "exit": 0,
+      "negative_cases": 13,
+      "status": "pass in approved and reproduced Release/Debug"
     },
     "c_blosc_upstream": {
       "command": "ctest --test-dir <upstream-build> --output-on-failure",
@@ -208,6 +210,9 @@
       "focused_exit": null,
       "focused_passed": null,
       "image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
+      "kat_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_zarr_aead.py::TestAeadCandidateWire::test_wire_exact_kat_encrypts_and_decrypts tests/test_zarr_aead.py::TestAeadCandidateWire::test_kat_plaintext_is_the_declared_inner_blosc_frame",
+      "kat_exit": 0,
+      "kat_passed": 2,
       "packages": {
         "cryptography": "44.0.2",
         "hypothesis": "6.155.7",
@@ -217,15 +222,30 @@
         "zarr": "2.18.3"
       },
       "pip_freeze_stdout_sha256": "1dfb6e928ff4b3c5e6bd46eb9e7cada01baeb9b99c4818c4fc463740046a954a",
+      "snapshot_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
       "status": "identity verified; focused rerun pending"
     },
     "kat": {
-      "commands": [],
-      "debug_exit": null,
-      "debug_result": "pending",
+      "boundary_cases": 33,
+      "commands": [
+        "sha256sum ../gcsa/src/gcsa/store/data/aead_v1_kat.json",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/release-approved -V",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/debug-approved -V",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/release-reproduced -V",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/debug-reproduced -V",
+        "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_zarr_aead.py::TestAeadCandidateWire::test_wire_exact_kat_encrypts_and_decrypts tests/test_zarr_aead.py::TestAeadCandidateWire::test_kat_plaintext_is_the_declared_inner_blosc_frame"
+      ],
+      "cpp_checks": 42,
+      "debug_exit": 0,
+      "debug_result": "pass for approved and reproduced libraries",
+      "gcsa_exit": 0,
+      "gcsa_passed": 2,
+      "inner_frame_bytes": 40,
       "inner_frame_sha256": "f3d3b18c284608ee1500b93556ba13a66373b4923a7ac19a533e03a7ff0de7db",
-      "release_exit": null,
-      "release_result": "pending"
+      "negative_cases": 13,
+      "release_exit": 0,
+      "release_result": "pass for approved and reproduced libraries",
+      "status": "byte-identical inner frame, ciphertext, tag, and wire; original bits restored"
     }
   }
 }

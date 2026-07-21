@@ -130,12 +130,48 @@ CNG uses an explicit test-only key provider and `(key_id, nonce)` registry and
 does not log keys.
 
 This remains an isolated harness. Nothing is linked to production acquisition,
-EP2/EP4/EP6, the existing solution, C ABI, or WPF. Batch 2 does not claim the
-byte KAT, full boundary/negative matrix, generated Zarr store, gcsa roundtrip,
-P0-S1/P0-S2 acceptance, sharding choice, A-4b, Frozen v1, or Phase 0 closure.
+EP2/EP4/EP6, the existing solution, C ABI, or WPF. It does not claim the
+generated Zarr store, full gcsa roundtrip, P0-S1/P0-S2 acceptance, sharding
+choice, A-4b, Frozen v1, or Phase 0 closure.
+
+## Byte-exact KAT and boundary matrix
+
+Before reading the vector, `sha256sum` verified the read-only gcsa KAT as
+`cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa`.
+CMake independently requires that hash. The C++ test parses the pinned JSON
+strictly rather than copying its wire constants. In approved and locally
+reproduced Release `/MD` and Debug `/MDd`, it passed 88 assertions:
+
+- 42 KAT checks prove byte-identical inner Blosc frame, AAD, AES-GCM
+  ciphertext, tag, complete wire, authenticated decryption, decompression, and
+  original input bits;
+- the 40-byte inner frame SHA-256 is
+  `f3d3b18c284608ee1500b93556ba13a66373b4923a7ac19a533e03a7ff0de7db`;
+- 33 boundary rows cover sizes 0/1/15/16/17 with typesize 2/8, zero,
+  repetitive and deterministic incompressible inputs, bit-exact
+  NaN/+Inf/-Inf, partial chunks, and full 1,920,000/48,000,000/76,800,000-byte
+  feature/GMI/FL chunks;
+- 13 typed negative checks cover zero-byte decoded-result rejection,
+  truncated/corrupt/mismatched Blosc frames, wrong AES key, tag/ciphertext
+  mutation, structural and authenticated truncation, chunk-swap AAD mismatch,
+  unknown key ID, and nonce reuse. The return-by-value API exposes no partial
+  plaintext on failure.
+
+c-blosc emits a valid frame for a zero-byte source, but its decoded result is
+zero and the adapter rejects the `<= 0` return as `kDecompressionFailed`.
+Consequently a zero-row partition is a writer-level metadata/manifest state and
+must not publish a zero-length chunk file.
+
+All four Windows runs used the required wrapper and reported
+`kat_matrix_checks=88 kat_checks=42 boundary_cases=33 negative_cases=13
+status=pass`. No golden changed. An ignored `git archive` snapshot of gcsa
+commit `20689a991697217518ec2ff15aaaa2533b169eb0` was then tested in the pinned
+`gcsa-dev` environment. The two accepted KAT tests passed with exit 0, proving
+gcsa authentication/decryption and numcodecs 0.13.1 expansion to values
+`0..11` without modifying the sibling worktree.
 
 ## Remaining closure evidence
 
-The c-blosc blocker remains open until Batch 3–4 evidence covers the exact
-Blosc/AES KAT, boundary/negative matrix, and encrypted three-array gcsa
-roundtrip with one minimal append. No approved golden is changed on mismatch.
+The c-blosc blocker remains open until Batch 4 evidence covers the encrypted
+three-array gcsa roundtrip with one minimal append. The KAT and full
+boundary/negative matrix are green; no approved golden changed.

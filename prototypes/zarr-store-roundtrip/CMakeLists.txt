@@ -17,6 +17,7 @@ set(P0S_EXPECTED_BLOSC_HEADER_SHA256 "1b7efa0efe51294ba8eb5ff4bf6d612d1c837a8e1d
 set(P0S_EXPECTED_BLOSC_EXPORT_HEADER_SHA256 "ca20d39d276209d485b900675fabbb14c78642f0ddef93a0141c8a5802eadc68")
 set(P0S_EXPECTED_RELEASE_LIB_SHA256 "0660daf135ccd08a3060905a35ba139f332c8e398a6ddc82b308a0deae4d70ee")
 set(P0S_EXPECTED_DEBUG_LIB_SHA256 "cbeb1b05517d82adf36d787c1b0790d6d503f27749b4ff7e48edcbc3108045e6")
+set(P0S_EXPECTED_GCSA_KAT_SHA256 "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa")
 
 set(ANALOGBOARD_P0S_DEPENDENCY_BUNDLE "$ENV{ANALOGBOARD_P0S_DEPENDENCY_BUNDLE}"
     CACHE FILEPATH "Exact owner-approved offline dependency archive")
@@ -42,6 +43,9 @@ set(P0S_BLOSC_ROOT "${P0S_DEPENDENCY_ROOT}/c-blosc"
     CACHE PATH "c-blosc include/library root")
 set(P0S_JSON_ROOT "${P0S_DEPENDENCY_ROOT}/nlohmann-json"
     CACHE PATH "nlohmann/json include root")
+set(P0S_GCSA_KAT_FILE
+    "${P0S_REPOSITORY_ROOT}/../gcsa/src/gcsa/store/data/aead_v1_kat.json"
+    CACHE FILEPATH "Read-only accepted gcsa AEAD v1 KAT")
 option(P0S_EXPECT_APPROVED_BLOSC_HASHES
        "Require the byte-pinned approved c-blosc library" ON)
 
@@ -83,10 +87,16 @@ foreach(P0S_REQUIRED_FILE IN ITEMS
       "Run scripts/validate_offline_bundle.py; no download is permitted.")
   endif()
 endforeach()
+if(NOT EXISTS "${P0S_GCSA_KAT_FILE}")
+  message(FATAL_ERROR
+    "Accepted gcsa AEAD KAT is absent: ${P0S_GCSA_KAT_FILE}; expected SHA-256 "
+    "${P0S_EXPECTED_GCSA_KAT_SHA256}. No substitute or download is permitted.")
+endif()
 
 file(SHA256 "${P0S_BLOSC_HEADER}" P0S_BLOSC_HEADER_SHA256)
 file(SHA256 "${P0S_BLOSC_EXPORT_HEADER}" P0S_BLOSC_EXPORT_HEADER_SHA256)
 file(SHA256 "${P0S_JSON_HEADER}" P0S_JSON_HEADER_SHA256)
+file(SHA256 "${P0S_GCSA_KAT_FILE}" P0S_GCSA_KAT_SHA256)
 if(NOT P0S_BLOSC_HEADER_SHA256 STREQUAL P0S_EXPECTED_BLOSC_HEADER_SHA256)
   message(FATAL_ERROR "blosc.h SHA-256 mismatch: ${P0S_BLOSC_HEADER_SHA256}")
 endif()
@@ -97,6 +107,11 @@ endif()
 if(NOT P0S_JSON_HEADER_SHA256 STREQUAL P0S_EXPECTED_JSON_SHA256)
   message(FATAL_ERROR "json.hpp SHA-256 mismatch: ${P0S_JSON_HEADER_SHA256}")
 endif()
+if(NOT P0S_GCSA_KAT_SHA256 STREQUAL P0S_EXPECTED_GCSA_KAT_SHA256)
+  message(FATAL_ERROR "gcsa AEAD KAT SHA-256 mismatch: ${P0S_GCSA_KAT_SHA256}")
+endif()
+set(P0S_GCSA_KAT_COPY "${CMAKE_CURRENT_BINARY_DIR}/aead_v1_kat.json")
+configure_file("${P0S_GCSA_KAT_FILE}" "${P0S_GCSA_KAT_COPY}" COPYONLY)
 if(P0S_EXPECT_APPROVED_BLOSC_HASHES)
   file(SHA256 "${P0S_BLOSC_LIBRARY}" P0S_BLOSC_LIBRARY_SHA256)
   if(NOT P0S_BLOSC_LIBRARY_SHA256 STREQUAL P0S_EXPECTED_BLOSC_LIBRARY_SHA256)
@@ -121,8 +136,16 @@ target_include_directories(p0s_adapter_tests
 target_compile_options(p0s_adapter_tests PRIVATE /W4 /permissive-)
 target_link_libraries(p0s_adapter_tests PRIVATE p0s_zarr_adapters "${P0S_BLOSC_LIBRARY}")
 
+add_executable(p0s_kat_matrix_tests tests/kat_matrix_tests.cpp)
+target_include_directories(p0s_kat_matrix_tests
+  PRIVATE "${P0S_BLOSC_ROOT}/include")
+target_compile_options(p0s_kat_matrix_tests PRIVATE /W4 /permissive-)
+target_link_libraries(p0s_kat_matrix_tests PRIVATE p0s_zarr_adapters)
+
 enable_testing()
 add_test(NAME p0s_adapter_tests COMMAND p0s_adapter_tests)
+add_test(NAME p0s_kat_matrix_tests
+         COMMAND p0s_kat_matrix_tests "${P0S_GCSA_KAT_COPY}")
 
 message(STATUS "P0-S dependency archive SHA-256: ${P0S_BUNDLE_SHA256}")
 message(STATUS "P0-S c-blosc root: ${P0S_BLOSC_ROOT}")
