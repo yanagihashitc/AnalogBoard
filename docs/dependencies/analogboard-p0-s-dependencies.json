@@ -1,0 +1,273 @@
+{
+  "bundle": {
+    "archive_sha256": "4fbae209a47b050ee21f8d48091393a093e02ed396c108e90bf1cf59c0af019f",
+    "environment_variable": "ANALOGBOARD_P0S_DEPENDENCY_BUNDLE",
+    "expected_filename": "analogboard-p0-s-dependencies-20260721.tar.gz",
+    "extracted_root": "analogboard-p0-s-dependencies-20260721",
+    "manifest_sha256": "71886c544cc15b101eca4ae67e149a9c9d284b76096df4011af747e7336282d0",
+    "policy": "immutable-offline-bundle",
+    "provisioning": "approved artifact cache or manual seed only; never download",
+    "repository_cache": ".deps/p0-s"
+  },
+  "contract": {
+    "aead_kat_sha256": "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa",
+    "contract_rc_id": "gcsa-store-a4a-rc1",
+    "frozen_v1": false,
+    "gate_golden_sha256": "44be68e012df5aea9e365081a33b5db12790e7fefbf380c2e36512df257b8cd0",
+    "gcsa_joint_validation_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+    "pr33_accepted_amendment": "canonical v2 and gate golden v2",
+    "pr33_merge_commit": "b89556c51faa6e4b0c6a36a98eb066726df4ca16"
+  },
+  "dependencies": [
+    {
+      "approved_artifacts": {
+        "debug_library_sha256": "cbeb1b05517d82adf36d787c1b0790d6d503f27749b4ff7e48edcbc3108045e6",
+        "release_library_sha256": "0660daf135ccd08a3060905a35ba139f332c8e398a6ddc82b308a0deae4d70ee"
+      },
+      "architecture": "windows-x64",
+      "build": {
+        "commands": {
+          "debug_static": {
+            "build": "cmake --build D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/debug-evidence --target install --verbose",
+            "build_wall_seconds": 1.64,
+            "configure": "cmake -S D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/source/c-blosc-616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0 -B D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/debug-evidence -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/install/debug-evidence -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DBLOSC_IS_SUBPROJECT=TRUE -DBLOSC_INSTALL=TRUE -DBUILD_STATIC=ON -DBUILD_SHARED=OFF -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_LZ4=OFF -DDEACTIVATE_SNAPPY=ON -DDEACTIVATE_ZLIB=ON -DDEACTIVATE_ZSTD=ON -DPREFER_EXTERNAL_LZ4=OFF",
+            "configure_wall_seconds": 2.49,
+            "exit": 0
+          },
+          "release_static": {
+            "build": "cmake --build D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/release-evidence --target install --verbose",
+            "build_wall_seconds": 2.63,
+            "configure": "cmake -S D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/source/c-blosc-616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0 -B D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/release-evidence -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/install/release-evidence -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DBLOSC_IS_SUBPROJECT=TRUE -DBLOSC_INSTALL=TRUE -DBUILD_STATIC=ON -DBUILD_SHARED=OFF -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_LZ4=OFF -DDEACTIVATE_SNAPPY=ON -DDEACTIVATE_ZLIB=ON -DDEACTIVATE_ZSTD=ON -DPREFER_EXTERNAL_LZ4=OFF",
+            "configure_wall_seconds": 2.68,
+            "exit": 0
+          },
+          "upstream_regression": {
+            "build": "cmake --build D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/upstream-evidence --verbose",
+            "build_wall_seconds": 5.54,
+            "configure": "cmake -S D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/source/c-blosc-616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0 -B D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/upstream-evidence -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DBUILD_TESTS=ON -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_LZ4=OFF -DDEACTIVATE_SNAPPY=ON -DDEACTIVATE_ZLIB=OFF -DDEACTIVATE_ZSTD=OFF -DPREFER_EXTERNAL_LZ4=OFF",
+            "configure_wall_seconds": 2.79,
+            "exit": 0
+          }
+        },
+        "debug_runtime": "MultiThreadedDebugDLL (/MDd)",
+        "linkage": "static",
+        "options": {
+          "BLOSC_INSTALL": true,
+          "BLOSC_IS_SUBPROJECT": true,
+          "BUILD_BENCHMARKS": false,
+          "BUILD_FUZZERS": false,
+          "BUILD_SHARED": false,
+          "BUILD_STATIC": true,
+          "BUILD_TESTS": false,
+          "CMAKE_POLICY_DEFAULT_CMP0091": "NEW",
+          "DEACTIVATE_LZ4": false,
+          "DEACTIVATE_SNAPPY": true,
+          "DEACTIVATE_ZLIB": true,
+          "DEACTIVATE_ZSTD": true,
+          "PREFER_EXTERNAL_LZ4": false
+        },
+        "release_runtime": "MultiThreadedDLL (/MD)"
+      },
+      "commit": "616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0",
+      "headers": {
+        "blosc-export.h_sha256": "ca20d39d276209d485b900675fabbb14c78642f0ddef93a0141c8a5802eadc68",
+        "blosc.h_sha256": "1b7efa0efe51294ba8eb5ff4bf6d612d1c837a8e1df977fa44f6fe61802c8e24"
+      },
+      "internal_lz4": {
+        "external_lz4_forbidden": true,
+        "license_sha256": "8b58c446121a109ccf32edc094bba3010a3d85e4ee3702950db55e4d3e87736c",
+        "notice_path": "docs/third-party/lz4-BSD-2-Clause.txt",
+        "spdx": "BSD-2-Clause",
+        "version": "1.9.4"
+      },
+      "license": {
+        "notice_path": "docs/third-party/c-blosc-BSD-3-Clause.txt",
+        "sha256": "22623131a9b9f6a86a4dc6b9bccbb1d2aeb390df86bca00fc727af24735c2fae",
+        "spdx": "BSD-3-Clause"
+      },
+      "name": "c-blosc",
+      "profile": {
+        "blocksize": 0,
+        "clevel": 5,
+        "cname": "lz4",
+        "numinternalthreads": 1,
+        "shuffle": 1
+      },
+      "reproduced_artifacts": {
+        "debug_library_sha256": "523ccc44eb4ece9e7d05b4961a45d562a398aad6a8a9b46cd7fca6f5a872e191",
+        "headers_byte_identical_to_approved": true,
+        "release_library_sha256": "4db0e7317f4173da35d0ff9f2f0b0ee5a4fbe2d1e878b15e0b1a2630907d86ff",
+        "status": "behavior-equivalent; COFF byte hashes differ as expected"
+      },
+      "source": {
+        "acquired_at": "2026-07-21 14:12:33 JST",
+        "archive_sha256": "31b005197faa7ffd63983fadca9d36a3259371eb98f17ad21073987d0a112afc",
+        "archive_traversal_entries": 0,
+        "directories": 60,
+        "files": 490,
+        "gitmodules_present": false,
+        "official_url": "https://github.com/Blosc/c-blosc/archive/616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0.zip",
+        "source_tree_manifest_sha256": "700070935e041ced3695b5314bb44a56770ee4bdab021890033a6d3723f6675e",
+        "symlinks": 0,
+        "unexpected_binary_payloads": 0
+      },
+      "tag": "v1.21.6",
+      "version": "1.21.6"
+    },
+    {
+      "header_sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+      "license": {
+        "notice_path": "docs/third-party/nlohmann-json-MIT.txt",
+        "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14",
+        "spdx": "MIT"
+      },
+      "name": "nlohmann-json-single-header",
+      "provenance": {
+        "ghostcytometer_blob_commit": "41a7e3b52bf195e88f1864e590cec0e3613ee2ea",
+        "official_url": "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp",
+        "status": "official and GhostCytometer blobs byte-identical"
+      },
+      "version": "3.11.3"
+    },
+    {
+      "library": "bcrypt.dll",
+      "license": "Windows system component; no third-party crypto license bundled",
+      "name": "Windows CNG AES-256-GCM",
+      "sdk_dependency": "Windows SDK 10.0.26100.0"
+    }
+  ],
+  "evidence_paths": {
+    "bundle_validation": "artifacts/phase0-zarr-roundtrip/dependency/bundle-validation.json",
+    "dependency_evidence": "docs/dependencies/analogboard-p0-s-dependency-evidence.md",
+    "gcsa_roundtrip_validator": "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py",
+    "gcsa_snapshot": ".deps/p0-s/gcsa-20689a991697217518ec2ff15aaaa2533b169eb0",
+    "generated_stores": "artifacts/phase0-zarr-roundtrip/stores",
+    "local_build": "docs/dependencies/analogboard-p0-s-dependency-evidence.md",
+    "process_log": "docs/process_log/2026-07-21-p0-s-dependency-preflight-log.md",
+    "windows_artifact_verification": "artifacts/phase0-zarr-roundtrip/dependency/windows-artifact-verification.json"
+  },
+  "format_version": 1,
+  "scope": "P0-S dependency and checkpoint preparation only",
+  "toolchain": {
+    "cmake": "3.31.6-msvc6",
+    "compiler": "MSVC 19.37.32826.1",
+    "generator": "Ninja",
+    "ninja": "1.12.1",
+    "sdk": "Windows SDK 10.0.26100.0"
+  },
+  "validation": {
+    "adapter_smoke": {
+      "approved_debug": {
+        "checks": 29,
+        "duration_seconds": 0.17,
+        "exit": 0
+      },
+      "approved_release": {
+        "checks": 29,
+        "duration_seconds": 0.16,
+        "exit": 0
+      },
+      "command": "ctest --test-dir <prototype-build> --output-on-failure",
+      "reproduced_debug": {
+        "checks": 29,
+        "duration_seconds": 0.17,
+        "exit": 0
+      },
+      "reproduced_release": {
+        "checks": 29,
+        "duration_seconds": 0.17,
+        "exit": 0
+      },
+      "status": "pass"
+    },
+    "artifact_inspection": {
+      "command": "python3 prototypes/zarr-store-roundtrip/scripts/verify_windows_artifacts.py --release-headers <report> --release-directives <report> --debug-headers <report> --debug-directives <report> --release-smoke <report> --debug-smoke <report>",
+      "debug_crt": "MSVCRTD",
+      "exit": 0,
+      "library_objects": "12/12 x64 in Release and Debug",
+      "release_crt": "MSVCRT",
+      "runtime_dependencies": "Windows CNG/MSVC/UCRT system DLLs only",
+      "status": "pass"
+    },
+    "boundary_matrix": {
+      "assertions": 88,
+      "boundary_cases": 33,
+      "command": ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir <prototype-build> -V -R p0s_kat_matrix_tests",
+      "exit": 0,
+      "negative_cases": 13,
+      "status": "pass in approved and reproduced Release/Debug"
+    },
+    "c_blosc_upstream": {
+      "command": "ctest --test-dir <upstream-build> --output-on-failure",
+      "duration_seconds": 39.47,
+      "local_exit": 0,
+      "local_passed": 1626,
+      "reference_exit": 0,
+      "reference_passed": 1626,
+      "status": "pass"
+    },
+    "gcsa": {
+      "container_id": "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8",
+      "focused_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_store_contract_materials.py tests/test_store_schema.py tests/test_zarr_aead.py tests/test_zarr_aead_integration.py tests/test_zarr_state_transition.py tests/test_zarr_visibility.py",
+      "focused_duration_seconds": 5.72,
+      "focused_exit": 0,
+      "focused_passed": 328,
+      "image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
+      "kat_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_zarr_aead.py::TestAeadCandidateWire::test_wire_exact_kat_encrypts_and_decrypts tests/test_zarr_aead.py::TestAeadCandidateWire::test_kat_plaintext_is_the_declared_inner_blosc_frame",
+      "kat_exit": 0,
+      "kat_passed": 2,
+      "packages": {
+        "cryptography": "44.0.2",
+        "hypothesis": "6.155.7",
+        "numcodecs": "0.13.1",
+        "numpy": "2.2.6",
+        "python": "3.10.17",
+        "zarr": "2.18.3"
+      },
+      "pip_freeze_stdout_sha256": "1dfb6e928ff4b3c5e6bd46eb9e7cada01baeb9b99c4818c4fc463740046a954a",
+      "roundtrip_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py --open-store <ignored-open-store> --finalized-store <ignored-finalized-store>",
+      "roundtrip_exit": 0,
+      "roundtrip_negative_checks": 9,
+      "roundtrip_positive_checks": 84,
+      "snapshot_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+      "snapshot_files": 570,
+      "status": "identity, focused suite, strict validator, and read-only three-array roundtrip pass"
+    },
+    "kat": {
+      "boundary_cases": 33,
+      "commands": [
+        "sha256sum ../gcsa/src/gcsa/store/data/aead_v1_kat.json",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/release-approved -V",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/debug-approved -V",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/release-reproduced -V",
+        ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/prototype/debug-reproduced -V",
+        "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_zarr_aead.py::TestAeadCandidateWire::test_wire_exact_kat_encrypts_and_decrypts tests/test_zarr_aead.py::TestAeadCandidateWire::test_kat_plaintext_is_the_declared_inner_blosc_frame"
+      ],
+      "cpp_checks": 42,
+      "debug_exit": 0,
+      "debug_result": "pass for approved and reproduced libraries",
+      "gcsa_exit": 0,
+      "gcsa_passed": 2,
+      "inner_frame_bytes": 40,
+      "inner_frame_sha256": "f3d3b18c284608ee1500b93556ba13a66373b4923a7ac19a533e03a7ff0de7db",
+      "negative_cases": 13,
+      "release_exit": 0,
+      "release_result": "pass for approved and reproduced libraries",
+      "status": "byte-identical inner frame, ciphertext, tag, and wire; original bits restored"
+    },
+    "store_writer": {
+      "approved_debug": "pass",
+      "approved_release": "pass",
+      "command": ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir <prototype-build> --output-on-failure",
+      "deterministic_json_runs": 2,
+      "encrypted_chunks": 6,
+      "exit": 0,
+      "generated_store_profile": "two one-row partitions; open and finalized ignored fixtures",
+      "publication_events": 6,
+      "reproduced_debug": "pass",
+      "reproduced_release": "pass",
+      "status": "atomic chunk-before-manifest publication and D21 generation/finalization pass",
+      "writer_checks": 501
+    }
+  }
+}

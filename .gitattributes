@@ -1,1 +1,7 @@
 .gitignore text eol=lf
+
+# Preserve accepted third-party notices byte-for-byte, including upstream
+# whitespace, so their pinned SHA-256 identities survive checkout.
+docs/third-party/c-blosc-BSD-3-Clause.txt -text -diff
+docs/third-party/lz4-BSD-2-Clause.txt -text -diff
+docs/third-party/nlohmann-json-MIT.txt -text -diff

@@ -7,11 +7,15 @@
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-21 | P0-S dependency preflight | [log](2026-07-21-p0-s-dependency-preflight-log.md) |
 
 ## Archived Logs
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-22 | Zarr validator review follow-up | [log](../archive/review-findings/2026-07-22-zarr-validator-review-followup-log.md) |
+| 2026-07-22 | PR #3 Claude review fixer | [log](../archive/review-findings/2026-07-22-pr3-claude-review-fixer-log.md) |
+| 2026-07-22 | Zarr roundtrip review fixes | [log](../archive/review-findings/2026-07-22-zarr-roundtrip-review-fixes-log.md) |
 | 2026-07-21 | PR #2 reviewer and Cursor Bugbot fixes | [log](../archive/review-findings/2026-07-21-pr2-bugbot-review-log.md) |
 | 2026-07-21 | PR #2 Claude review and fixes | [log](../archive/review-findings/2026-07-21-pr2-claude-review-log.md) |
 | 2026-07-21 | Review findings correction | [log](../archive/review-findings/2026-07-21-review-findings-log.md) |

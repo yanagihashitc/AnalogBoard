@@ -1,0 +1,403 @@
+#include "p0s/aead_store.h"
+#include "p0s/atomic_file.h"
+#include "p0s/error.h"
+#include "p0s/minimal_zarr_writer.h"
+#include "p0s/store_contract.h"
+#include "p0s/strict_json.h"
+
+#include <windows.h>
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace {
+
+int checks = 0;
+int publication_checks = 0;
+
+void Require(bool condition, const std::string& message) {
+  ++checks;
+  if (!condition) {
+    throw std::runtime_error(message);
+  }
+}
+
+std::string ReadText(const std::filesystem::path& path) {
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    throw std::runtime_error("cannot read generated text file");
+  }
+  return std::string(std::istreambuf_iterator<char>(stream),
+                     std::istreambuf_iterator<char>());
+}
+
+std::vector<std::uint8_t> ReadBytes(const std::filesystem::path& path) {
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    throw std::runtime_error("cannot read generated binary file");
+  }
+  return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(stream),
+                                   std::istreambuf_iterator<char>());
+}
+
+class TemporaryDirectory final {
+ public:
+  TemporaryDirectory() {
+    root_ = std::filesystem::temp_directory_path() /
+            ("analogboard_p0s_store_writer_" +
+             std::to_string(GetCurrentProcessId()) + "_" +
+             std::to_string(GetTickCount64()));
+    if (!std::filesystem::create_directory(root_)) {
+      throw std::runtime_error("cannot create test-owned temporary directory");
+    }
+  }
+
+  ~TemporaryDirectory() {
+    std::error_code ignored;
+    std::filesystem::remove_all(root_, ignored);
+  }
+
+  TemporaryDirectory(const TemporaryDirectory&) = delete;
+  TemporaryDirectory& operator=(const TemporaryDirectory&) = delete;
+  [[nodiscard]] const std::filesystem::path& path() const noexcept {
+    return root_;
+  }
+
+ private:
+  std::filesystem::path root_;
+};
+
+std::filesystem::path DatasetPath(const std::filesystem::path& root) {
+  return root / "datasets" / std::string(p0s::kSyntheticDatasetId);
+}
+
+std::filesystem::path ArrayPath(const std::filesystem::path& root,
+                                std::string_view array_name,
+                                std::size_t partition) {
+  return DatasetPath(root) / std::string(array_name) /
+         ("partition_" + std::to_string(partition) + ".zarr");
+}
+
+std::string ChunkKey(std::size_t rank) {
+  return rank == 2 ? "0.0" : "0.0.0";
+}
+
+p0s::Json ReadJson(const std::filesystem::path& path) {
+  return p0s::ParseStrictJson(ReadText(path));
+}
+
+void CheckMetaState(const std::filesystem::path& root,
+                    std::size_t generation,
+                    const std::array<std::size_t, 2>& rows,
+                    const std::array<bool, 2>& sealed,
+                    const std::string& status) {
+  const auto meta = ReadJson(DatasetPath(root) / "meta.json");
+  Require(meta.at("write_generation") == generation,
+          "meta generation overclaims or lags the publication event");
+  Require(meta.at("events_per_partition") ==
+              p0s::Json::array({rows[0], rows[1]}),
+          "meta partition rows differ from the committed prefix");
+  Require(meta.at("status") == status,
+          "meta status differs from the publication event");
+  for (const auto& contract : p0s::kMeasurementArrayContracts) {
+    const auto& entries =
+        meta.at("partition_manifests").at(std::string(contract.name));
+    for (std::size_t partition = 0; partition < rows.size(); ++partition) {
+      Require(entries.at(partition).at("row_count") == rows[partition],
+              "manifest row count differs from committed metadata");
+      Require(entries.at(partition).at("sealed") == sealed[partition],
+              "manifest seal differs from committed metadata");
+      if (rows[partition] > 0) {
+        Require(std::filesystem::is_regular_file(
+                    ArrayPath(root, contract.name, partition) /
+                    ChunkKey(contract.rank)),
+                "manifest must not claim a row without its chunk");
+      }
+    }
+  }
+}
+
+void CheckPublicationEvent(const p0s::PublicationEvent& event,
+                           const std::filesystem::path& root) {
+  ++publication_checks;
+  CheckMetaState(root, event.write_generation, event.visible_rows, event.sealed,
+                 event.status);
+  if (event.stage == "initial_meta_published") {
+    for (const auto& contract : p0s::kMeasurementArrayContracts) {
+      for (std::size_t partition = 0;
+           partition < p0s::kSyntheticPartitionCount; ++partition) {
+        Require(!std::filesystem::exists(
+                    ArrayPath(root, contract.name, partition) /
+                    ChunkKey(contract.rank)),
+                "zero-row partition must not publish a chunk file");
+        const auto zarray =
+            ReadJson(ArrayPath(root, contract.name, partition) / ".zarray");
+        Require(zarray.at("shape").at(0) == 0,
+                "zero-row partition must publish a zero-row shape");
+      }
+    }
+  }
+  if (event.stage == "chunks_published") {
+    const std::size_t partition = event.visible_rows[0] == 0 ? 0 : 1;
+    for (const auto& contract : p0s::kMeasurementArrayContracts) {
+      Require(std::filesystem::is_regular_file(
+                  ArrayPath(root, contract.name, partition) /
+                  ChunkKey(contract.rank)),
+              "chunk must exist before manifest publication");
+    }
+  }
+}
+
+void CheckExactZarray(const std::filesystem::path& root,
+                      const p0s::MeasurementArrayContract& contract,
+                      std::size_t partition) {
+  const auto zarray = ReadJson(ArrayPath(root, contract.name, partition) /
+                               ".zarray");
+  p0s::RequireExactObjectFields(
+      zarray, {"chunks", "compressor", "dimension_separator", "dtype",
+               "fill_value", "filters", "order", "shape", "zarr_format"});
+  Require(zarray.at("dtype") == std::string(contract.dtype),
+          "Zarr dtype changed");
+  Require(zarray.at("dimension_separator") == ".",
+          "Zarr dimension separator changed");
+  Require(zarray.at("order") == "C", "Zarr order changed");
+  Require(zarray.at("zarr_format") == 2, "Zarr format changed");
+  Require(zarray.at("filters").is_null(), "Zarr filters must remain null");
+  if (contract.floating_fill) {
+    Require(zarray.at("fill_value").is_number_float() &&
+                zarray.at("fill_value").get<double>() == 0.0,
+            "floating Zarr fill value changed type or value");
+  } else {
+    Require(zarray.at("fill_value").is_number_integer() &&
+                zarray.at("fill_value").get<std::int64_t>() == 0,
+            "integer Zarr fill value changed type or value");
+  }
+  Require(zarray.at("shape").at(0) == 1, "Zarr visible shape changed");
+  Require(zarray.at("chunks").size() == contract.rank,
+          "Zarr chunk rank changed");
+  Require(zarray.at("shape").size() == contract.rank,
+          "Zarr shape rank changed");
+  for (std::size_t dimension = 0; dimension < contract.rank; ++dimension) {
+    Require(zarray.at("chunks").at(dimension) == contract.chunks[dimension],
+            "Zarr chunk dimension changed");
+    if (dimension > 0) {
+      Require(zarray.at("shape").at(dimension) ==
+                  contract.trailing_shape[dimension - 1],
+              "Zarr trailing shape changed");
+    }
+  }
+  const auto& compressor = zarray.at("compressor");
+  p0s::RequireExactObjectFields(
+      compressor, {"id", "cname", "clevel", "shuffle", "blocksize"});
+  Require(compressor == p0s::Json{{"blocksize", 0},
+                                  {"clevel", 5},
+                                  {"cname", "lz4"},
+                                  {"id", "blosc"},
+                                  {"shuffle", 1}},
+          "Zarr inner compressor profile changed");
+}
+
+void CheckFinalStore(const std::filesystem::path& root) {
+  const auto marker = ReadJson(root / ".gcsa_store.json");
+  Require(marker == p0s::Json{{"capabilities",
+                               p0s::Json::array(
+                                   {"d21_visibility", "encrypted_chunks"})},
+                              {"producer", "analogboard"},
+                              {"store_format", 1}},
+          "strict store marker changed");
+
+  CheckMetaState(root, 2, {1, 1}, {true, true}, "finalized");
+  const auto meta = ReadJson(DatasetPath(root) / "meta.json");
+  Require(meta.size() == 22, "strict meta field set changed");
+  Require(meta.at("dataset_id") == std::string(p0s::kSyntheticDatasetId),
+          "dataset id changed");
+  Require(meta.at("n_events") == 2 && meta.at("n_partitions") == 2,
+          "synthetic event or partition count changed");
+  Require(meta.at("feature_schema_version") == 1,
+          "feature schema version changed");
+  Require(meta.at("features").size() == p0s::kPulseFeatureColumns.size(),
+          "feature count changed");
+  Require(meta.at("channels").size() ==
+              p0s::kFlChannelOrder.size() + p0s::kGmiChannelOrder.size(),
+          "channel count changed");
+  for (std::size_t index = 0; index < p0s::kPulseFeatureColumns.size();
+       ++index) {
+    Require(meta.at("features").at(index).at("name") ==
+                std::string(p0s::kPulseFeatureColumns[index]),
+            "feature order changed");
+  }
+
+  std::set<std::pair<std::uint8_t,
+                     std::array<std::uint8_t, p0s::kAeadNonceSize>>>
+      key_nonces;
+  for (const auto& contract : p0s::kMeasurementArrayContracts) {
+    for (std::size_t partition = 0;
+         partition < p0s::kSyntheticPartitionCount; ++partition) {
+      CheckExactZarray(root, contract, partition);
+      const auto wire = ReadBytes(ArrayPath(root, contract.name, partition) /
+                                  ChunkKey(contract.rank));
+      Require(wire.size() >= p0s::kAeadHeaderSize + p0s::kAeadTagSize,
+              "encrypted chunk is truncated");
+      Require(wire[0] == 'G' && wire[1] == 'C' && wire[2] == 'S' &&
+                  wire[3] == 'A' && wire[4] == p0s::kAeadFormatVersion,
+              "encrypted chunk wire header changed");
+      std::array<std::uint8_t, p0s::kAeadNonceSize> nonce{};
+      std::copy_n(wire.begin() + 6, nonce.size(), nonce.begin());
+      Require(key_nonces.emplace(wire[5], nonce).second,
+              "encrypted store reused a nonce for one key");
+    }
+  }
+  Require(key_nonces.size() == 6,
+          "encrypted store must contain six unique chunk nonces");
+
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+    Require(entry.path().extension() != ".tmp" &&
+                entry.path().filename().wstring().find(L".p0s.tmp") ==
+                    std::wstring::npos,
+            "atomic publication left a temporary file");
+  }
+}
+
+void CheckDeterministicJson(const std::filesystem::path& first,
+                            const std::filesystem::path& second) {
+  std::vector<std::filesystem::path> relative_paths{
+      ".gcsa_store.json",
+      std::filesystem::path("datasets") /
+          std::string(p0s::kSyntheticDatasetId) / "meta.json"};
+  for (const auto& contract : p0s::kMeasurementArrayContracts) {
+    for (std::size_t partition = 0;
+         partition < p0s::kSyntheticPartitionCount; ++partition) {
+      relative_paths.push_back(
+          std::filesystem::path("datasets") /
+          std::string(p0s::kSyntheticDatasetId) /
+          std::string(contract.name) /
+          ("partition_" + std::to_string(partition) + ".zarr") / ".zarray");
+    }
+  }
+  for (const auto& relative : relative_paths) {
+    Require(ReadText(first / relative) == ReadText(second / relative),
+            "deterministic JSON differs across two writer runs");
+  }
+}
+
+void CheckExistingRootFails(const std::filesystem::path& root,
+                            const std::filesystem::path& kat) {
+  try {
+    p0s::GenerateSyntheticStore({root, kat, true});
+  } catch (const p0s::Error& error) {
+    Require(error.code() == p0s::ErrorCode::kFilesystem,
+            "existing root returned an unexpected typed error");
+    Require(std::string(error.what()) ==
+                "Prototype store output path must not already exist",
+            "existing root returned an unstable error message");
+    return;
+  }
+  throw std::runtime_error("existing output root did not fail loud");
+}
+
+std::filesystem::path AtomicTemporaryPath(std::filesystem::path path) {
+  path += L".p0s.tmp";
+  return path;
+}
+
+void CheckAtomicWriteRejectsMissingParent(
+    const std::filesystem::path& root) {
+  // Given: A destination whose parent directory does not exist.
+  const auto destination = root / "missing" / "metadata.json";
+
+  // When: Atomic publication is attempted.
+  try {
+    p0s::AtomicWriteText(destination, "{}\n");
+  } catch (const p0s::Error& error) {
+    // Then: The typed failure is stable and no temporary file remains.
+    Require(error.code() == p0s::ErrorCode::kFilesystem,
+            "missing parent returned an unexpected typed error");
+    Require(std::string(error.what()) ==
+                "Atomic file parent directory is absent",
+            "missing parent returned an unstable error message");
+    Require(!std::filesystem::exists(AtomicTemporaryPath(destination)),
+            "missing-parent failure left an atomic temporary file");
+    return;
+  }
+  throw std::runtime_error("atomic write accepted an absent parent directory");
+}
+
+void CheckAtomicWriteCleansUpAfterMoveFailure(
+    const std::filesystem::path& root) {
+  // Given: An existing directory occupies the publication destination.
+  const auto destination = root / "directory_destination";
+  if (!std::filesystem::create_directory(destination)) {
+    throw std::runtime_error("cannot create atomic destination directory");
+  }
+
+  // When: The temporary file is written but atomic replacement cannot publish.
+  try {
+    p0s::AtomicWriteText(destination, "{}\n");
+  } catch (const p0s::Error& error) {
+    // Then: The move failure is preserved and the closed temporary is removed.
+    Require(error.code() == p0s::ErrorCode::kFilesystem,
+            "move failure returned an unexpected typed error");
+    const std::string message(error.what());
+    Require(message.rfind("MoveFileExW for atomic publication failed with "
+                          "Windows error ",
+                          0) == 0,
+            "move failure returned an unstable error message");
+    Require(std::filesystem::is_directory(destination),
+            "move failure replaced the destination directory");
+    Require(!std::filesystem::exists(AtomicTemporaryPath(destination)),
+            "move failure left an atomic temporary file");
+    return;
+  }
+  throw std::runtime_error("atomic write replaced a destination directory");
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    if (argc != 2) {
+      throw std::runtime_error("usage: p0s_store_writer_tests <accepted-kat>");
+    }
+    TemporaryDirectory temporary;
+    const auto first = temporary.path() / "store_a";
+    const auto second = temporary.path() / "store_b";
+    const std::filesystem::path kat(argv[1]);
+
+    CheckAtomicWriteRejectsMissingParent(temporary.path());
+    CheckAtomicWriteCleansUpAfterMoveFailure(temporary.path());
+
+    p0s::GenerateSyntheticStore(
+        {first, kat, true},
+        [](const p0s::PublicationEvent& event,
+           const std::filesystem::path& root) {
+          CheckPublicationEvent(event, root);
+        });
+    p0s::GenerateSyntheticStore({second, kat, true});
+
+    Require(publication_checks == 6,
+            "writer emitted an unexpected publication event count");
+    CheckFinalStore(first);
+    CheckFinalStore(second);
+    CheckDeterministicJson(first, second);
+    CheckExistingRootFails(first, kat);
+
+    std::cout << "store_writer_checks=" << checks
+              << " publication_events=" << publication_checks
+              << " encrypted_chunks=6 deterministic_runs=2 status=pass\n";
+    return 0;
+  } catch (const std::exception& error) {
+    std::cerr << "store_writer_tests failed: " << error.what() << '\n';
+    return 1;
+  }
+}
