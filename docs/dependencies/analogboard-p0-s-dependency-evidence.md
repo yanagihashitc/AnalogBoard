@@ -31,9 +31,14 @@ Expected archive: `analogboard-p0-s-dependencies-20260721.tar.gz`
 - CI/other hosts: provision from an approved artifact cache or manual seed; no download path exists
 
 Pre-extraction inspection found 28 outer archive entries, zero symlinks, and
-zero absolute/traversal paths. Every streamed pinned header, library, license,
-source ZIP, and manifest hash matched. Full extraction/source-tree validation is
-deferred to the Batch 2 fail-closed validator.
+zero absolute/traversal paths. The Batch 2 validator then checked the exact
+archive before extraction, required the 15-file embedded manifest inventory,
+ran `sha256sum -c MANIFEST.sha256`, and extracted only into ignored
+`.deps/p0-s/`. It also checked the source ZIP and its extracted tree: zero
+traversal entries, zero links, `.gitmodules` absent, 490 files/60 directories,
+no extra files, and no ELF/PE/shared/archive payload. Exit was 0; deterministic
+ignored evidence is at
+`artifacts/phase0-zarr-roundtrip/dependency/bundle-validation.json`.
 
 ## Source and license audit pins
 
@@ -69,11 +74,68 @@ All Windows inventory/build commands use
 `scripts/run_with_vsdevcmd.bat`. The reproducible path is Ninja because the raw
 bridge does not reliably preserve the quoted Visual Studio generator.
 
-## Pending closure evidence
+## c-blosc source builds
 
-The c-blosc blocker remains open until Batch 2–4 evidence covers the separate
-upstream regression build, local Release/Debug static builds, object/CRT/runtime
-inspection, exact Blosc/AES KAT, boundary/negative matrix, and the encrypted
-three-array gcsa roundtrip with one minimal append. Approved library hashes are
-verified supply identities; local rebuild hashes will be recorded separately
-because COFF timestamps are build-dependent.
+Three out-of-source builds used the verified commit ZIP without source edits:
+
+1. Upstream regression: Release `/MD`, static and shared enabled, tests enabled,
+   internal LZ4/zlib/Zstd. Configure reported c-blosc `1.21.6` and
+   `Using LZ4 internal sources.` Configure/build/test exited 0 in
+   2.79/5.54/39.47 seconds; `ctest --output-on-failure` passed 1626/1626.
+2. Accepted Release: static-only, LZ4-only, tests/fuzzers/benchmarks off,
+   external LZ4 off, `/MD`. Configure/build exited 0 in 2.68/2.63 seconds.
+3. Accepted Debug: the same static-only profile with `/MDd`.
+   Configure/build exited 0 in 2.49/1.64 seconds.
+
+The static-only profiles use every option recorded in the deterministic JSON
+manifest. c-blosc's Windows CMake test graph refers to `blosc_shared` when
+static-only plus tests is selected, so tests remain in the separate upstream
+regression build. No source patch or shared test artifact is shipped.
+
+Approved bundle library identities remain:
+
+- Release: `0660daf135ccd08a3060905a35ba139f332c8e398a6ddc82b308a0deae4d70ee`
+- Debug: `cbeb1b05517d82adf36d787c1b0790d6d503f27749b4ff7e48edcbc3108045e6`
+
+The fresh local COFF outputs have expected timestamp-dependent hashes:
+
+- Release: `4db0e7317f4173da35d0ff9f2f0b0ee5a4fbe2d1e878b15e0b1a2630907d86ff`
+- Debug: `523ccc44eb4ece9e7d05b4961a45d562a398aad6a8a9b46cd7fca6f5a872e191`
+
+Both installed headers are byte-identical to their approved hashes. The local
+libraries were linked into the same adapter smoke executable: Release and
+Debug each passed 29 checks, including c-blosc `1.21.6`, compressor list,
+internal LZ4 `1.9.4`, header/link/runtime compression/decompression, strict
+JSON, and CNG authentication behavior. The approved libraries passed the same
+29 checks.
+
+`dumpbin /headers` found 12/12 library objects as `8664 machine (x64)` in both
+configurations. `/directives` found Release `MSVCRT` and Debug `MSVCRTD`.
+Linked approved and locally reproduced smoke executables import only
+`bcrypt.dll`, `KERNEL32.dll`, and the configuration-appropriate MSVC/UCRT
+system DLLs. No c-blosc, LZ4, zlib, Zstd, or unknown third-party DLL appears.
+The fail-closed parser exited 0 and published ignored evidence at
+`artifacts/phase0-zarr-roundtrip/dependency/windows-artifact-verification.json`.
+
+## Isolated adapters
+
+`prototypes/zarr-store-roundtrip/` contains the only c-blosc call site, a
+strict-JSON boundary, and a Windows CNG AES-256-GCM Store-wrapper boundary.
+The c-blosc adapter fixes LZ4/level 5/shuffle/blocksize 0/one internal thread,
+uses context APIs, checks destination arithmetic and typesize 2/8, validates
+the decoded size before allocation, and has no raw-byte fallback. Strict JSON
+rejects duplicate keys, invalid UTF-8, non-finite tokens, type mismatch,
+missing/unexpected fields, and trailing data; sorted serialization is stable.
+CNG uses an explicit test-only key provider and `(key_id, nonce)` registry and
+does not log keys.
+
+This remains an isolated harness. Nothing is linked to production acquisition,
+EP2/EP4/EP6, the existing solution, C ABI, or WPF. Batch 2 does not claim the
+byte KAT, full boundary/negative matrix, generated Zarr store, gcsa roundtrip,
+P0-S1/P0-S2 acceptance, sharding choice, A-4b, Frozen v1, or Phase 0 closure.
+
+## Remaining closure evidence
+
+The c-blosc blocker remains open until Batch 3–4 evidence covers the exact
+Blosc/AES KAT, boundary/negative matrix, and encrypted three-array gcsa
+roundtrip with one minimal append. No approved golden is changed on mismatch.

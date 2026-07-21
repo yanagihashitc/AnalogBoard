@@ -26,6 +26,29 @@
       },
       "architecture": "windows-x64",
       "build": {
+        "commands": {
+          "debug_static": {
+            "build": "cmake --build D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/debug-evidence --target install --verbose",
+            "build_wall_seconds": 1.64,
+            "configure": "cmake -S D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/source/c-blosc-616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0 -B D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/debug-evidence -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/install/debug-evidence -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DBLOSC_IS_SUBPROJECT=TRUE -DBLOSC_INSTALL=TRUE -DBUILD_STATIC=ON -DBUILD_SHARED=OFF -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_LZ4=OFF -DDEACTIVATE_SNAPPY=ON -DDEACTIVATE_ZLIB=ON -DDEACTIVATE_ZSTD=ON -DPREFER_EXTERNAL_LZ4=OFF",
+            "configure_wall_seconds": 2.49,
+            "exit": 0
+          },
+          "release_static": {
+            "build": "cmake --build D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/release-evidence --target install --verbose",
+            "build_wall_seconds": 2.63,
+            "configure": "cmake -S D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/source/c-blosc-616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0 -B D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/release-evidence -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/install/release-evidence -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DBLOSC_IS_SUBPROJECT=TRUE -DBLOSC_INSTALL=TRUE -DBUILD_STATIC=ON -DBUILD_SHARED=OFF -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_LZ4=OFF -DDEACTIVATE_SNAPPY=ON -DDEACTIVATE_ZLIB=ON -DDEACTIVATE_ZSTD=ON -DPREFER_EXTERNAL_LZ4=OFF",
+            "configure_wall_seconds": 2.68,
+            "exit": 0
+          },
+          "upstream_regression": {
+            "build": "cmake --build D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/upstream-evidence --verbose",
+            "build_wall_seconds": 5.54,
+            "configure": "cmake -S D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/source/c-blosc-616f4b7343a8479f7e71dd3d7025bd92c9a6bbd0 -B D:/ubuntu/jupyter/sys_analyzer/AnalogBoard/.deps/p0-s/build/upstream-evidence -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DBUILD_STATIC=ON -DBUILD_SHARED=ON -DBUILD_TESTS=ON -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_LZ4=OFF -DDEACTIVATE_SNAPPY=ON -DDEACTIVATE_ZLIB=OFF -DDEACTIVATE_ZSTD=OFF -DPREFER_EXTERNAL_LZ4=OFF",
+            "configure_wall_seconds": 2.79,
+            "exit": 0
+          }
+        },
         "debug_runtime": "MultiThreadedDebugDLL (/MDd)",
         "linkage": "static",
         "options": {
@@ -71,9 +94,10 @@
         "shuffle": 1
       },
       "reproduced_artifacts": {
-        "debug_library_sha256": null,
-        "release_library_sha256": null,
-        "status": "pending local rebuild"
+        "debug_library_sha256": "523ccc44eb4ece9e7d05b4961a45d562a398aad6a8a9b46cd7fca6f5a872e191",
+        "headers_byte_identical_to_approved": true,
+        "release_library_sha256": "4db0e7317f4173da35d0ff9f2f0b0ee5a4fbe2d1e878b15e0b1a2630907d86ff",
+        "status": "behavior-equivalent; COFF byte hashes differ as expected"
       },
       "source": {
         "acquired_at": "2026-07-21 14:12:33 JST",
@@ -116,8 +140,9 @@
     "bundle_validation": "artifacts/phase0-zarr-roundtrip/dependency/bundle-validation.json",
     "dependency_evidence": "docs/dependencies/analogboard-p0-s-dependency-evidence.md",
     "gcsa_snapshot": ".deps/p0-s/gcsa-20689a991697217518ec2ff15aaaa2533b169eb0",
-    "local_build": "artifacts/phase0-zarr-roundtrip/dependency/windows-build-evidence.json",
-    "process_log": "docs/process_log/2026-07-21-p0-s-dependency-preflight-log.md"
+    "local_build": "docs/dependencies/analogboard-p0-s-dependency-evidence.md",
+    "process_log": "docs/process_log/2026-07-21-p0-s-dependency-preflight-log.md",
+    "windows_artifact_verification": "artifacts/phase0-zarr-roundtrip/dependency/windows-artifact-verification.json"
   },
   "format_version": 1,
   "scope": "P0-S dependency and checkpoint preparation only",
@@ -129,6 +154,39 @@
     "sdk": "Windows SDK 10.0.26100.0"
   },
   "validation": {
+    "adapter_smoke": {
+      "approved_debug": {
+        "checks": 29,
+        "duration_seconds": 0.17,
+        "exit": 0
+      },
+      "approved_release": {
+        "checks": 29,
+        "duration_seconds": 0.16,
+        "exit": 0
+      },
+      "command": "ctest --test-dir <prototype-build> --output-on-failure",
+      "reproduced_debug": {
+        "checks": 29,
+        "duration_seconds": 0.17,
+        "exit": 0
+      },
+      "reproduced_release": {
+        "checks": 29,
+        "duration_seconds": 0.17,
+        "exit": 0
+      },
+      "status": "pass"
+    },
+    "artifact_inspection": {
+      "command": "python3 prototypes/zarr-store-roundtrip/scripts/verify_windows_artifacts.py --release-headers <report> --release-directives <report> --debug-headers <report> --debug-directives <report> --release-smoke <report> --debug-smoke <report>",
+      "debug_crt": "MSVCRTD",
+      "exit": 0,
+      "library_objects": "12/12 x64 in Release and Debug",
+      "release_crt": "MSVCRT",
+      "runtime_dependencies": "Windows CNG/MSVC/UCRT system DLLs only",
+      "status": "pass"
+    },
     "boundary_matrix": {
       "command": null,
       "count": null,
@@ -137,11 +195,12 @@
     },
     "c_blosc_upstream": {
       "command": "ctest --test-dir <upstream-build> --output-on-failure",
-      "local_exit": null,
-      "local_passed": null,
+      "duration_seconds": 39.47,
+      "local_exit": 0,
+      "local_passed": 1626,
       "reference_exit": 0,
       "reference_passed": 1626,
-      "status": "accepted reference recorded; local reproduction pending"
+      "status": "pass"
     },
     "gcsa": {
       "container_id": "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8",

@@ -18,10 +18,10 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 
 ## Batch 2: Dependency adapters and Windows verification
 
-- [ ] Validate and extract the exact offline bundle without download
-- [ ] Audit the c-blosc source ZIP and reproduce upstream/static builds
-- [ ] Implement thin c-blosc, strict JSON, and Windows CNG adapters by TDD
-- [ ] Verify x64 objects, CRT directives, runtime DLLs, hashes, and behavior
+- [x] Validate and extract the exact offline bundle without download
+- [x] Audit the c-blosc source ZIP and reproduce upstream/static builds
+- [x] Implement thin c-blosc, strict JSON, and Windows CNG adapters by TDD
+- [x] Verify x64 objects, CRT directives, runtime DLLs, hashes, and behavior
 - [ ] Complete checkpoint review, commit, push, and archive the active batch
 
 ## Batch 3: KAT and boundary/negative matrix
