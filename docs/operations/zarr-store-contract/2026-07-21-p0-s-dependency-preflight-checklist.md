@@ -44,8 +44,8 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 - [x] Complete deterministic manifest/evidence with exact commands and results
 - [x] Run clean full verification, refactor, review, and Claude review
 - [x] Scan diff/staging for secrets, generated artifacts, and sibling changes
-- [ ] Commit/push final preparation evidence and archive the active batch
-- [ ] Open one non-merge preparatory PR to `main`
+- [x] Commit/push final preparation evidence and archive the active batch
+- [x] Open one non-merge preparatory PR to `main`
 
 ## Scope-wide gate
 

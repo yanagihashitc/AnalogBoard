@@ -1,9 +1,9 @@
 # AnalogBoard P0-S dependency preparation evidence
 
-Status: technical validation complete; preparatory PR pending. This document
-records repository-local dependency and checkpoint preparation only. It does
-not close P0-S1/P0-S2, choose P0-S2 sharding, declare A-4b/Frozen v1, or
-complete Phase 0.
+Status: technical validation complete; preparatory PR open and human merge
+pending. This document records repository-local dependency and checkpoint
+preparation only. It does not close P0-S1/P0-S2, choose P0-S2 sharding,
+declare A-4b/Frozen v1, or complete Phase 0.
 
 ## Accepted identities
 
@@ -282,6 +282,7 @@ The clean closeout rerun completed on 2026-07-21 at 18:58 JST from branch
   generated store, executable, secret, raw payload, production integration,
   or sibling-repository change.
 
-The final evidence commit and preparatory PR URL are recorded in the process
-log after publication. A human merge remains mandatory before the dependency
-blocker can be handed back as closed.
+The technical evidence commit is
+`7af097da3cd47f51f1815b0f07fbd3216daabbd8`. The non-merge preparatory PR is
+[PR #3](https://github.com/yanagihashitc/AnalogBoard/pull/3). A human merge
+remains mandatory before the dependency blocker can be handed back as closed.
