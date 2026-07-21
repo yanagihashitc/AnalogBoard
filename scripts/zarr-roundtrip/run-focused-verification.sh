@@ -17,10 +17,13 @@ readonly GCSA_CONTAINER_VALIDATOR_DIR="/home/jupyter/AnalogBoard/prototypes/zarr
 readonly EXPECTED_GCSA_CONTRACT_ID="gcsa-store-a4a-rc1"
 readonly EXPECTED_GCSA_PACKAGE_SHA256="c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14"
 readonly JOINT_GOLDEN="${REPOSITORY_ROOT}/docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json"
+readonly PHASE0_EVIDENCE_MANIFEST_RELATIVE="docs/reference/zarr-store-contract/phase0-roundtrip/phase0-roundtrip-manifest.json"
+readonly PHASE0_EVIDENCE_MANIFEST="${REPOSITORY_ROOT}/${PHASE0_EVIDENCE_MANIFEST_RELATIVE}"
+readonly SHARDING_COMPARISON_RELATIVE="docs/reference/zarr-store-contract/phase0-roundtrip/sharding-comparison.json"
 readonly JOINT_ARTIFACT_PARENT="${REPOSITORY_ROOT}/artifacts/phase0-zarr-roundtrip/focused"
 
 usage() {
-  echo "usage: $0 batch1|cpp|python|gcsa-kat|joint" >&2
+  echo "usage: $0 batch1|cpp|python|gcsa-kat|joint|sharding" >&2
 }
 
 require_identity() {
@@ -133,6 +136,98 @@ run_joint() (
       "${GCSA_CONTAINER_REPOSITORY_ROOT}/docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json"
 )
 
+run_timed_generator() {
+  local windows_generator="$1"
+  local windows_kat="$2"
+  local output_root="$3"
+  local mode="$4"
+  local start_ns
+  local end_ns
+  start_ns="$(date +%s%N)"
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${output_root}")" --sharding "${mode}"
+  end_ns="$(date +%s%N)"
+  LAST_GENERATOR_MS="$(((end_ns - start_ns) / 1000000))"
+}
+
+run_sharding() (
+  if [[ ! -f "${PHASE0_EVIDENCE_MANIFEST}" ]]; then
+    echo "tracked phase0 evidence manifest is absent: ${PHASE0_EVIDENCE_MANIFEST}" >&2
+    return 1
+  fi
+  local build_root="${PROTOTYPE_BUILD_ROOT}/release-approved"
+  local windows_build_root
+  windows_build_root="$(wslpath -w "${build_root}")"
+  "${BUILD_HELPER}" raw -- cmake --build "${windows_build_root}" \
+    --target p0s_store_generator --verbose
+
+  mkdir -p "${JOINT_ARTIFACT_PARENT}"
+  local run_root
+  run_root="$(mktemp -d "${JOINT_ARTIFACT_PARENT}/sharding.XXXXXX")"
+  trap 'rm -rf -- "${run_root}"' EXIT
+
+  local generator="${build_root}/p0s_store_generator.exe"
+  local windows_generator
+  local windows_kat
+  windows_generator="$(wslpath -w "${generator}")"
+  windows_kat="$(wslpath -w "${ACCEPTED_KAT}")"
+
+  local -a modes=(
+    round-robin
+    append-sequential
+    append-sequential
+    round-robin
+    round-robin
+    append-sequential
+  )
+  local -a round_robin_samples=()
+  local -a append_sequential_samples=()
+  local round_robin_index=0
+  local append_sequential_index=0
+  local mode
+  local output_root
+  for mode in "${modes[@]}"; do
+    if [[ "${mode}" == "round-robin" ]]; then
+      round_robin_index=$((round_robin_index + 1))
+      output_root="${run_root}/round-robin-${round_robin_index}"
+      run_timed_generator \
+        "${windows_generator}" "${windows_kat}" "${output_root}" "${mode}"
+      round_robin_samples+=("${LAST_GENERATOR_MS}")
+    else
+      append_sequential_index=$((append_sequential_index + 1))
+      output_root="${run_root}/append-sequential-${append_sequential_index}"
+      run_timed_generator \
+        "${windows_generator}" "${windows_kat}" "${output_root}" "${mode}"
+      append_sequential_samples+=("${LAST_GENERATOR_MS}")
+    fi
+  done
+
+  local repository_relative_run_root
+  local container_run_root
+  repository_relative_run_root="${run_root#"${REPOSITORY_ROOT}/"}"
+  container_run_root="${GCSA_CONTAINER_REPOSITORY_ROOT}/${repository_relative_run_root}"
+  local -a timing_arguments=()
+  local sample
+  for sample in "${round_robin_samples[@]}"; do
+    timing_arguments+=(--round-robin-wall-ms "${sample}")
+  done
+  for sample in "${append_sequential_samples[@]}"; do
+    timing_arguments+=(--append-sequential-wall-ms "${sample}")
+  done
+  docker exec \
+    -e "PYTHONPATH=${GCSA_CONTAINER_SNAPSHOT}/src:${GCSA_CONTAINER_VALIDATOR_DIR}" \
+    -e PYTHONDONTWRITEBYTECODE=1 \
+    "${GCSA_CONTAINER}" python \
+    "${GCSA_CONTAINER_VALIDATOR_DIR}/compare_sharding_modes.py" \
+    --round-robin-store "${container_run_root}/round-robin-1" \
+    --append-sequential-store "${container_run_root}/append-sequential-1" \
+    --evidence-manifest \
+      "${GCSA_CONTAINER_REPOSITORY_ROOT}/${PHASE0_EVIDENCE_MANIFEST_RELATIVE}" \
+    --expected-evidence \
+      "${GCSA_CONTAINER_REPOSITORY_ROOT}/${SHARDING_COMPARISON_RELATIVE}" \
+    "${timing_arguments[@]}"
+)
+
 main() {
   if [[ $# -ne 1 ]]; then
     usage
@@ -159,6 +254,12 @@ main() {
       require_gcsa_container_identity
       run_gcsa_kat_checks
       run_joint
+      ;;
+    sharding)
+      run_python
+      require_gcsa_container_identity
+      run_gcsa_kat_checks
+      run_sharding
       ;;
     *)
       usage

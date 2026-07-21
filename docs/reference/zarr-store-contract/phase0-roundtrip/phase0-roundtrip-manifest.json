@@ -1,0 +1,33 @@
+{
+  "schema": "analogboard-p0-s-evidence-manifest-v1",
+  "generated_at": "2026-07-22",
+  "command": "scripts/zarr-roundtrip/run-focused-verification.sh sharding",
+  "identities": {
+    "analogboard_baseline_commit": "da818ba245be252a3717bf9bf3d55c57fa20594e",
+    "gcsa_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+    "gcsa_package_tree_sha256": "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14",
+    "gcsa_container_id": "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8",
+    "gcsa_image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
+    "contract_id": "gcsa-store-a4a-rc1",
+    "public_kat_sha256": "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
+  },
+  "files_sha256": {
+    "docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json": "7bc30c81c1939735eda8e648f009c0a8e1025ae0a4f1d5970f77564a35f52457",
+    "docs/reference/zarr-store-contract/phase0-roundtrip/sharding-comparison.json": "a22eca0fca592654834bbe22919e26f1e75bc0257e4babfb870efb956a032381",
+    "docs/reference/zarr-store-contract/phase0-roundtrip/sharding-decision.md": "f29284a6f9bf7b9e9250df7ba74ed714b348c3a7c0a1b9ea9f460974ebc4aa14",
+    "prototypes/zarr-store-roundtrip/README.md": "92a47876d648f0330c6ef309dc11cea16c5e223ad6bcd7d2f37db13c6187e22b",
+    "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h": "39c23fd9023b6aa82afd7ee8331b3ddcb88f09a069b9f8f2fc2dd9da4830d692",
+    "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h": "012df415d283da5a681a3eec85bf73257f0dfb0401b1e4fd848d72343c862252",
+    "prototypes/zarr-store-roundtrip/scripts/compare_sharding_modes.py": "128fdba734f66d86bd3132c84be58e16b9e4e5dfc6e461fe1fe8c3a94db6d49c",
+    "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "a045f18625a2e5995f3dce9ea5d0f9dc476860047365d7d7678ca9783d403369",
+    "prototypes/zarr-store-roundtrip/tests/store_writer_tests.cpp": "d27261db8411e73b2844091177a9cfd252655b92073657f7acf6a72d699a20c8",
+    "prototypes/zarr-store-roundtrip/tests/test_compare_sharding_modes.py": "1c875f0c16ab151c9b0e8f5a3ead8c5b8c44ad1e8d8890e849bf26d12a3410ea",
+    "prototypes/zarr-store-roundtrip/tools/store_generator.cpp": "adb04b75093401b10ff1cb6c90a725b1e43cf5cee00dbc62e7a328f51af63575",
+    "scripts/zarr-roundtrip/run-focused-verification.sh": "820ca68fb22a83759ed953007053b325567208eecd70e4db67c92ea7021f5b72"
+  },
+  "exclusions": {
+    "manifest_self_hash": true,
+    "parent_plan_and_central_handoff": true,
+    "generated_measurement_payload": true
+  }
+}

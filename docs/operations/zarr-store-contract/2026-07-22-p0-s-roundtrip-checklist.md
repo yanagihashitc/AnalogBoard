@@ -38,16 +38,16 @@
 
 依存: Batch 3
 
-- [ ] Compare round-robin and append-sequential on one five-event/two-cycle fixture and identical observations
-- [ ] Adopt exactly one mode only if the accepted gcsa validator/reader passes without modification
-- [ ] Publish the decision record, comparison evidence, central handoff, and bounded parent-plan status/evidence update
-- [ ] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
+- [x] Compare round-robin and append-sequential on one five-event/two-cycle fixture and identical observations
+- [x] Adopt exactly one mode only if the accepted gcsa validator/reader passes without modification
+- [x] Publish the decision record, comparison evidence, central handoff, and bounded parent-plan status/evidence update
+- [x] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
 
 ## Phase checkpoint
 
 依存: Batches 1-4
 
-- [ ] Rebuild from clean generated roots and rerun the complete C++/Python/gcsa matrix
-- [ ] Audit every Product acceptance and Completion Criteria item against current evidence
+- [x] Rebuild from clean generated roots and rerun the complete C++/Python/gcsa matrix
+- [x] Audit every Product acceptance and Completion Criteria item against current evidence
 - [ ] Confirm Active todo empty, branch/remote parity, clean tracked worktree, and ignored generated payloads
 - [ ] Create the phase PR to `main` and stop before merge

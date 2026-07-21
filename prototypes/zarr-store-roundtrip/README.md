@@ -1,9 +1,10 @@
 # P0-S Zarr dependency prototype
 
-This directory is an isolated Phase 0 harness. It prepares dependency and wire
-building blocks only. It is not linked to the production `AcquisitionEngine`,
-EP2/EP4/EP6, the existing solution, the C ABI, or WPF. It does not accept
-P0-S1/P0-S2, decide partition sharding, or declare Frozen v1.
+This directory is an isolated Phase 0 harness. It provides the joint evidence
+for P0-S1 and the round-robin decision for P0-S2; both remain `gate_ready` until
+the phase PR is merged and centrally synchronized. It is not linked to the
+production `AcquisitionEngine`, EP2/EP4/EP6, the existing solution, the C ABI,
+or WPF, and it does not declare A-4b, Frozen v1, or Phase 0 complete.
 
 ## Offline dependency boundary
 
@@ -47,18 +48,22 @@ c-blosc adapter, encrypts only through the CNG Store wrapper, and publishes
 files through same-directory temp-to-rename. The CLI invokes it on a dedicated
 writer thread; no acquisition or UI boundary is involved.
 
-The synthetic lifecycle starts with two zero-row partitions and no chunk
-files. It then publishes all three authenticated chunks for partition 0 before
-advancing the manifest and `write_generation`, repeats that minimum append for
-partition 1, and only then publishes `status=finalized` with every partition
-sealed. One nonce registry spans every array and partition. The public gcsa KAT
-key is used only as test material and is never logged or tracked separately.
+The discriminating fixture has five global events, two append/re-arm-like
+cycles `[2,3]`, and two partitions. Round-robin maps events to
+`[0,2,4] / [1,3]`; append-sequential maps them to `[0,1] / [2,3,4]`. Every
+publication keeps the three arrays aligned, publishes durable chunk data before
+the manifest/generation, uses a fresh nonce for coordinate rewrites, and seals
+before `status=finalized`. One nonce registry spans every array and partition.
+The public gcsa KAT key is test material and is never logged or tracked
+separately.
 
-The two one-row partitions are the minimum append needed to exercise the
-accepted gcsa reader. Its round-robin reconstruction is an observation, not a
-P0-S2 sharding decision. AAD prevents cross-coordinate substitution but does
-not by itself prevent rollback to an older valid wire at the same coordinate;
-that static-snapshot residual remains explicit.
+P0-S2 selects round-robin because the accepted gcsa strict validator and
+full/slice/gather readers accept it unchanged. Append-sequential is a valid
+partition-local control but is rejected by all global Contract RC surfaces.
+Performance observations are recorded but are not a selection basis. AAD
+prevents cross-coordinate substitution but does not identify an older valid
+wire at the same coordinate from one static snapshot; that residual remains
+explicit.
 
 ## KAT and matrix
 
@@ -138,6 +143,8 @@ exist:
 ```text
 p0s_store_generator.exe <verified-kat> <ignored-output-root>
 p0s_store_generator.exe <verified-kat> <ignored-open-output-root> --open
+p0s_store_generator.exe <verified-kat> <ignored-output-root> \
+  --sharding round-robin|append-sequential
 ```
 
 The generator writes no key file, nonce registry, raw measurement, or real
@@ -149,12 +156,37 @@ sibling worktree:
 PYTHONPATH=<gcsa-snapshot>/src PYTHONDONTWRITEBYTECODE=1 \
 python prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py \
   --open-store <ignored-open-store> \
-  --finalized-store <ignored-finalized-store>
+  --finalized-store-a <ignored-finalized-store-a> \
+  --finalized-store-b <ignored-finalized-store-b> \
+  --expected-evidence \
+    docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json
 ```
 
 The script runs the accepted strict validator and encrypted read-only reader,
 checks all three arrays to original bits, exact orders/shapes/dtypes/min-max,
-partition/global alignment, and verifies the source trees are unchanged. Its
-test-owned temporary copies cover open-product rejection, wrong key, mutated
-tag/ciphertext, truncation, partition swap/AAD mismatch, unknown key ID,
-plaintext fallback, and manifest overclaim. It never repairs a failed store.
+partition/global/slice/gather alignment, no feature recomputation, ordered D21
+transitions, and source-tree immutability. Its test-owned temporary copies cover
+open-product rejection, wrong key, mutated tag/ciphertext, truncation,
+partition swap/AAD mismatch, nonce reuse, unknown key ID, plaintext fallback,
+schema drift, row misalignment, and manifest overclaim. It never repairs a
+failed store. The tracked golden uses strict JSON and verifies its outer
+provenance plus every listed source SHA before accepting the runtime summary.
+
+Run the complete pinned entries from WSL:
+
+```bash
+scripts/zarr-roundtrip/run-focused-verification.sh joint
+scripts/zarr-roundtrip/run-focused-verification.sh sharding
+```
+
+The sharding entry generates three alternating observations per mode, verifies
+round-robin strict/full/slice/gather success and append-sequential global
+fail-loud behavior in the accepted gcsa snapshot, then removes the exact
+ignored temporary root. The bounded evidence and decision are under
+`docs/reference/zarr-store-contract/phase0-roundtrip/`; no generated store,
+measurement payload, encrypted chunk, nonce, or secret is tracked.
+`phase0-roundtrip-manifest.json` binds the exact source/evidence inventory and
+accepted gcsa identity before the comparison runs. Runtime comparison semantics
+must equal `sharding-comparison.json`; only valid wall-time observations may
+vary. `central-handoff.md` records the post-merge synchronization input without
+participating in that hash graph.

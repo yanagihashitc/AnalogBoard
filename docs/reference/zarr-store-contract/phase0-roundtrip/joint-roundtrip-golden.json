@@ -11,7 +11,7 @@
       "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py": "221d9f0a4ee7a7b64c64d7b527cdea5050dca9d49c8a2f41717fde1a5b26a1cf",
       "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "a045f18625a2e5995f3dce9ea5d0f9dc476860047365d7d7678ca9783d403369",
       "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "2601b8ace177e3cebfc7ee25ea456b0aa7f2ef9d7cfbc3463783f77e0c5eb8e0",
-      "scripts/zarr-roundtrip/run-focused-verification.sh": "e7389b7150bd119f662ebd6826778c3f0a7750be62a05998539ae31959c8284d"
+      "scripts/zarr-roundtrip/run-focused-verification.sh": "820ca68fb22a83759ed953007053b325567208eecd70e4db67c92ea7021f5b72"
     }
   },
   "gcsa": {
