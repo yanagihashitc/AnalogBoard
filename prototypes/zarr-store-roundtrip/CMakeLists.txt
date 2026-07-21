@@ -130,6 +130,16 @@ target_compile_definitions(p0s_zarr_adapters PRIVATE NOMINMAX WIN32_LEAN_AND_MEA
 target_compile_options(p0s_zarr_adapters PRIVATE /W4 /permissive-)
 target_link_libraries(p0s_zarr_adapters PRIVATE "${P0S_BLOSC_LIBRARY}" bcrypt)
 
+add_library(p0s_minimal_zarr_writer STATIC
+  src/atomic_file.cpp
+  src/minimal_zarr_writer.cpp)
+target_include_directories(p0s_minimal_zarr_writer
+  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_compile_definitions(p0s_minimal_zarr_writer
+  PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_compile_options(p0s_minimal_zarr_writer PRIVATE /W4 /permissive-)
+target_link_libraries(p0s_minimal_zarr_writer PRIVATE p0s_zarr_adapters bcrypt)
+
 add_executable(p0s_adapter_tests tests/adapter_tests.cpp)
 target_include_directories(p0s_adapter_tests
   PRIVATE "${P0S_BLOSC_ROOT}/include")
@@ -142,10 +152,22 @@ target_include_directories(p0s_kat_matrix_tests
 target_compile_options(p0s_kat_matrix_tests PRIVATE /W4 /permissive-)
 target_link_libraries(p0s_kat_matrix_tests PRIVATE p0s_zarr_adapters)
 
+add_executable(p0s_store_writer_tests tests/store_writer_tests.cpp)
+target_include_directories(p0s_store_writer_tests
+  PRIVATE "${P0S_JSON_ROOT}/include")
+target_compile_options(p0s_store_writer_tests PRIVATE /W4 /permissive-)
+target_link_libraries(p0s_store_writer_tests PRIVATE p0s_minimal_zarr_writer)
+
+add_executable(p0s_store_generator tools/store_generator.cpp)
+target_compile_options(p0s_store_generator PRIVATE /W4 /permissive-)
+target_link_libraries(p0s_store_generator PRIVATE p0s_minimal_zarr_writer)
+
 enable_testing()
 add_test(NAME p0s_adapter_tests COMMAND p0s_adapter_tests)
 add_test(NAME p0s_kat_matrix_tests
          COMMAND p0s_kat_matrix_tests "${P0S_GCSA_KAT_COPY}")
+add_test(NAME p0s_store_writer_tests
+         COMMAND p0s_store_writer_tests "${P0S_GCSA_KAT_COPY}")
 
 message(STATUS "P0-S dependency archive SHA-256: ${P0S_BUNDLE_SHA256}")
 message(STATUS "P0-S c-blosc root: ${P0S_BLOSC_ROOT}")

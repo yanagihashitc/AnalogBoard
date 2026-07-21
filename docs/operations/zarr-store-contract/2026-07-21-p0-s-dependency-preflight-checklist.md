@@ -14,7 +14,7 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 - [x] Add ignored offline-cache/generated-artifact boundaries
 - [x] Replace stale checkpoint documents with Zarr scope
 - [x] Verify deterministic manifest, hashes, links, and repository scope
-- [x] Complete checkpoint review, commit, push, and archive the active batch
+- [ ] Complete checkpoint review, commit, push, and archive the active batch
 
 ## Batch 2: Dependency adapters and Windows verification
 
@@ -33,11 +33,11 @@ P0-S1/P0-S2, decide sharding, declare A-4b/Frozen v1, or complete Phase 0.
 
 ## Batch 4: Minimal encrypted Zarr and gcsa roundtrip
 
-- [ ] Generate the ignored deterministic three-array Zarr v2 store
-- [ ] Exercise one append/re-arm-like partition without deciding sharding
-- [ ] Re-run accepted gcsa focused tests from a git-archive snapshot
-- [ ] Validate strict positive/negative reads and original-bit roundtrip
-- [ ] Complete checkpoint review, commit, push, and archive the active batch
+- [x] Generate the ignored deterministic three-array Zarr v2 store
+- [x] Exercise one append/re-arm-like partition without deciding sharding
+- [x] Re-run accepted gcsa focused tests from a git-archive snapshot
+- [x] Validate strict positive/negative reads and original-bit roundtrip
+- [x] Complete checkpoint review, commit, push, and archive the active batch
 
 ## Batch 5: Evidence closeout and preparatory PR
 

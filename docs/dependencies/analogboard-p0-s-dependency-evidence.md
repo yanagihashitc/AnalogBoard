@@ -130,9 +130,8 @@ CNG uses an explicit test-only key provider and `(key_id, nonce)` registry and
 does not log keys.
 
 This remains an isolated harness. Nothing is linked to production acquisition,
-EP2/EP4/EP6, the existing solution, C ABI, or WPF. It does not claim the
-generated Zarr store, full gcsa roundtrip, P0-S1/P0-S2 acceptance, sharding
-choice, A-4b, Frozen v1, or Phase 0 closure.
+EP2/EP4/EP6, the existing solution, C ABI, or WPF. It does not claim
+P0-S1/P0-S2 acceptance, a sharding choice, A-4b, Frozen v1, or Phase 0 closure.
 
 ## Byte-exact KAT and boundary matrix
 
@@ -170,8 +169,85 @@ commit `20689a991697217518ec2ff15aaaa2533b169eb0` was then tested in the pinned
 gcsa authentication/decryption and numcodecs 0.13.1 expansion to values
 `0..11` without modifying the sibling worktree.
 
-## Remaining closure evidence
+## Minimal encrypted Zarr publication
 
-The c-blosc blocker remains open until Batch 4 evidence covers the encrypted
-three-array gcsa roundtrip with one minimal append. The KAT and full
-boundary/negative matrix are green; no approved golden changed.
+The isolated writer uses one typed contract surface for the three exact Zarr
+v2 arrays. Each full fixed chunk is assembled in a writer-thread-only buffer,
+compressed through the c-blosc adapter, encrypted through the CNG Store
+wrapper, and published by same-directory temp-to-rename. No raw byte crosses a
+C ABI or WPF boundary. The output root must be absent, and failures never
+select a different dependency, codec, profile, key, or wire version.
+
+The writer test ran in approved and locally reproduced Release `/MD` and Debug
+`/MDd` builds. Every configuration passed all three CTest targets. The focused
+writer target reports 501 checks, six publication events, six encrypted chunks,
+and two deterministic-JSON runs. It proves:
+
+- exact `.zarray` dtype/shape/chunks/fill/order/dimension separator and the
+  inner `blosc`/`lz4`/5/shuffle/blocksize-0 object;
+- zero-row partitions publish shape/manifest state but no chunk file;
+- all three partition chunks exist before the committed manifest advances;
+- `write_generation` progresses `0 -> 1 -> 2`, row counts stay aligned, both
+  partitions seal, and finalization follows the last manifest;
+- all six `(key_id, nonce)` pairs are unique and no temp file remains;
+- marker, metadata, and all six `.zarray` files are byte-identical across two
+  independent runs even though nonce-bearing chunk wires intentionally differ.
+
+The Release generator created ignored `open` and `finalized` stores at
+`artifacts/phase0-zarr-roundtrip/stores/`. Each has `tube_1`, two partitions,
+and all three arrays. Each partition represents one global event, which is the
+minimum append/re-arm-like cycle needed for the reader seam. This records the
+accepted reader's round-robin reconstruction only; it does not choose P0-S2
+sharding. No generated store, executable, key, nonce registry, or payload is
+tracked.
+
+Publication uses a single writer and atomic replacement, but this harness does
+not claim crash-consistent directory fsync beyond the Windows
+`FlushFileBuffers` plus `MOVEFILE_WRITE_THROUGH` boundary. AAD rejects a chunk
+swapped to another array/partition/key, but an older authenticated wire at the
+same exact coordinate remains a static-snapshot rollback limit. Those are
+recorded residuals, not hidden acceptance claims.
+
+## Accepted gcsa snapshot roundtrip
+
+The existing `gcsa-dev` identity was rechecked immediately before use:
+container `d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8`,
+image `sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e`,
+Python 3.10.17, and pip-freeze stdout SHA
+`1dfb6e928ff4b3c5e6bd46eb9e7cada01baeb9b99c4818c4fc463740046a954a`.
+No package was installed or downloaded. All imports came from the ignored
+570-file `git archive` snapshot of accepted commit `20689a99`, with bytecode and
+pytest cache disabled.
+
+The exact focused command from the owner prompt passed 328/328 in 5.72 seconds,
+exit 0. The generated-store command then passed 84 positive checks plus nine
+fail-loud negative/visibility checks, exit 0. The accepted strict validator
+reported six encrypted chunks for each of the open and finalized stores. The
+read-only `ZarrStore` proved:
+
+- raw synthetic bits -> c-blosc -> AES wrapper -> gcsa authentication and
+  decryption -> numcodecs 0.13.1 -> original bits for `pulse_features`,
+  `gmi_waveform`, and `fl_waveform`;
+- exact dtype, shapes, chunk contract, 24 feature columns, eight FL channels,
+  five GMI channels, feature min/max, aligned rows, and global event order;
+- the two one-row partitions reconstruct the same logical two-event arrays;
+- open is hidden from product listing and product reads fail with
+  `DatasetNotFinalizedError`, while finalized is visible;
+- wrong key, tag mutation, ciphertext mutation, truncation, partition swap/AAD
+  mismatch, unknown key, plaintext chunk replacement, and manifest overclaim
+  all fail without returned plaintext or repair;
+- tree digests before and after validation are identical, so neither generated
+  store nor the accepted snapshot was mutated.
+
+The validation script is
+`prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py`. Its
+negative stores exist only in a temporary directory and are deleted on exit.
+The sibling gcsa worktree is not imported or modified.
+
+## Remaining human gate
+
+The technical dependency path, KAT, boundary matrix, and isolated three-array
+roundtrip are green; no approved golden changed. The preparatory blocker is not
+declared closed until this branch's checkpoint documents and evidence are
+human-merged. P0-S1/P0-S2, the P0-S2 sharding decision, A-4b, Frozen v1, and
+Phase 0 remain open.

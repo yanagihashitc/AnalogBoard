@@ -35,9 +35,30 @@ and must never be committed.
   dataset/array/chunk context as AAD, requires an explicit key provider and
   nonce registry, and never logs key bytes.
 
-The test target includes adapter checks plus the byte-exact accepted gcsa KAT
-and the full boundary/negative matrix. Generated-store/gcsa roundtrip remains
-Batch 4 scope.
+The test targets include adapter checks, the byte-exact accepted gcsa KAT, the
+full boundary/negative matrix, and the isolated store-publication harness.
+
+## Minimal writer boundary
+
+`minimal_zarr_writer` is a Phase 0 synthetic harness, not a production writer.
+It uses one typed contract surface for the three fixed Zarr v2 arrays, pads each
+physical chunk to its fixed decoded size, compresses only through the thin
+c-blosc adapter, encrypts only through the CNG Store wrapper, and publishes
+files through same-directory temp-to-rename. The CLI invokes it on a dedicated
+writer thread; no acquisition or UI boundary is involved.
+
+The synthetic lifecycle starts with two zero-row partitions and no chunk
+files. It then publishes all three authenticated chunks for partition 0 before
+advancing the manifest and `write_generation`, repeats that minimum append for
+partition 1, and only then publishes `status=finalized` with every partition
+sealed. One nonce registry spans every array and partition. The public gcsa KAT
+key is used only as test material and is never logged or tracked separately.
+
+The two one-row partitions are the minimum append needed to exercise the
+accepted gcsa reader. Its round-robin reconstruction is an observation, not a
+P0-S2 sharding decision. AAD prevents cross-coordinate substitution but does
+not by itself prevent rollback to an older valid wire at the same coordinate;
+that static-snapshot residual remains explicit.
 
 ## KAT and matrix
 
@@ -108,3 +129,32 @@ python3 prototypes/zarr-store-roundtrip/scripts/verify_windows_artifacts.py \
 The verifier requires 12/12 x64 library objects, Release `MSVCRT`, Debug
 `MSVCRTD`, and only the pinned Windows/MSVC/UCRT runtime dependencies. Any
 c-blosc, LZ4, zlib, Zstd, or unknown third-party DLL fails loud.
+
+## Synthetic store and read-only gcsa validation
+
+Generate only into the ignored evidence tree. The output root must not already
+exist:
+
+```text
+p0s_store_generator.exe <verified-kat> <ignored-output-root>
+p0s_store_generator.exe <verified-kat> <ignored-open-output-root> --open
+```
+
+The generator writes no key file, nonce registry, raw measurement, or real
+payload. Run the validator with `PYTHONPATH` pointing to the ignored
+`git archive` snapshot of accepted gcsa commit `20689a99`; do not use the
+sibling worktree:
+
+```bash
+PYTHONPATH=<gcsa-snapshot>/src PYTHONDONTWRITEBYTECODE=1 \
+python prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py \
+  --open-store <ignored-open-store> \
+  --finalized-store <ignored-finalized-store>
+```
+
+The script runs the accepted strict validator and encrypted read-only reader,
+checks all three arrays to original bits, exact orders/shapes/dtypes/min-max,
+partition/global alignment, and verifies the source trees are unchanged. Its
+test-owned temporary copies cover open-product rejection, wrong key, mutated
+tag/ciphertext, truncation, partition swap/AAD mismatch, unknown key ID,
+plaintext fallback, and manifest overclaim. It never repairs a failed store.

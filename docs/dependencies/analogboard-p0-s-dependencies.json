@@ -139,7 +139,9 @@
   "evidence_paths": {
     "bundle_validation": "artifacts/phase0-zarr-roundtrip/dependency/bundle-validation.json",
     "dependency_evidence": "docs/dependencies/analogboard-p0-s-dependency-evidence.md",
+    "gcsa_roundtrip_validator": "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py",
     "gcsa_snapshot": ".deps/p0-s/gcsa-20689a991697217518ec2ff15aaaa2533b169eb0",
+    "generated_stores": "artifacts/phase0-zarr-roundtrip/stores",
     "local_build": "docs/dependencies/analogboard-p0-s-dependency-evidence.md",
     "process_log": "docs/process_log/2026-07-21-p0-s-dependency-preflight-log.md",
     "windows_artifact_verification": "artifacts/phase0-zarr-roundtrip/dependency/windows-artifact-verification.json"
@@ -207,8 +209,9 @@
     "gcsa": {
       "container_id": "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8",
       "focused_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_store_contract_materials.py tests/test_store_schema.py tests/test_zarr_aead.py tests/test_zarr_aead_integration.py tests/test_zarr_state_transition.py tests/test_zarr_visibility.py",
-      "focused_exit": null,
-      "focused_passed": null,
+      "focused_duration_seconds": 5.72,
+      "focused_exit": 0,
+      "focused_passed": 328,
       "image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
       "kat_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -q tests/test_zarr_aead.py::TestAeadCandidateWire::test_wire_exact_kat_encrypts_and_decrypts tests/test_zarr_aead.py::TestAeadCandidateWire::test_kat_plaintext_is_the_declared_inner_blosc_frame",
       "kat_exit": 0,
@@ -222,8 +225,13 @@
         "zarr": "2.18.3"
       },
       "pip_freeze_stdout_sha256": "1dfb6e928ff4b3c5e6bd46eb9e7cada01baeb9b99c4818c4fc463740046a954a",
+      "roundtrip_command": "PYTHONPATH=<snapshot>/src PYTHONDONTWRITEBYTECODE=1 python prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py --open-store <ignored-open-store> --finalized-store <ignored-finalized-store>",
+      "roundtrip_exit": 0,
+      "roundtrip_negative_checks": 9,
+      "roundtrip_positive_checks": 84,
       "snapshot_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
-      "status": "identity verified; focused rerun pending"
+      "snapshot_files": 570,
+      "status": "identity, focused suite, strict validator, and read-only three-array roundtrip pass"
     },
     "kat": {
       "boundary_cases": 33,
@@ -246,6 +254,20 @@
       "release_exit": 0,
       "release_result": "pass for approved and reproduced libraries",
       "status": "byte-identical inner frame, ciphertext, tag, and wire; original bits restored"
+    },
+    "store_writer": {
+      "approved_debug": "pass",
+      "approved_release": "pass",
+      "command": ".claude/skills/msvc-build/scripts/build.sh raw -- ctest --test-dir <prototype-build> --output-on-failure",
+      "deterministic_json_runs": 2,
+      "encrypted_chunks": 6,
+      "exit": 0,
+      "generated_store_profile": "two one-row partitions; open and finalized ignored fixtures",
+      "publication_events": 6,
+      "reproduced_debug": "pass",
+      "reproduced_release": "pass",
+      "status": "atomic chunk-before-manifest publication and D21 generation/finalization pass",
+      "writer_checks": 501
     }
   }
 }

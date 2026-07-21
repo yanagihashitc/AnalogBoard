@@ -20,6 +20,8 @@ enum class ErrorCode {
   kJsonTypeMismatch,
   kJsonMissingField,
   kJsonUnexpectedField,
+  kFilesystem,
+  kStoreContract,
   kAeadContext,
   kAeadKey,
   kAeadUnknownKey,
