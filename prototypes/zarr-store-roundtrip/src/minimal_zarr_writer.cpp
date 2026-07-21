@@ -215,9 +215,9 @@ Json BuildZarray(const MeasurementArrayContract& contract,
   }
   Json compressor{{"id", "blosc"},
                   {"cname", "lz4"},
-                  {"clevel", 5},
-                  {"shuffle", 1},
-                  {"blocksize", 0}};
+                  {"clevel", kBloscCompressionLevel},
+                  {"shuffle", kBloscShuffle},
+                  {"blocksize", kBloscBlockSize}};
   return Json{{"chunks", std::move(chunks)},
               {"compressor", std::move(compressor)},
               {"dimension_separator", "."},

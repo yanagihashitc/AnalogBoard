@@ -72,8 +72,8 @@ void AtomicWriteFile(const std::filesystem::path& path,
                 ErrorMessage("CreateFileW for atomic temporary", error));
   }
 
-  FileHandle handle(raw_handle);
   try {
+    FileHandle handle(raw_handle);
     std::size_t offset = 0;
     while (offset < bytes.size()) {
       const std::size_t remaining = bytes.size() - offset;

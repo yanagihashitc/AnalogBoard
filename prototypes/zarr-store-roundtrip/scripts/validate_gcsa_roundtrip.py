@@ -38,6 +38,10 @@ EXPECTED_SHAPES = {
     name: (2, *candidate.trailing_shape)
     for name, candidate in ARRAY_WIRE_CANDIDATES.items()
 }
+GCSA_SNAPSHOT_EXCLUDED_DIRECTORIES = frozenset(
+    {"__pycache__", ".git", ".hg", ".svn"}
+)
+GCSA_SNAPSHOT_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
 
 
 class CheckFailure(RuntimeError):
@@ -80,11 +84,18 @@ class Checks:
         raise CheckFailure(f"{label}: accepted invalid input")
 
 
-def tree_digest(root: Path) -> str:
+def tree_digest(
+    root: Path,
+    *,
+    exclude: Callable[[Path], bool] | None = None,
+) -> str:
     """Return a deterministic digest without writing cache state."""
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
-        relative = path.relative_to(root).as_posix().encode("utf-8")
+        relative_path = path.relative_to(root)
+        if exclude is not None and exclude(relative_path):
+            continue
+        relative = relative_path.as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
         if path.is_symlink():
@@ -99,6 +110,29 @@ def tree_digest(root: Path) -> str:
         else:
             raise CheckFailure(f"store contains an unsupported entry: {path}")
     return digest.hexdigest()
+
+
+def gcsa_snapshot_root() -> Path:
+    """Return the installed gcsa package directory and nothing above it."""
+    module_file = getattr(gcsa, "__file__", None)
+    if module_file is None:
+        raise CheckFailure("gcsa package has no filesystem location")
+    return Path(module_file).resolve().parent
+
+
+def gcsa_snapshot_digest(root: Path) -> str:
+    """Digest immutable gcsa package content without transient metadata."""
+
+    def excluded(relative: Path) -> bool:
+        return (
+            any(
+                part in GCSA_SNAPSHOT_EXCLUDED_DIRECTORIES
+                for part in relative.parts
+            )
+            or relative.suffix.lower() in GCSA_SNAPSHOT_EXCLUDED_SUFFIXES
+        )
+
+    return tree_digest(root, exclude=excluded)
 
 
 def feature_bits() -> np.ndarray:
@@ -161,8 +195,8 @@ def context(array_name: str, partition: int) -> AeadChunkContext:
 
 def validate_positive(open_root: Path, finalized_root: Path, checks: Checks) -> None:
     """Validate strict schema, product visibility, and original-bit reads."""
-    snapshot_root = Path(gcsa.__file__).resolve().parents[2]
-    before_snapshot = tree_digest(snapshot_root)
+    snapshot_root = gcsa_snapshot_root()
+    before_snapshot = gcsa_snapshot_digest(snapshot_root)
     before_open = tree_digest(open_root)
     before_finalized = tree_digest(finalized_root)
 
@@ -264,7 +298,7 @@ def validate_positive(open_root: Path, finalized_root: Path, checks: Checks) -> 
         "finalized read mutated store",
     )
     checks.require(
-        tree_digest(snapshot_root) == before_snapshot,
+        gcsa_snapshot_digest(snapshot_root) == before_snapshot,
         "accepted gcsa snapshot was mutated",
     )
 
