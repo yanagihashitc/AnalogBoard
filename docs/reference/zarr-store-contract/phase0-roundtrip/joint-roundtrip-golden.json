@@ -3,7 +3,7 @@
   "generated_at": "2026-07-22",
   "result": "pass",
   "generator": {
-    "base_commit": "db1643c50a86f523932c0c11a2f1dea9dd563a44",
+    "base_commit": "1333a3e64bff3557ea82c3fbaa68462381c0cb77",
     "command": "scripts/zarr-roundtrip/run-focused-verification.sh joint",
     "source_sha256": {
       "prototypes/zarr-store-roundtrip/CMakeLists.txt": "54445b4f95fb0bf0b84c7a5623075245f0eb7ea04ec799a54d10e50744e76d8c",
@@ -23,7 +23,7 @@
       "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py": "07f4f9bccdbc35c60dc52aef067e347a3529f77de85cb72f64d9287a366923d2",
       "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "36008c6b0ea8d9f412be1919252eda006e8cc5be2c00f79d029e0750649bfd63",
       "prototypes/zarr-store-roundtrip/tools/store_generator.cpp": "adb04b75093401b10ff1cb6c90a725b1e43cf5cee00dbc62e7a328f51af63575",
-      "scripts/zarr-roundtrip/run-focused-verification.sh": "0349de8f582917cadb7fe45c8c402e32bb3794493b0a3f60bcc0c2ba3f550eef"
+      "scripts/zarr-roundtrip/run-focused-verification.sh": "036af59cdbb732b71651b415a6f911a0f4931bf62453cc95c60c141f1dd579a9"
     }
   },
   "gcsa": {

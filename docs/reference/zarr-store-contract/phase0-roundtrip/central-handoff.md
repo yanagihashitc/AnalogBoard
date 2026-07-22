@@ -18,6 +18,8 @@ Remote branch: `origin/feat/phase0-store-roundtrip`
   `a3aa73383ca092ee682b46d966ff2b20c0360b81`
 - PR #4 immutable reader/source-closure repair:
   `db1643c50a86f523932c0c11a2f1dea9dd563a44`
+- PR #4 ShellCheck source repair:
+  `1333a3e64bff3557ea82c3fbaa68462381c0cb77`
 - Phase PR: [#4](https://github.com/yanagihashitc/AnalogBoard/pull/4)
 - Batch 4 terminal publication at its closeout: local `HEAD`, the same-name
   remote-tracking ref, and
@@ -25,8 +27,8 @@ Remote branch: `origin/feat/phase0-store-roundtrip`
   the Batch 4 SHA; the tracked worktree was clean at verification. The active
   todo was empty and the completed Batch 4 was present in the ignored local
   todo archive.
-- The PR review follow-up uses the immutable source commit above plus this
-  evidence-only descendant; terminal parity is verified after push.
+- The PR review follow-up uses the latest immutable source commit above plus
+  this evidence-only descendant; terminal parity is verified after push.
 - Base: `origin/main` at
   `807b44106dce35fe1f6b8f91b37e130ea69b3cb9`
 
@@ -61,13 +63,13 @@ after the phase PR is merged and task_management accepts the evidence.
   `b90427471da1d18618d4add37273903ce0376dc7eccb1eb682d4e1c42fa6b62d`
 - P0-S2 comparison: 37 positive / 9 expected rejection checks
 - Joint golden SHA-256:
-  `7bc0e903d3b363e64d79d0ff93b58bee0d3775c5e20b64686ae741ee07860a6e`
+  `d5fb8b27f094164fec98acaef1453c607ec7a675d10994706ae55a8a14980de7`
 - Sharding comparison SHA-256:
   `1cd8299455554f5484ebcb0412472fceb391525b4c11c2032ecaabb774d852c7`
 - Sharding decision SHA-256:
-  `0d624ca08c714e6034a7f9f61f5f34a78efedc8cb04e3316e8ce982015007f26`
+  `084433cc1456324746ac5278f34b10e01d68b0e1f6092a5ec184756d12b58060`
 - Evidence/source manifest SHA-256:
-  `5b0d943b4f239c2415ac0bcb3a383b322282f87b2ca643a0f60b4de071f14096`
+  `237b4b54ddeffd2cdb43319a35d69208d2c365615ffce4b94bc2a5df417e30da`
 
 Tracked evidence contains only bounded synthetic metadata, hashes, counts, and
 decisions. Generated stores remain under ignored roots. No real measurement,

@@ -77,7 +77,7 @@ RC transitions, not a separately captured writer crash at every cut.
 ## Evidence and limits
 
 - Joint golden: `joint-roundtrip-golden.json`, SHA-256
-  `7bc0e903d3b363e64d79d0ff93b58bee0d3775c5e20b64686ae741ee07860a6e`
+  `d5fb8b27f094164fec98acaef1453c607ec7a675d10994706ae55a8a14980de7`
 - Sharding comparison: `sharding-comparison.json`, SHA-256
   `1cd8299455554f5484ebcb0412472fceb391525b4c11c2032ecaabb774d852c7`
 - Joint matrix: 269 positive and 35 fail-loud negative checks
