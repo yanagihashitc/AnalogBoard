@@ -16,12 +16,17 @@ Remote branch: `origin/feat/phase0-store-roundtrip`
 - Batch 4: `8fdcd747e0d6bf760fd6e674f620f8c97b356235`
 - PR #4 review source/provenance repair:
   `a3aa73383ca092ee682b46d966ff2b20c0360b81`
+- PR #4 immutable reader/source-closure repair:
+  `db1643c50a86f523932c0c11a2f1dea9dd563a44`
 - Phase PR: [#4](https://github.com/yanagihashitc/AnalogBoard/pull/4)
-- Terminal publication: local `HEAD`, the same-name remote-tracking ref, and
+- Batch 4 terminal publication at its closeout: local `HEAD`, the same-name
+  remote-tracking ref, and
   `git ls-remote --heads origin feat/phase0-store-roundtrip` all resolved to
   the Batch 4 SHA; the tracked worktree was clean at verification. The active
   todo was empty and the completed Batch 4 was present in the ignored local
   todo archive.
+- The PR review follow-up uses the immutable source commit above plus this
+  evidence-only descendant; terminal parity is verified after push.
 - Base: `origin/main` at
   `807b44106dce35fe1f6b8f91b37e130ea69b3cb9`
 
@@ -34,10 +39,11 @@ after the phase PR is merged and task_management accepts the evidence.
 - gcsa package tree SHA-256:
   `c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14`
 - Contract: `gcsa-store-a4a-rc1`
-- gcsa container:
-  `d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8`
-- image:
+- accepted reader image:
   `sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e`
+- runtime policy: exact local image (`--pull never`), fresh `--rm` container,
+  read-only rootfs and repository mount, network disabled, no-new-privileges,
+  and a single writable 64 MiB `/tmp` tmpfs
 - public KAT SHA-256:
   `cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa`
 - dependency: c-blosc 1.21.6 with internal LZ4 1.9.4; AES backend is Windows
@@ -46,22 +52,22 @@ after the phase PR is merged and task_management accepts the evidence.
 ## Acceptance evidence
 
 - C++ approved/reproduced Release/Debug: CTest 3/3 in each configuration;
-  writer 314710 checks and byte-exact KAT matrix 95 in each
-- Host Python: 62/62 after the required-manifest and semantic-evidence
-  negatives were added
+  writer 470877 checks and byte-exact KAT matrix 95 in each
+- Host Python: 82/82, including immutable reader and complete producer-source
+  closure drift checks
 - Accepted gcsa public KAT: 2/2
 - P0-S1 joint matrix: 269 positive / 35 fail-loud negative; decoded/meta
   canonical SHA-256
   `b90427471da1d18618d4add37273903ce0376dc7eccb1eb682d4e1c42fa6b62d`
 - P0-S2 comparison: 37 positive / 9 expected rejection checks
 - Joint golden SHA-256:
-  `adddf4a035b343ff5db372fd1699a6f8f20802c59f109a6d6894657b630d5e37`
+  `7bc0e903d3b363e64d79d0ff93b58bee0d3775c5e20b64686ae741ee07860a6e`
 - Sharding comparison SHA-256:
-  `a22eca0fca592654834bbe22919e26f1e75bc0257e4babfb870efb956a032381`
+  `1cd8299455554f5484ebcb0412472fceb391525b4c11c2032ecaabb774d852c7`
 - Sharding decision SHA-256:
-  `ced20553b54b27d57028c6d8474b9949c522bd51e64c7e43329e6d61f080ebc9`
+  `0d624ca08c714e6034a7f9f61f5f34a78efedc8cb04e3316e8ce982015007f26`
 - Evidence/source manifest SHA-256:
-  `8c572b318efa8d45255fc56a646838e7fef9ba4b2126cfd49a2b05a61ebd37b8`
+  `5b0d943b4f239c2415ac0bcb3a383b322282f87b2ca643a0f60b4de071f14096`
 
 Tracked evidence contains only bounded synthetic metadata, hashes, counts, and
 decisions. Generated stores remain under ignored roots. No real measurement,

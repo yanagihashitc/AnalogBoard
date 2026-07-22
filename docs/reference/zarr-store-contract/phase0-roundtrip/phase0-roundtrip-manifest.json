@@ -6,24 +6,35 @@
     "analogboard_baseline_commit": "da818ba245be252a3717bf9bf3d55c57fa20594e",
     "gcsa_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
     "gcsa_package_tree_sha256": "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14",
-    "gcsa_container_id": "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8",
     "gcsa_image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
+    "gcsa_runtime_policy": {
+      "container_lifecycle": "fresh--rm",
+      "image_pull": "never",
+      "network": "none",
+      "privileges": "no-new-privileges",
+      "repository_mount": "read-only",
+      "rootfs": "read-only",
+      "writable_tmpfs": "/tmp-64m"
+    },
     "contract_id": "gcsa-store-a4a-rc1",
     "public_kat_sha256": "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
   },
   "files_sha256": {
-    "docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json": "adddf4a035b343ff5db372fd1699a6f8f20802c59f109a6d6894657b630d5e37",
-    "docs/reference/zarr-store-contract/phase0-roundtrip/sharding-comparison.json": "a22eca0fca592654834bbe22919e26f1e75bc0257e4babfb870efb956a032381",
-    "docs/reference/zarr-store-contract/phase0-roundtrip/sharding-decision.md": "ced20553b54b27d57028c6d8474b9949c522bd51e64c7e43329e6d61f080ebc9",
+    "docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json": "7bc0e903d3b363e64d79d0ff93b58bee0d3775c5e20b64686ae741ee07860a6e",
+    "docs/reference/zarr-store-contract/phase0-roundtrip/sharding-comparison.json": "1cd8299455554f5484ebcb0412472fceb391525b4c11c2032ecaabb774d852c7",
+    "docs/reference/zarr-store-contract/phase0-roundtrip/sharding-decision.md": "0d624ca08c714e6034a7f9f61f5f34a78efedc8cb04e3316e8ce982015007f26",
     "prototypes/zarr-store-roundtrip/README.md": "92a47876d648f0330c6ef309dc11cea16c5e223ad6bcd7d2f37db13c6187e22b",
     "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h": "09184caee0c9d6ccd7ebb8af3d014d1ab503c632e6c1263074e42b4de0809489",
     "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h": "012df415d283da5a681a3eec85bf73257f0dfb0401b1e4fd848d72343c862252",
-    "prototypes/zarr-store-roundtrip/scripts/compare_sharding_modes.py": "815c5a4bc5d650e5c2cbd0defa2c3b734862f2795eb4cc01d8a8844a263cfddd",
+    "prototypes/zarr-store-roundtrip/scripts/compare_sharding_modes.py": "a6f4f6dd742d1f359e4fbf308b4a426fb46f3ea977a13277f8345822c9aa9faa",
+    "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py": "83697b40d5cf68bec653a444f301413098930b4122d52fc75c05e378d97f4d6c",
     "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "d34b9b1e6230fcc06b493b1ebc94bb42be63ce6616b6ea01ef5a10c11ae6c05f",
     "prototypes/zarr-store-roundtrip/tests/store_writer_tests.cpp": "cd8d83ee54acfc6f459b2f598babd460699eb961a0058c675dfcd5b6abc3dcad",
-    "prototypes/zarr-store-roundtrip/tests/test_compare_sharding_modes.py": "1cdf0aeee0d014b4e773a5832e235bd342120f5b2f4cf46f212c083f7abc2bec",
+    "prototypes/zarr-store-roundtrip/tests/test_compare_sharding_modes.py": "c114315e1a05deb1a3c92de7e730cd3a83f2ad1b0f727ebf62fad7f1e8d5ce10",
+    "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py": "07f4f9bccdbc35c60dc52aef067e347a3529f77de85cb72f64d9287a366923d2",
+    "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "36008c6b0ea8d9f412be1919252eda006e8cc5be2c00f79d029e0750649bfd63",
     "prototypes/zarr-store-roundtrip/tools/store_generator.cpp": "adb04b75093401b10ff1cb6c90a725b1e43cf5cee00dbc62e7a328f51af63575",
-    "scripts/zarr-roundtrip/run-focused-verification.sh": "820ca68fb22a83759ed953007053b325567208eecd70e4db67c92ea7021f5b72"
+    "scripts/zarr-roundtrip/run-focused-verification.sh": "0349de8f582917cadb7fe45c8c402e32bb3794493b0a3f60bcc0c2ba3f550eef"
   },
   "exclusions": {
     "manifest_self_hash": true,

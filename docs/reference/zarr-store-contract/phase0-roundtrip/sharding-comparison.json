@@ -5,6 +5,16 @@
     "analogboard_baseline_commit": "da818ba245be252a3717bf9bf3d55c57fa20594e",
     "gcsa_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
     "gcsa_package_tree_sha256": "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14",
+    "gcsa_image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
+    "gcsa_runtime_policy": {
+      "container_lifecycle": "fresh--rm",
+      "image_pull": "never",
+      "network": "none",
+      "privileges": "no-new-privileges",
+      "repository_mount": "read-only",
+      "rootfs": "read-only",
+      "writable_tmpfs": "/tmp-64m"
+    },
     "contract_id": "gcsa-store-a4a-rc1",
     "public_kat_sha256": "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
   },
