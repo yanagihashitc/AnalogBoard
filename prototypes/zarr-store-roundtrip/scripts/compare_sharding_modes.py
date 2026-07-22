@@ -7,7 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -23,6 +23,7 @@ MEASUREMENT_ARRAYS = (
 )
 ROUND_ROBIN_MODE = "round-robin"
 APPEND_SEQUENTIAL_MODE = "append-sequential"
+READER_COMPATIBILITY_SURFACES = ("strict", "full", "slice", "gather")
 SEQUENTIAL_STRICT_ERROR = "D21 round-robin row distribution mismatch"
 SEQUENTIAL_GLOBAL_ERROR = "events_per_partition distribution mismatch"
 ANALOGBOARD_BASELINE_COMMIT = "da818ba245be252a3717bf9bf3d55c57fa20594e"
@@ -261,6 +262,14 @@ def select_sharding_mode(
     )
 
 
+def is_reader_compatible(compatibility: Mapping[str, Any]) -> bool:
+    """Return whether all accepted global reader surfaces passed."""
+    return all(
+        compatibility.get(surface) == "pass"
+        for surface in READER_COMPATIBILITY_SURFACES
+    )
+
+
 def require_expected_failure(
     label: str,
     action: Callable[[], object],
@@ -288,7 +297,7 @@ def require_expected_failure(
     raise joint.CheckFailure(f"{label}: accepted invalid input")
 
 
-def validate_round_robin(root: Path, checks: Any) -> None:
+def validate_round_robin(root: Path, checks: Any) -> dict[str, str]:
     """Require strict and global reader compatibility for round-robin."""
     before = joint.tree_digest(root)
     report = joint.strict_validate(root)
@@ -355,12 +364,19 @@ def validate_round_robin(root: Path, checks: Any) -> None:
         joint.tree_digest(root) == before,
         "round-robin comparison mutated the store",
     )
+    return {
+        "strict": "pass",
+        "partition_local": "pass",
+        "full": "pass",
+        "slice": "pass",
+        "gather": "pass",
+    }
 
 
 def validate_append_sequential(
     root: Path,
     checks: Any,
-) -> tuple[dict[str, str], dict[str, str]]:
+) -> dict[str, Any]:
     """Require local alignment and global rejection for append-sequential."""
     before = joint.tree_digest(root)
     strict_rejection = require_expected_failure(
@@ -446,7 +462,15 @@ def validate_append_sequential(
         joint.tree_digest(root) == before,
         "append-sequential comparison mutated the store",
     )
-    return strict_rejection, global_rejection
+    return {
+        "strict": "expected-rejection",
+        "partition_local": "pass",
+        "full": "expected-rejection",
+        "slice": "expected-rejection",
+        "gather": "expected-rejection",
+        "strict_rejection": strict_rejection,
+        "global_rejection": global_rejection,
+    }
 
 
 def lifecycle_rows(mode: str) -> list[dict[str, Any]]:
@@ -522,14 +546,18 @@ def build_summary(
     checks: Any,
 ) -> dict[str, Any]:
     """Build bounded compatibility and observational evidence."""
-    validate_round_robin(round_robin_root, checks)
-    strict_rejection, global_rejection = validate_append_sequential(
+    round_robin_compatibility = validate_round_robin(round_robin_root, checks)
+    append_sequential_compatibility = validate_append_sequential(
         append_sequential_root,
         checks,
     )
     selected = select_sharding_mode(
-        round_robin_compatible=True,
-        append_sequential_compatible=False,
+        round_robin_compatible=is_reader_compatible(
+            round_robin_compatibility
+        ),
+        append_sequential_compatible=is_reader_compatible(
+            append_sequential_compatibility
+        ),
     )
     return {
         "schema": "analogboard-p0-s-sharding-comparison-v1",
@@ -557,13 +585,7 @@ def build_summary(
                 "lifecycle": lifecycle_rows(ROUND_ROBIN_MODE),
                 "atomic_chunk_publications": 12,
                 "same_coordinate_rewrites": 6,
-                "compatibility": {
-                    "strict": "pass",
-                    "partition_local": "pass",
-                    "full": "pass",
-                    "slice": "pass",
-                    "gather": "pass",
-                },
+                "compatibility": round_robin_compatibility,
             },
             APPEND_SEQUENTIAL_MODE: {
                 "mapping": [
@@ -575,15 +597,7 @@ def build_summary(
                 "lifecycle": lifecycle_rows(APPEND_SEQUENTIAL_MODE),
                 "atomic_chunk_publications": 6,
                 "same_coordinate_rewrites": 0,
-                "compatibility": {
-                    "strict": "expected-rejection",
-                    "partition_local": "pass",
-                    "full": "expected-rejection",
-                    "slice": "expected-rejection",
-                    "gather": "expected-rejection",
-                    "strict_rejection": strict_rejection,
-                    "global_rejection": global_rejection,
-                },
+                "compatibility": append_sequential_compatibility,
             },
         },
         "observational_metrics": {

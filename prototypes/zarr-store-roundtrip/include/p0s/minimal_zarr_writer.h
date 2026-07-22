@@ -24,6 +24,8 @@ struct StoreGenerationOptions {
   ShardingMode sharding_mode = ShardingMode::kRoundRobin;
   AtomicPublicationObserver chunk_publication_observer = {};
   SensitiveCleanupObserver sensitive_cleanup_observer = {};
+  // Zero preserves the Contract RC layout; nonzero is only for writer tests.
+  std::size_t row_chunk_size_for_testing = 0;
 };
 
 using StoreGenerationRunner =

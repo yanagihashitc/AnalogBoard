@@ -229,11 +229,13 @@ void CreateDirectoryChecked(const std::filesystem::path& path) {
 }
 
 Json BuildZarray(const MeasurementArrayContract& contract,
-                 std::size_t visible_rows) {
+                 std::size_t visible_rows,
+                 std::size_t row_chunk_size) {
   Json chunks = Json::array();
   Json shape = Json::array();
   for (std::size_t dimension = 0; dimension < contract.rank; ++dimension) {
-    chunks.push_back(contract.chunks[dimension]);
+    chunks.push_back(dimension == 0 ? row_chunk_size
+                                    : contract.chunks[dimension]);
     if (dimension == 0) {
       shape.push_back(visible_rows);
     } else {
@@ -405,14 +407,15 @@ std::string ArrayRelativePath(const MeasurementArrayContract& contract,
 
 std::vector<std::uint8_t> BuildDecodedChunk(
     const MeasurementArrayContract& contract,
-    const PartitionChunkPlan& chunk) {
+    const PartitionChunkPlan& chunk,
+    std::size_t row_chunk_size) {
   if (chunk.global_events.size() != chunk.extent.row_count) {
     throw Error(ErrorCode::kStoreContract,
                 "Partition chunk plan row count is inconsistent");
   }
-  std::vector<std::uint8_t> decoded(contract.decoded_chunk_bytes, 0);
   const std::size_t row_bytes =
       contract.decoded_chunk_bytes / contract.chunks[0];
+  std::vector<std::uint8_t> decoded(row_bytes * row_chunk_size, 0);
   if (contract.name == "pulse_features") {
     for (std::size_t row = 0; row < chunk.global_events.size(); ++row) {
       for (std::size_t feature = 0; feature < kPulseFeatureColumns.size();
@@ -475,6 +478,20 @@ class NonceSequence final {
   std::array<std::uint8_t, 8> salt_{};
   std::uint32_t counter_ = 0;
 };
+
+std::size_t EffectiveRowChunkSize(
+    const StoreGenerationOptions& options,
+    const MeasurementArrayContract& contract) {
+  if (options.row_chunk_size_for_testing == 0) {
+    return contract.chunks[0];
+  }
+  if (options.row_chunk_size_for_testing > contract.chunks[0]) {
+    throw Error(
+        ErrorCode::kInvalidArgument,
+        "Synthetic test chunk row count exceeds Contract RC chunk size");
+  }
+  return options.row_chunk_size_for_testing;
+}
 
 void Notify(const PublicationObserver& observer,
             std::string stage,
@@ -775,6 +792,9 @@ void GenerateSyntheticStore(const StoreGenerationOptions& options,
     throw Error(ErrorCode::kFilesystem,
                 "Prototype store output path must not already exist");
   }
+  for (const auto& contract : kMeasurementArrayContracts) {
+    static_cast<void>(EffectiveRowChunkSize(options, contract));
+  }
 
   ScopedWriterAesKey loaded_key(options.sensitive_cleanup_observer);
   const std::uint8_t key_id =
@@ -794,6 +814,8 @@ void GenerateSyntheticStore(const StoreGenerationOptions& options,
                                                "encrypted_chunks"})}}));
 
   for (const auto& contract : kMeasurementArrayContracts) {
+    const std::size_t row_chunk_size =
+        EffectiveRowChunkSize(options, contract);
     const auto array_root = DatasetPath(options.output_root) /
                             std::string(contract.name);
     CreateDirectoryChecked(array_root);
@@ -803,7 +825,8 @@ void GenerateSyntheticStore(const StoreGenerationOptions& options,
                                             partition);
       CreateDirectoryChecked(partition_path);
       AtomicWriteText(partition_path / ".zarray",
-                      DumpDeterministicJson(BuildZarray(contract, 0)));
+                      DumpDeterministicJson(
+                          BuildZarray(contract, 0, row_chunk_size)));
     }
   }
 
@@ -830,6 +853,8 @@ void GenerateSyntheticStore(const StoreGenerationOptions& options,
     }
 
     for (const auto& contract : kMeasurementArrayContracts) {
+      const std::size_t row_chunk_size =
+          EffectiveRowChunkSize(options, contract);
       for (std::size_t partition = 0; partition < kSyntheticPartitionCount;
            ++partition) {
         if (next_rows[partition] == rows[partition]) {
@@ -839,12 +864,14 @@ void GenerateSyntheticStore(const StoreGenerationOptions& options,
             ArrayPath(options.output_root, contract, partition);
         const auto chunks = PlanPartitionChunks(
             options.sharding_mode, partition, next_committed,
-            contract.chunks[0]);
+            row_chunk_size);
         AtomicWriteText(
             partition_path / ".zarray",
-            DumpDeterministicJson(BuildZarray(contract, next_rows[partition])));
+            DumpDeterministicJson(
+                BuildZarray(contract, next_rows[partition], row_chunk_size)));
         for (const auto& chunk : chunks) {
-          auto decoded = BuildDecodedChunk(contract, chunk);
+          auto decoded =
+              BuildDecodedChunk(contract, chunk, row_chunk_size);
           const auto frame =
               CompressBlosc(decoded.data(), decoded.size(), contract.typesize);
           std::fill(decoded.begin(), decoded.end(), std::uint8_t{0});

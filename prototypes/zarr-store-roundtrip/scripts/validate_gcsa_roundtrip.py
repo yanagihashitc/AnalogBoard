@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import struct
+import subprocess
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
@@ -80,7 +82,6 @@ EXPECTED_GCSA_PACKAGE_TREE_SHA256 = (
 )
 EXPECTED_GOLDEN_SCHEMA = "analogboard-p0-s-joint-golden-v1"
 EXPECTED_GOLDEN_DATE = "2026-07-22"
-EXPECTED_GOLDEN_BASE_COMMIT = "01103017c55aed109b450bc81b0af171726a6c91"
 EXPECTED_GOLDEN_COMMAND = "scripts/zarr-roundtrip/run-focused-verification.sh joint"
 EXPECTED_GOLDEN_RELATIVE_PATH = Path(
     "docs/reference/zarr-store-contract/phase0-roundtrip/"
@@ -107,6 +108,119 @@ EXPECTED_PUBLIC_KAT_SHA256 = (
 
 class CheckFailure(RuntimeError):
     """Raised when the isolated roundtrip does not match its fixed contract."""
+
+
+def run_git(
+    repository_root: Path,
+    arguments: Sequence[str],
+) -> subprocess.CompletedProcess[bytes]:
+    """Run one bounded Git read and normalize execution failures."""
+    try:
+        return subprocess.run(
+            [
+                "git",
+                f"--git-dir={repository_root / '.git'}",
+                *arguments,
+            ],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CheckFailure("expected evidence git command failed") from exc
+
+
+def require_immutable_commit(repository_root: Path, commit: object) -> str:
+    """Require one canonical commit SHA that belongs to the current history."""
+    if (
+        not isinstance(commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", commit) is None
+    ):
+        raise CheckFailure("expected evidence base commit is not a full SHA-1")
+    object_type = run_git(repository_root, ["cat-file", "-t", commit])
+    if object_type.returncode != 0:
+        raise CheckFailure("expected evidence base commit is unavailable")
+    if object_type.stdout.strip() != b"commit":
+        raise CheckFailure("expected evidence base object is not a commit")
+    ancestry = run_git(
+        repository_root,
+        ["merge-base", "--is-ancestor", commit, "HEAD"],
+    )
+    if ancestry.returncode != 0:
+        raise CheckFailure(
+            "expected evidence base commit is not an ancestor of HEAD"
+        )
+    return commit
+
+
+def read_committed_source(
+    repository_root: Path,
+    commit: str,
+    relative: str,
+) -> bytes:
+    """Read one safe source path only from the immutable commit tree."""
+    if (
+        not isinstance(commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", commit) is None
+    ):
+        raise CheckFailure("expected evidence base commit is not a full SHA-1")
+    parts = relative.split("/") if isinstance(relative, str) else []
+    if (
+        not parts
+        or any(part in {"", ".", ".."} for part in parts)
+        or re.fullmatch(r"[A-Za-z0-9._/-]+", relative) is None
+    ):
+        raise CheckFailure("expected evidence source path is unsafe")
+    result = run_git(
+        repository_root,
+        ["cat-file", "blob", f"{commit}:{relative}"],
+    )
+    if result.returncode != 0:
+        raise CheckFailure(
+            f"expected evidence source blob is unavailable: {relative}"
+        )
+    return result.stdout
+
+
+def require_source_provenance(
+    repository_root: Path,
+    commit: object,
+    source_hashes: Mapping[str, Any],
+) -> None:
+    """Require committed and shipped sources to match one manifest exactly."""
+    canonical_commit = require_immutable_commit(repository_root, commit)
+    for relative in EXPECTED_GOLDEN_SOURCE_PATHS:
+        expected_sha256 = source_hashes[relative]
+        if (
+            not isinstance(expected_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+        ):
+            raise CheckFailure(
+                f"expected evidence source SHA-256 is not canonical: {relative}"
+            )
+
+        committed_source = read_committed_source(
+            repository_root,
+            canonical_commit,
+            relative,
+        )
+        committed_sha256 = hashlib.sha256(committed_source).hexdigest()
+        if expected_sha256 != committed_sha256:
+            raise CheckFailure(
+                f"expected evidence committed source SHA-256 drift: {relative}"
+            )
+
+        worktree_source = repository_root / relative
+        if not worktree_source.is_file() or worktree_source.is_symlink():
+            raise CheckFailure(
+                f"expected evidence worktree source is absent: {relative}"
+            )
+        worktree_sha256 = hashlib.sha256(worktree_source.read_bytes()).hexdigest()
+        if expected_sha256 != worktree_sha256:
+            raise CheckFailure(
+                f"expected evidence worktree source SHA-256 drift: {relative}"
+            )
 
 
 class StoreEvidence(NamedTuple):
@@ -470,10 +584,7 @@ def require_expected_joint_evidence(
         "source_sha256",
     }:
         raise CheckFailure("expected evidence generator provenance drift")
-    if (
-        generator["base_commit"] != EXPECTED_GOLDEN_BASE_COMMIT
-        or generator["command"] != EXPECTED_GOLDEN_COMMAND
-    ):
+    if generator["command"] != EXPECTED_GOLDEN_COMMAND:
         raise CheckFailure("expected evidence generator identity drift")
     source_hashes = generator["source_sha256"]
     if not isinstance(source_hashes, dict) or set(source_hashes) != set(
@@ -488,13 +599,11 @@ def require_expected_joint_evidence(
         raise CheckFailure("expected evidence path is outside a repository") from exc
     if resolved_path != repository_root / EXPECTED_GOLDEN_RELATIVE_PATH:
         raise CheckFailure("expected evidence path is not the tracked golden")
-    for relative in EXPECTED_GOLDEN_SOURCE_PATHS:
-        source = repository_root / relative
-        if not source.is_file() or source.is_symlink():
-            raise CheckFailure(f"expected evidence source is absent: {relative}")
-        actual_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
-        if source_hashes[relative] != actual_sha256:
-            raise CheckFailure(f"expected evidence source SHA-256 drift: {relative}")
+    require_source_provenance(
+        repository_root,
+        generator["base_commit"],
+        source_hashes,
+    )
 
     expected_gcsa = {
         "commit": EXPECTED_GCSA_SNAPSHOT_COMMIT,

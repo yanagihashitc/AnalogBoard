@@ -303,6 +303,301 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(checks.negative, 1)
 
 
+class ReaderOutcomeTests(unittest.TestCase):
+    class StoreContractValidationError(ValueError):
+        pass
+
+    class Array:
+        def __init__(self, values: object) -> None:
+            self.values = tuple(values)
+
+        def __getitem__(self, key: object) -> ReaderOutcomeTests.Array:
+            if isinstance(key, list):
+                return self.__class__(self.values[index] for index in key)
+            selected = self.values[key]
+            if isinstance(key, slice):
+                return self.__class__(selected)
+            return selected
+
+        def __eq__(self, other: object) -> bool:
+            return isinstance(other, self.__class__) and self.values == other.values
+
+    class Checks:
+        def __init__(self) -> None:
+            self.positive = 0
+            self.negative = 0
+
+        def require(self, condition: bool, message: str) -> None:
+            self.positive += 1
+            if not condition:
+                raise RuntimeError(message)
+
+    @classmethod
+    def _reader_patch(
+        cls,
+        *,
+        round_robin_wrong_data: bool = False,
+        round_robin_exception: Exception | None = None,
+        append_global_success: bool = False,
+    ) -> mock._patch:
+        expected = {
+            name: cls.Array(range(comparator.SYNTHETIC_EVENT_COUNT))
+            for name in comparator.MEASUREMENT_ARRAYS
+        }
+
+        class Store:
+            def __init__(
+                self,
+                root: Path,
+                *,
+                config: object,
+                readonly: bool,
+            ) -> None:
+                del config
+                self.mode = str(root)
+                self.readonly = readonly
+
+            def list_datasets(self) -> list[str]:
+                return ["tube_1"]
+
+            def get_meta(self, dataset_id: str) -> types.SimpleNamespace:
+                if dataset_id != "tube_1":
+                    raise AssertionError("unexpected dataset")
+                append = self.mode == "append-sequential"
+                manifests = {
+                    name: [
+                        types.SimpleNamespace(row_count=2, sealed=True),
+                        types.SimpleNamespace(row_count=3, sealed=True),
+                    ]
+                    for name in comparator.MEASUREMENT_ARRAYS
+                }
+                return types.SimpleNamespace(
+                    events_per_partition=[2, 3] if append else [3, 2],
+                    write_generation=2,
+                    extra={
+                        "partition_sharding": (
+                            comparator.APPEND_SEQUENTIAL_MODE
+                            if append
+                            else comparator.ROUND_ROBIN_MODE
+                        )
+                    },
+                    partition_manifests=manifests,
+                )
+
+        def strict_validate(root: Path) -> object:
+            if str(root) == "append-sequential":
+                raise cls.StoreContractValidationError(
+                    comparator.SEQUENTIAL_STRICT_ERROR
+                )
+            return object()
+
+        def require_report(
+            report: object,
+            checks: ReaderOutcomeTests.Checks,
+            label: str,
+        ) -> None:
+            del report, label
+            for _ in range(4):
+                checks.require(True, "strict report")
+
+        def read_measurement(
+            store: Store,
+            array_name: str,
+            *,
+            event_slice: slice | None = None,
+            event_indices: list[int] | None = None,
+            partition: int | None = None,
+        ) -> ReaderOutcomeTests.Array:
+            if store.mode == "round-robin":
+                if round_robin_exception is not None:
+                    raise round_robin_exception
+                if (
+                    round_robin_wrong_data
+                    and array_name == "pulse_features"
+                    and event_slice is None
+                    and event_indices is None
+                    and partition is None
+                ):
+                    return cls.Array([-1])
+                mapping = comparator.global_events_by_partition(
+                    comparator.ROUND_ROBIN_MODE
+                )
+            else:
+                if partition is None and not append_global_success:
+                    raise ValueError(comparator.SEQUENTIAL_GLOBAL_ERROR)
+                mapping = comparator.global_events_by_partition(
+                    comparator.APPEND_SEQUENTIAL_MODE
+                )
+            actual = expected[array_name]
+            if partition is not None:
+                return actual[list(mapping[partition])]
+            if event_indices is not None:
+                return actual[event_indices]
+            if event_slice is not None:
+                return actual[event_slice]
+            return actual
+
+        return mock.patch.multiple(
+            joint,
+            DATASET_ID="tube_1",
+            StoreContractValidationError=cls.StoreContractValidationError,
+            ZarrStore=Store,
+            store_config=lambda: object(),
+            expected_arrays=lambda: expected,
+            strict_validate=strict_validate,
+            require_report=require_report,
+            read_measurement=read_measurement,
+            arrays_equal=lambda _name, actual, wanted: actual == wanted,
+            tree_digest=lambda _root: "unchanged",
+            create=True,
+        )
+
+    def test_build_summary_uses_successful_reader_outcomes(self) -> None:
+        # Given: Strict and product-reader seams with accepted RR behavior and
+        # expected append-sequential rejection behavior.
+        checks = self.Checks()
+
+        # When: Both candidate validators and the summary builder run.
+        with self._reader_patch(), mock.patch.object(
+            comparator,
+            "collect_directory_metrics",
+            return_value={
+                "regular_files": 1,
+                "total_regular_file_bytes": 1,
+                "measurement_chunk_files": 1,
+                "measurement_wire_bytes": 1,
+                "array_partition_directories": 1,
+            },
+        ):
+            summary = comparator.build_summary(
+                Path("round-robin"),
+                Path("append-sequential"),
+                [10, 11, 12],
+                [9, 10, 11],
+                checks,
+            )
+
+        # Then: Compatibility and selection reflect the observed reader outcomes.
+        self.assertEqual(summary["decision"]["selected"], "round-robin")
+        self.assertEqual(
+            summary["modes"]["round-robin"]["compatibility"],
+            {
+                "strict": "pass",
+                "partition_local": "pass",
+                "full": "pass",
+                "slice": "pass",
+                "gather": "pass",
+            },
+        )
+        self.assertEqual(
+            summary["modes"]["append-sequential"]["compatibility"]["full"],
+            "expected-rejection",
+        )
+        self.assertEqual(summary["verification"], {
+            "positive_checks": 37,
+            "expected_rejections": 9,
+        })
+
+    def test_validators_return_observed_compatibility_records(self) -> None:
+        # Given: Accepted RR reads and the expected append-sequential rejection.
+        round_robin_checks = self.Checks()
+        append_checks = self.Checks()
+
+        # When: Each validator completes its reader matrix.
+        with self._reader_patch():
+            round_robin = comparator.validate_round_robin(
+                Path("round-robin"),
+                round_robin_checks,
+            )
+            append = comparator.validate_append_sequential(
+                Path("append-sequential"),
+                append_checks,
+            )
+
+        # Then: Each returns the compatibility record established by those reads.
+        self.assertEqual(round_robin["strict"], "pass")
+        self.assertEqual(round_robin["full"], "pass")
+        self.assertEqual(append["strict"], "expected-rejection")
+        self.assertEqual(append["full"], "expected-rejection")
+        self.assertEqual(round_robin_checks.positive, 23)
+        self.assertEqual(append_checks.positive, 14)
+        self.assertEqual(append_checks.negative, 9)
+
+    def test_build_summary_rejects_incompatible_validator_outcome(self) -> None:
+        # Given: A completed validator record where RR is not globally compatible.
+        incompatible_round_robin = {
+            "strict": "pass",
+            "partition_local": "pass",
+            "full": "expected-rejection",
+            "slice": "pass",
+            "gather": "pass",
+        }
+        incompatible_append = {
+            "strict": "expected-rejection",
+            "partition_local": "pass",
+            "full": "expected-rejection",
+            "slice": "expected-rejection",
+            "gather": "expected-rejection",
+            "strict_rejection": {},
+            "global_rejection": {},
+        }
+
+        # When/Then: Selection derives from the records and refuses adoption.
+        with mock.patch.object(
+            comparator,
+            "validate_round_robin",
+            return_value=incompatible_round_robin,
+        ), mock.patch.object(
+            comparator,
+            "validate_append_sequential",
+            return_value=incompatible_append,
+        ), self.assertRaisesRegex(RuntimeError, "cannot adopt round-robin"):
+            comparator.build_summary(
+                Path("round-robin"),
+                Path("append-sequential"),
+                [10, 11, 12],
+                [9, 10, 11],
+                self.Checks(),
+            )
+
+    def test_round_robin_wrong_data_fails_loud(self) -> None:
+        # Given: A RR reader that returns incorrect full pulse-feature data.
+        checks = self.Checks()
+
+        # When/Then: Validation rejects the observed data with a stable message.
+        with self._reader_patch(
+            round_robin_wrong_data=True
+        ), self.assertRaisesRegex(RuntimeError, "pulse_features full/global drift"):
+            comparator.validate_round_robin(Path("round-robin"), checks)
+
+    def test_round_robin_reader_exception_is_not_converted_to_pass(self) -> None:
+        # Given: A RR product reader that fails before returning data.
+        checks = self.Checks()
+
+        # When/Then: The original reader failure propagates without an outcome.
+        with self._reader_patch(
+            round_robin_exception=OSError("reader unavailable")
+        ), self.assertRaisesRegex(OSError, "reader unavailable"):
+            comparator.validate_round_robin(Path("round-robin"), checks)
+
+    def test_append_global_read_success_fails_loud(self) -> None:
+        # Given: Append-sequential local reads are aligned, but a global read
+        # unexpectedly succeeds instead of raising the accepted incompatibility.
+        checks = self.Checks()
+
+        # When/Then: Validation refuses to report the mode as incompatible.
+        with self._reader_patch(
+            append_global_success=True
+        ), self.assertRaisesRegex(
+            RuntimeError,
+            "append-sequential pulse_features full: accepted invalid input",
+        ):
+            comparator.validate_append_sequential(
+                Path("append-sequential"),
+                checks,
+            )
+
+
 class CliTests(unittest.TestCase):
     def test_cli_requires_both_roots_and_three_samples_per_mode(self) -> None:
         arguments = [

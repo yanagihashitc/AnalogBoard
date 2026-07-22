@@ -397,7 +397,8 @@ std::vector<std::uint8_t> DecodeChunk(
     const p0s::MeasurementArrayContract& contract,
     std::size_t partition,
     const p0s::TestKeyProvider& keys,
-    std::size_t chunk_index = 0) {
+    std::size_t chunk_index = 0,
+    std::size_t decoded_chunk_bytes = 0) {
   const std::string chunk_key = ChunkKey(contract.rank, chunk_index);
   const p0s::AeadChunkContext context(
       std::string(p0s::kSyntheticDatasetId),
@@ -407,7 +408,9 @@ std::vector<std::uint8_t> DecodeChunk(
   const auto frame = p0s::DecryptAead(
       ReadBytes(ArrayPath(root, contract.name, partition) / chunk_key), context,
       keys);
-  return p0s::DecompressBlosc(frame, contract.decoded_chunk_bytes);
+  return p0s::DecompressBlosc(
+      frame, decoded_chunk_bytes == 0 ? contract.decoded_chunk_bytes
+                                      : decoded_chunk_bytes);
 }
 
 void CheckDeterministicDecodedChunks(const std::filesystem::path& first,
@@ -976,7 +979,8 @@ std::uint64_t ReadLittleEndian(const std::vector<std::uint8_t>& input,
 
 void CheckDecodedRowsAndTailFill(const std::filesystem::path& root,
                                  const std::filesystem::path& kat,
-                                 p0s::ShardingMode mode) {
+                                 p0s::ShardingMode mode,
+                                 std::size_t row_chunk_size = 0) {
   // Given: The final cycle-2 chunks and the same public planner used by writer.
   const auto keys = LoadTestKeys(kat);
 
@@ -984,14 +988,19 @@ void CheckDecodedRowsAndTailFill(const std::filesystem::path& root,
   for (const auto& contract : p0s::kMeasurementArrayContracts) {
     const std::size_t row_bytes =
         contract.decoded_chunk_bytes / contract.chunks[0];
+    const std::size_t effective_chunk_rows =
+        row_chunk_size == 0 ? contract.chunks[0] : row_chunk_size;
+    const std::size_t decoded_chunk_bytes =
+        row_bytes * effective_chunk_rows;
     for (std::size_t partition = 0;
          partition < p0s::kSyntheticPartitionCount; ++partition) {
       const auto chunks = p0s::PlanPartitionChunks(
-          mode, partition, p0s::kSyntheticEventCount, contract.chunks[0]);
+          mode, partition, p0s::kSyntheticEventCount, effective_chunk_rows);
       for (const auto& chunk : chunks) {
         const auto decoded = DecodeChunk(root, contract, partition, keys,
-                                         chunk.extent.chunk_index);
-        Require(decoded.size() == contract.decoded_chunk_bytes,
+                                         chunk.extent.chunk_index,
+                                         decoded_chunk_bytes);
+        Require(decoded.size() == decoded_chunk_bytes,
                 "writer did not emit a full decoded Zarr chunk buffer");
         bool logical_values_match = true;
         for (std::size_t row = 0; row < chunk.global_events.size(); ++row) {
@@ -1038,6 +1047,91 @@ void CheckDecodedRowsAndTailFill(const std::filesystem::path& root,
                 "partial chunk tail fill is not zero");
       }
     }
+  }
+}
+
+void CheckMultiChunkWriterPipeline(const std::filesystem::path& root,
+                                   const std::filesystem::path& kat) {
+  // Given: The unchanged five-event round-robin fixture and a test-only
+  // two-row physical chunk override that forces a one-row chunk-index-1 tail.
+  constexpr std::size_t kTestChunkRows = 2;
+  std::size_t chunk_one_atomic_cuts = 0;
+  p0s::StoreGenerationOptions options{
+      root, kat, true, p0s::ShardingMode::kRoundRobin};
+  options.row_chunk_size_for_testing = kTestChunkRows;
+  options.chunk_publication_observer =
+      [&chunk_one_atomic_cuts](
+          const p0s::AtomicPublicationObservation& observation) {
+        if (observation.destination_path.filename().string().rfind("1.", 0) !=
+            0) {
+          return;
+        }
+
+        // Then: Chunk index 1 reaches the flushed pre-rename atomic cut.
+        Require(std::filesystem::is_regular_file(observation.temporary_path),
+                "chunk index 1 did not reach its atomic temporary cut");
+        Require(!std::filesystem::exists(observation.destination_path),
+                "chunk index 1 became visible before atomic rename");
+        ++chunk_one_atomic_cuts;
+      };
+
+  // When: The real writer plans, fills, compresses, encrypts, and publishes it.
+  p0s::GenerateSyntheticStore(options);
+
+  // Then: Each array publishes chunk 1, advertises only the test physical row
+  // size, and preserves the production Contract RC constants in memory.
+  Require(chunk_one_atomic_cuts == p0s::kMeasurementArrayContracts.size(),
+          "writer did not atomically publish chunk index 1 for every array");
+  for (const auto& contract : p0s::kMeasurementArrayContracts) {
+    const auto zarray =
+        ReadJson(ArrayPath(root, contract.name, 0) / ".zarray");
+    Require(zarray.at("chunks").at(0) == kTestChunkRows,
+            "test-only writer did not advertise its physical row chunk");
+    Require(std::filesystem::is_regular_file(
+                ArrayPath(root, contract.name, 0) /
+                ChunkKey(contract.rank, 1)),
+            "writer did not publish chunk index 1");
+  }
+  CheckDecodedRowsAndTailFill(root, kat, p0s::ShardingMode::kRoundRobin,
+                              kTestChunkRows);
+}
+
+void CheckInvalidTestChunkSizeFailsBeforePublication(
+    const std::filesystem::path& root,
+    const std::filesystem::path& kat) {
+  // Given: A test-only row chunk one above the smallest Contract RC maximum.
+  p0s::StoreGenerationOptions options{
+      root, kat, true, p0s::ShardingMode::kRoundRobin};
+  options.row_chunk_size_for_testing =
+      p0s::kMeasurementArrayContracts[1].chunks[0] + 1;
+
+  // When: Store generation validates its test seam.
+  RequireTypedError(
+      [&options] { p0s::GenerateSyntheticStore(options); },
+      p0s::ErrorCode::kInvalidArgument,
+      "Synthetic test chunk row count exceeds Contract RC chunk size");
+
+  // Then: Invalid test layout cannot leave a partially published store.
+  Require(!std::filesystem::exists(root),
+          "invalid test chunk size created an output store");
+}
+
+void CheckMinimumTestChunkSize(const std::filesystem::path& root,
+                               const std::filesystem::path& kat) {
+  // Given: The minimum positive test-only row chunk size.
+  p0s::StoreGenerationOptions options{
+      root, kat, true, p0s::ShardingMode::kRoundRobin};
+  options.row_chunk_size_for_testing = 1;
+
+  // When: The unchanged five-event fixture is generated at that boundary.
+  p0s::GenerateSyntheticStore(options);
+
+  // Then: The third row of partition 0 is published at chunk index 2.
+  for (const auto& contract : p0s::kMeasurementArrayContracts) {
+    Require(std::filesystem::is_regular_file(
+                ArrayPath(root, contract.name, 0) /
+                ChunkKey(contract.rank, 2)),
+            "minimum test chunk size did not publish the final row chunk");
   }
 }
 
@@ -1469,6 +1563,9 @@ int main(int argc, char** argv) {
     const auto sequential_second = temporary.path() / "sequential_b";
     const auto round_robin_open = temporary.path() / "round_robin_open";
     const auto sequential_open = temporary.path() / "sequential_open";
+    const auto multi_chunk = temporary.path() / "multi_chunk";
+    const auto invalid_chunk = temporary.path() / "invalid_chunk";
+    const auto minimum_chunk = temporary.path() / "minimum_chunk";
     const std::filesystem::path kat(argv[1]);
 
     CheckFiveEventMappingAndValidation();
@@ -1484,6 +1581,9 @@ int main(int argc, char** argv) {
     CheckAtomicWriteRejectsMissingParent(temporary.path());
     CheckAtomicWriteCleansUpAfterMoveFailure(temporary.path());
     CheckWriterKeyCleanupOnException(temporary.path(), kat);
+    CheckMultiChunkWriterPipeline(multi_chunk, kat);
+    CheckInvalidTestChunkSizeFailsBeforePublication(invalid_chunk, kat);
+    CheckMinimumTestChunkSize(minimum_chunk, kat);
 
     const auto round_robin_run = GenerateObservedStore(
         round_robin_first, kat, p0s::ShardingMode::kRoundRobin);

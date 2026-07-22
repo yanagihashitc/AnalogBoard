@@ -401,6 +401,15 @@ class TrackedEvidenceTests(unittest.TestCase):
         }
 
     @staticmethod
+    def _committed_source(
+        repository: Path,
+        commit: str,
+        relative: str,
+    ) -> bytes:
+        del commit
+        return (repository / relative).read_bytes()
+
+    @staticmethod
     def _manifest(
         root: Path,
         summary: dict[str, object],
@@ -413,7 +422,7 @@ class TrackedEvidenceTests(unittest.TestCase):
             "generated_at": "2026-07-22",
             "result": "pass",
             "generator": {
-                "base_commit": "01103017c55aed109b450bc81b0af171726a6c91",
+                "base_commit": "8fdcd747e0d6bf760fd6e674f620f8c97b356235",
                 "command": "scripts/zarr-roundtrip/run-focused-verification.sh joint",
                 "source_sha256": {"source.txt": source_sha},
             },
@@ -449,18 +458,26 @@ class TrackedEvidenceTests(unittest.TestCase):
         return golden, document
 
     def test_tracked_evidence_accepts_an_exact_joint_summary(self) -> None:
-        # Given: A bounded manifest containing exact provenance and runtime summary.
+        # Given: A bounded manifest whose source is available at the pinned commit.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             summary = self._summary()
             golden, _ = self._manifest(root, summary)
 
-            # When/Then: Exact semantic evidence is accepted.
+            # When: Immutable commit lookup returns the recorded source bytes.
             with mock.patch.object(
                 validator,
                 "EXPECTED_GOLDEN_SOURCE_PATHS",
                 ("source.txt",),
+            ), mock.patch.object(
+                validator,
+                "require_immutable_commit",
+            ), mock.patch.object(
+                validator,
+                "read_committed_source",
+                side_effect=self._committed_source,
             ):
+                # Then: Exact semantic evidence is accepted.
                 validator.require_expected_joint_evidence(golden, summary)
 
     def test_tracked_evidence_rejects_missing_or_malformed_summary(self) -> None:
@@ -480,6 +497,13 @@ class TrackedEvidenceTests(unittest.TestCase):
                         validator,
                         "EXPECTED_GOLDEN_SOURCE_PATHS",
                         ("source.txt",),
+                    ), mock.patch.object(
+                        validator,
+                        "require_immutable_commit",
+                    ), mock.patch.object(
+                        validator,
+                        "read_committed_source",
+                        side_effect=self._committed_source,
                     ), self.assertRaisesRegex(
                         validator.CheckFailure,
                         "top-level structure drift|no joint_evidence object",
@@ -502,6 +526,13 @@ class TrackedEvidenceTests(unittest.TestCase):
                 validator,
                 "EXPECTED_GOLDEN_SOURCE_PATHS",
                 ("source.txt",),
+            ), mock.patch.object(
+                validator,
+                "require_immutable_commit",
+            ), mock.patch.object(
+                validator,
+                "read_committed_source",
+                side_effect=self._committed_source,
             ), self.assertRaisesRegex(
                 validator.CheckFailure,
                 "joint evidence differs from tracked golden",
@@ -532,11 +563,116 @@ class TrackedEvidenceTests(unittest.TestCase):
                     validator,
                     "EXPECTED_GOLDEN_SOURCE_PATHS",
                     ("source.txt",),
+                ), mock.patch.object(
+                    validator,
+                    "require_immutable_commit",
+                ), mock.patch.object(
+                    validator,
+                    "read_committed_source",
+                    side_effect=self._committed_source,
                 ), self.assertRaises(validator.CheckFailure):
                     validator.require_expected_joint_evidence(
                         golden,
                         self._summary(),
                     )
+
+    def test_tracked_evidence_rejects_committed_source_drift(self) -> None:
+        # Given: The manifest and worktree agree but the pinned commit blob differs.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            summary = self._summary()
+            golden, _ = self._manifest(root, summary)
+
+            # When: Immutable source lookup returns bytes not named by the manifest.
+            with mock.patch.object(
+                validator,
+                "EXPECTED_GOLDEN_SOURCE_PATHS",
+                ("source.txt",),
+            ), mock.patch.object(
+                validator,
+                "require_immutable_commit",
+                return_value="8fdcd747e0d6bf760fd6e674f620f8c97b356235",
+            ), mock.patch.object(
+                validator,
+                "read_committed_source",
+                return_value=b"different committed source\n",
+            ), self.assertRaisesRegex(
+                validator.CheckFailure,
+                "committed source SHA-256 drift",
+            ):
+                # Then: The producer revision mismatch fails before acceptance.
+                validator.require_expected_joint_evidence(golden, summary)
+
+    def test_tracked_evidence_rejects_worktree_source_drift(self) -> None:
+        # Given: The manifest and pinned commit agree on accepted source bytes.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            summary = self._summary()
+            golden, _ = self._manifest(root, summary)
+            (root / "source.txt").write_text(
+                "uncommitted shipped source\n",
+                encoding="utf-8",
+            )
+
+            # When: The shipped worktree differs from the attested commit.
+            with mock.patch.object(
+                validator,
+                "EXPECTED_GOLDEN_SOURCE_PATHS",
+                ("source.txt",),
+            ), mock.patch.object(
+                validator,
+                "require_immutable_commit",
+                return_value="8fdcd747e0d6bf760fd6e674f620f8c97b356235",
+            ), mock.patch.object(
+                validator,
+                "read_committed_source",
+                return_value=b"accepted source\n",
+            ), self.assertRaisesRegex(
+                validator.CheckFailure,
+                "worktree source SHA-256 drift",
+            ):
+                # Then: A green runtime result cannot mask shipped-source drift.
+                validator.require_expected_joint_evidence(golden, summary)
+
+    def test_tracked_evidence_rejects_absent_or_symlinked_worktree_source(
+        self,
+    ) -> None:
+        # Given: A manifest whose committed source bytes are still available.
+        for variant in ("absent", "symlink"):
+            with self.subTest(
+                variant=variant
+            ), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                summary = self._summary()
+                golden, _ = self._manifest(root, summary)
+                source = root / "source.txt"
+                source.unlink()
+                if variant == "symlink":
+                    target = root / "target.txt"
+                    target.write_text("accepted source\n", encoding="utf-8")
+                    source.symlink_to(target.name)
+
+                # When: The shipped source is absent or redirects through a symlink.
+                with mock.patch.object(
+                    validator,
+                    "EXPECTED_GOLDEN_SOURCE_PATHS",
+                    ("source.txt",),
+                ), mock.patch.object(
+                    validator,
+                    "require_immutable_commit",
+                    return_value=(
+                        "8fdcd747e0d6bf760fd6e674f620f8c97b356235"
+                    ),
+                ), mock.patch.object(
+                    validator,
+                    "read_committed_source",
+                    return_value=b"accepted source\n",
+                ), self.assertRaisesRegex(
+                    validator.CheckFailure,
+                    "worktree source is absent",
+                ):
+                    # Then: Neither variant can satisfy shipped-source provenance.
+                    validator.require_expected_joint_evidence(golden, summary)
 
     def test_tracked_evidence_rejects_duplicate_keys_and_nonfinite_values(
         self,
@@ -566,6 +702,227 @@ class TrackedEvidenceTests(unittest.TestCase):
                         golden,
                         self._summary(),
                     )
+
+
+class ImmutableSourceProvenanceTests(unittest.TestCase):
+    COMMIT = "8fdcd747e0d6bf760fd6e674f620f8c97b356235"
+
+    @staticmethod
+    def _git_result(
+        *,
+        returncode: int = 0,
+        stdout: bytes = b"",
+    ) -> object:
+        return validator.subprocess.CompletedProcess(
+            args=[],
+            returncode=returncode,
+            stdout=stdout,
+            stderr=b"",
+        )
+
+    def test_accepts_a_canonical_commit_in_current_head_history(self) -> None:
+        # Given: The full object ID names a commit that is an ancestor of HEAD.
+        with mock.patch.object(
+            validator.subprocess,
+            "run",
+            side_effect=(
+                self._git_result(stdout=b"commit\n"),
+                self._git_result(),
+            ),
+        ) as run:
+            # When: The immutable generator revision is validated.
+            actual = validator.require_immutable_commit(
+                Path("/repository"),
+                self.COMMIT,
+            )
+
+        # Then: The canonical SHA is returned after type and ancestry checks.
+        self.assertEqual(actual, self.COMMIT)
+        self.assertEqual(
+            [call.args[0][2:] for call in run.call_args_list],
+            [
+                ["cat-file", "-t", self.COMMIT],
+                ["merge-base", "--is-ancestor", self.COMMIT, "HEAD"],
+            ],
+        )
+
+    def test_reads_a_source_blob_from_the_pinned_commit(self) -> None:
+        # Given: Git returns one blob from the exact immutable revision.
+        completed = validator.subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=b"committed source\n",
+            stderr=b"",
+        )
+        with mock.patch.object(
+            validator.subprocess,
+            "run",
+            return_value=completed,
+        ) as run:
+            # When: The source blob is requested by repository-relative path.
+            actual = validator.read_committed_source(
+                Path("/repository"),
+                self.COMMIT,
+                "source/file.py",
+            )
+
+        # Then: The exact committed bytes are returned without a tree fallback.
+        self.assertEqual(actual, b"committed source\n")
+        run.assert_called_once_with(
+            [
+                "git",
+                "--git-dir=/repository/.git",
+                "cat-file",
+                "blob",
+                f"{self.COMMIT}:source/file.py",
+            ],
+            check=False,
+            stdout=validator.subprocess.PIPE,
+            stderr=validator.subprocess.PIPE,
+            timeout=10,
+        )
+
+    def test_rejects_noncanonical_commit_identifiers_before_git(self) -> None:
+        # Given: Symbolic, short, empty, uppercase, and non-string identifiers.
+        malformed_identifiers = (
+            "HEAD",
+            self.COMMIT[:12],
+            "",
+            self.COMMIT.upper(),
+            None,
+        )
+
+        # When/Then: Every noncanonical boundary fails before Git execution.
+        with mock.patch.object(validator.subprocess, "run") as run:
+            for commit in malformed_identifiers:
+                with self.subTest(commit=commit), self.assertRaises(
+                    validator.CheckFailure
+                ) as malformed:
+                    validator.require_immutable_commit(
+                        Path("/repository"),
+                        commit,
+                    )
+                self.assertEqual(
+                    str(malformed.exception),
+                    "expected evidence base commit is not a full SHA-1",
+                )
+        run.assert_not_called()
+
+    def test_rejects_unavailable_or_noncommit_objects(self) -> None:
+        # Given: One absent object and one blob object at canonical full SHAs.
+        cases = {
+            "unavailable": (
+                self._git_result(returncode=1),
+                "expected evidence base commit is unavailable",
+            ),
+            "blob": (
+                self._git_result(stdout=b"blob\n"),
+                "expected evidence base object is not a commit",
+            ),
+        }
+
+        # When/Then: Existence and exact object type are both enforced.
+        for label, (result, message) in cases.items():
+            with self.subTest(label=label), mock.patch.object(
+                validator.subprocess,
+                "run",
+                return_value=result,
+            ), self.assertRaises(validator.CheckFailure) as raised:
+                validator.require_immutable_commit(
+                    Path("/repository"),
+                    self.COMMIT,
+                )
+            self.assertEqual(str(raised.exception), message)
+
+    def test_rejects_a_commit_outside_current_head_history(self) -> None:
+        # Given: A valid commit object that is not an ancestor of current HEAD.
+        with mock.patch.object(
+            validator.subprocess,
+            "run",
+            side_effect=(
+                self._git_result(stdout=b"commit\n"),
+                self._git_result(returncode=1),
+            ),
+        ):
+            # When: The unrelated revision is used as generator provenance.
+            with self.assertRaises(validator.CheckFailure) as raised:
+                validator.require_immutable_commit(
+                    Path("/repository"),
+                    self.COMMIT,
+                )
+
+        # Then: Evidence outside the shipped history fails closed.
+        self.assertEqual(
+            str(raised.exception),
+            "expected evidence base commit is not an ancestor of HEAD",
+        )
+
+    def test_rejects_unsafe_or_missing_blob_paths(self) -> None:
+        # Given: Parent traversal, an absolute path, and a missing committed blob.
+        invalid_paths = ("../source.py", "/source.py")
+        missing = validator.subprocess.CompletedProcess(
+            args=[],
+            returncode=1,
+            stdout=b"",
+            stderr=b"missing",
+        )
+
+        # When/Then: Unsafe paths fail before Git can resolve them.
+        for relative in invalid_paths:
+            with self.subTest(relative=relative), self.assertRaises(
+                validator.CheckFailure
+            ) as invalid:
+                validator.read_committed_source(
+                    Path("/repository"),
+                    self.COMMIT,
+                    relative,
+                )
+            self.assertEqual(
+                str(invalid.exception),
+                "expected evidence source path is unsafe",
+            )
+
+        # When: A safe path has no blob in the pinned commit.
+        with mock.patch.object(
+            validator.subprocess,
+            "run",
+            return_value=missing,
+        ), self.assertRaises(validator.CheckFailure) as unavailable:
+            validator.read_committed_source(
+                Path("/repository"),
+                self.COMMIT,
+                "missing.py",
+            )
+
+        # Then: Blob absence fails closed without reading the working tree.
+        self.assertEqual(
+            str(unavailable.exception),
+            "expected evidence source blob is unavailable: missing.py",
+        )
+
+    def test_rejects_git_execution_failure(self) -> None:
+        # Given: Git execution fails to start or exceeds its fixed timeout.
+        failures = (
+            OSError("git unavailable"),
+            validator.subprocess.TimeoutExpired(cmd="git", timeout=10),
+        )
+
+        # When/Then: External failures are normalized without partial acceptance.
+        for failure in failures:
+            with self.subTest(failure=type(failure).__name__), mock.patch.object(
+                validator.subprocess,
+                "run",
+                side_effect=failure,
+            ), self.assertRaises(validator.CheckFailure) as raised:
+                validator.require_immutable_commit(
+                    Path("/repository"),
+                    self.COMMIT,
+                )
+            self.assertEqual(
+                str(raised.exception),
+                "expected evidence git command failed",
+            )
+            self.assertIs(raised.exception.__cause__, failure)
 
 
 class ChecksTests(unittest.TestCase):
