@@ -1,0 +1,54 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('Focused')]
+    [string]$Mode,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('Release')]
+    [string]$Configuration,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('x64')]
+    [string]$Architecture
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+$env:DOTNET_NOLOGO = '1'
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
+$env:DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE = '1'
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepositoryRoot = (Resolve-Path -LiteralPath (Join-Path $ScriptDir '..\..') -ErrorAction Stop).Path
+$PrototypeRoot = (Resolve-Path -LiteralPath (Join-Path $RepositoryRoot 'prototypes\scatter-rendering') -ErrorAction Stop).Path
+$ModulePath = Join-Path $ScriptDir 'scatter_verification_core.psm1'
+
+try {
+    Import-Module $ModulePath -Force -ErrorAction Stop
+    $null = Assert-P0R1VerificationSelection `
+        -Mode $Mode `
+        -Configuration $Configuration `
+        -Architecture $Architecture
+    $dependency = Assert-P0R1RepositoryDependencyContract -RepositoryRoot $RepositoryRoot
+    $result = Invoke-P0R1FocusedVerification `
+        -RepositoryRoot $RepositoryRoot `
+        -PrototypeRoot $PrototypeRoot `
+        -Configuration $Configuration `
+        -Architecture $Architecture
+
+    Write-Host "P0-R1 verification status=$($result.Status) mode=$Mode configuration=$Configuration architecture=$Architecture"
+    Write-Host "sdk=$($dependency.SdkVersion) desktop_runtime=$($dependency.DesktopRuntimeVersion) target=$($dependency.TargetFramework) external_nuget=$($dependency.ExternalNuGetPackageCount)"
+    if (-not $result.ProductTestsExecuted) {
+        Write-Host 'prototype_projects=0 product_tests=not-run reason=Batch1-contract-only'
+    }
+    else {
+        Write-Host "tests_total=$($result.TestsTotal) tests_passed=$($result.TestsPassed) tests_failed=$($result.TestsFailed)"
+    }
+    exit 0
+}
+catch {
+    [Console]::Error.WriteLine("P0-R1 verification failed: $($_.Exception.Message)")
+    exit 2
+}

@@ -738,11 +738,11 @@ pre {
   <p class="subtitle">高速多パラメータ計測アプリの刷新 — ストラングラー型リビルド／新UI／堅牢化／リアルタイム scatter・gating／4GB制限撤廃／自動再接続／診断ログ／実機エミュレーション</p>
   <div class="doc-meta">
     <span class="doc-meta-item"><strong>Type:</strong> 実装プラン</span>
-    <span class="doc-meta-item"><strong>Version:</strong> Draft 4.3</span>
-    <span class="doc-meta-item"><strong>Status:</strong> in_progress（current＝フェーズ0：実機gate・owner gateは決着済み。USBPcap P0-C1〜C3＝completed。P0-S1／P0-S2＝completed（暗号化Zarr往復合格＋round-robin採用、PR #4／#5 merged、中央独立再検証Pass）。P0-C4／初期コーパスgate／scatter／D17 golden regression／Frozen v1はopen）</span>
+    <span class="doc-meta-item"><strong>Version:</strong> Draft 4.5</span>
+    <span class="doc-meta-item"><strong>Status:</strong> in_progress（current＝フェーズ0：実機gate・owner gateは決着済み。USBPcap P0-C1〜C3＝completed。P0-S1／P0-S2＝completed（暗号化Zarr往復合格＋round-robin採用、PR #4／#5 merged、中央独立再検証Pass）。P0-R1＝planned（same-scope owner amendmentでasinh authorityを<code>AB-DISPLAY-TRANSFORM-v1</code>として固定し、exact .NET SDK 10.0.302／Desktop Runtime 10.0.10 availabilityも確認済み。amended goalのResumeから実行再開可能）。P0-C4／初期コーパスgate／D17 golden regression／Frozen v1はopen）</span>
     <span class="doc-meta-item"><strong>Created:</strong> 2026-07-03</span>
     <span class="doc-meta-item"><strong>Last Updated:</strong> 2026-07-22（<strong>Draft 4.2</strong>：P0-S1 の暗号化 Zarr joint matrix（269 positive／35 fail-loud negative、C++ 4構成 writer 314710／KAT 95）と P0-S2 の同一fixture比較（37 positive／9 expected rejection）を証跡化し、<strong>round-robin を Frozen v1 入力として採用</strong>。phase PR merge前のため両 Step は <strong>gate_ready</strong>、A-4b／Frozen v1／Phase 0 は open のまま。同一座標の旧authenticated chunk差し戻しは、以前の信頼済みmetadataとの順序比較なら generation rollback を検出できる一方、単一static snapshotでは検出不能という Contract RC limit へ表現を限定。D1〜D23・P0-S1／P0-S2受け入れ基準は変更なし。<strong>Draft 4.1</strong>：phase PR <a href="https://github.com/yanagihashitc/AnalogBoard/pull/2">#2</a> の merge（2026-07-20T18:33:20Z・merge SHA <code>f4ea8ffb</code>・PR check＝Cursor Bugbot pass・repository に Actions CI 定義なし）を受け、<strong>P0-C1〜C3 を gate_ready → completed へ更新</strong>（中央受領 2026-07-21・task_management roadmap v1.33。実行 evidence の正本は <code>tasks/todo_archive.md</code>、focused tests 最終 55/55）。フェーズ0成果物の「Zarrライタ往復プロトタイプ」「パーティションシャーディング決着」へ<strong>安定 Step ID（P0-S1／P0-S2）を付与</strong>（Draft 3.7 の P0-C 方式と同趣旨の traceability 追加。既存の内容・合格条件・D1〜D23 は変更なし。中央 dispatch の goal.md が source plan から scope を参照できるようにする）。P0-C4・「初期コーパス取得」gate・Frozen v1・Phase 0 は open のまま。<strong>Draft 4.0</strong>：USBPcap protocol baseline の P0-C1〜C3 を実装・検証し、tracked <a href="../reference/usb-recording-corpus/2026-07-17/README.md">corpus index</a>、全6 capture の immutable identity／payload-free bounded summary schema v2、TShark・Capinfos 4.6.7、focused test 48/48、同一8 JSONの2-run byte identityを証跡化。phase PR merge前のため3 Stepは <strong>gate_ready</strong> とし、P0-C4・「初期コーパス取得」gate・Frozen v1・Phase 0はopenのまま。D1〜D23およびP0-C1／P0-C3／P0-C4の内容・受け入れ基準は変更せず、P0-C2は stop／drain／close の証拠範囲を観測された USB ordering に限定し、graceful close、DDR drain 完了、host cleanup 完了、graceful process termination という内部状態は USBPcap だけでは証明できない limitation を明確化した。<strong>Draft 3.9</strong>：P0-C4 の <strong>availability 確認と restore 検証を別条件へ分離</strong>（復元元を持たない availability 確認を restore 成功と記録しない）。<strong>Draft 3.8</strong>：codex cross-review 反映——<strong>P0-C4 の受け入れ基準を強化</strong>。実測 asset を全件固定（bin 3,520／cfg 6／telemetry 2／capture 6・総計 22,310,526,580 bytes）し、<strong>「Git 管理外」と「D19 at-rest 保護」を分離</strong>したうえで <strong>owner 判断（2026-07-20）＝既存資産は pre-D19 の平文 local-only evidence として持ち出し禁止</strong>を明記。canonical locator／owner／retention、manifest 全件の present・readable・SHA 照合と restore/availability smoke を gate evidence 化し、restore（同一 SHA 復元）と再取得（別 corpus version）を分離、FL/FH pair completeness と clock basis／許容誤差の検証を追加。<strong>Draft 3.7</strong>：フェーズ0「初期録画コーパス」へ<strong>安定 Step ID（P0-C1〜P0-C4）と受け入れ基準を正本として追加</strong>（<a href="#p0-corpus-steps">実機エミュレーション戦略節</a>）。中央 dispatch の <code>goal.md</code> が source plan から受け入れ基準を導出できるようにするための追加で、既存の gate 判定・D1〜D23 は変更していない。<strong>「初期コーパス取得」gate は P0-C1〜C4 の全完了で閉じる</strong>ことを明記し、2026-07-20 owner 判断（USBPcap コーパス最優先）により中央 dispatch 済み scope は P0-C1〜C3 のみ＝当該 scope 完了後も初期コーパス gate は未完で残ることを callout 化（実資産＝USBPcap capture 6本・FL/FH bin 3,520本・cfg・再アーム telemetry CSV 計約21GB を実測して記載）。<strong>Draft 3.6</strong>：remote validation branchのfield source凍結（commit <code>d760e90</code>）と、完了済みfield-session runbook／legacy process logのarchive pathを反映。<strong>Draft 3.5</strong>：D13 canonical v2の本文伝播——読替calloutに依存していた「正準v1」記述8箇所を解消（D19行・FR-03表／本文・UX gate管理・UIモック表・gcsa互換riskの生存仕様はv2へ直接更新、P1クローズ済み提案・gcsa v0.4.1ソース参照の履歴記述は当時v1／現行v2の注記方式）。<strong>Draft 3.4</strong>：codex cross-review反映——D4のr7 baseline決定をエグゼクティブサマリ・方針判断へ伝播、切替SW／DFXの因果表現を証跡範囲へ整合（旧driver側failureは「因果未確定のopen reliability note」へ統一。「DFX非依存」「切替SWが唯一の真因」表現を撤回）、validator証跡を実在2件（N-smoke／B-formal）へ分離、Gate C行へN formal soakのphase 4集約を明記、Status metadata追加。<strong>Draft 3.3</strong>：owner gate 2件を確定（2026-07-19 オーナー承認）——<strong>D4＝移植baselineとして「r7移植例外」を承認</strong>（実機実証済みr7を移植baselineとし、dev限定回復policyはheader単位でTier2回帰つきcherry-pick可。devの修正・再gateはcritical path外の任意作業へ格下げ。フェーズ1着手のD4前提は成立）。<strong>N leg formal soak＝再実施せずphase 4の100run soakへ集約</strong>（30 valid high cycleの非formal aggregateをPhase 0記録として受理）。<strong>Draft 3.2</strong>：D23 NoDfx dual-driver session（session <code>20260716_2</code>・判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>＝hash pin済み）の2026-07-16〜17実行結果を反映。N leg＝N0／N-smoke Pass、N-formalは単一セッション未達で<strong>30 valid high cycleの非formal aggregate</strong>（EP4 failure 0・rearm中央値15ms／max 16ms）として記録。R＝driver <code>1.2.3.20</code>への原状回復Pass。B leg＝初回pre-trigger EP4 failure（Set+98.19s・<code>UsbdStatus=0xC0000011</code>）→再試行Type B drain stall（pair 56）→承認済みUSB replug後のrecovery 33/33 Type C（FL/FH 20,750 pair・<code>.tmp</code> 0・telemetry 33行 <code>dropped=0</code>）により、<strong>ownerがGate Bを条件付きPassとして閉鎖（2026-07-17 13:02 JST・初回attempt信頼性はopen note）</strong>。旧driver側でもEP4 failureが発生したため<strong>DFXは唯一の故障機構ではない</strong>と明記。legacy再アームbaselineを取得済みへ更新し、2026-07-17午後のcharacterization 6 run＋USBPcap capture（<code>artifacts/field-session/2026-07-17-characterization/</code>）を参考証跡として登録。<strong>Draft 3.1</strong>：DFX A-B-A（session <code>20260716_111343</code>、driver 1.3.0.4固定・単変数）でA＝Set後EP4 failure 3/3→B＝NoDfxでidle 10/10・low/high Type C全Pass→復元A＝failure再発を確認し、DFXを因果要因と確定。owner decisionで<strong>D23（新driver構成＝cyusb3 1.3.x＋NoDfx）を追加</strong>。10ms polling remediation buildは実機3/3 Fail（DFX有効）でpoll-rate仮説棄却。判定buildをtelemetry graceful-stop buildへ更新し、実行順を「新driver＋NoDfx（N leg formal soak）→driver原状回復→旧driver Gate B閉鎖（B leg）」へ改訂（runbook Draft 2.6）。<strong>Draft 3.0</strong>：返却packageから、旧build＋driver 1.2.3.20のGate Bはlow 3＋high 31の34/34 Type Cだがdata／telemetry証跡不足、driver 1.3.0.4のGate Cはidle EP4 10/10後にSet→automatic EP4 failure 3/3と確定。外部trigger待ちの成功・未trigger pollだけ10ms cadenceを入れた新buildをreview後にclean rebuildし、現在の新driverでlow×1＋high×1のfail-fast smokeを30本より先に行う。<strong>Draft 2.9</strong>：既存新PC high×3はデータ完全性Passの参考証跡として保持し、実行binaryは<code>0.1.4r7</code>、Gate Bとの差はbinaryのみというowner確認によりGate B開始を承認。historical inventoryは推測で遡及せず、Gate B/C開始前に固定package hash・driver・USB topology・PC/OS・保存先disk・active power planとmanual contextを取得するread-only collectorを必須化。<strong>Draft 2.8</strong>：R7取得系＋endpoint hardening＋境界telemetryの新固定buildを作成。旧driver low×3＋high×30でPC qualificationと再アームbaselineを同時取得し、同じEXE/DLLのまま新driver first gateへ進む順序に統合。既存high×3は参考証跡として新build countへ合算しない。最終p99判定は新AcquisitionEngineでPhase 4に再実施。<strong>Draft 2.7</strong>：新PC high×3の全12GBを監査し、1,997 FL/FH pairの完全性とログ<code>saveBytes</code>一致を確認。Gate A残件をdriver／binary hash／port等の実行条件provenanceに限定。<strong>Draft 2.6</strong>：実機CH1–CH13と現行gcsaの波形／ラベル対応をオーナー確認済み証跡としてD17を凍結し、追加のch特定runを実機gateから除外。driver A/BをGate Cへ繰上げ。<strong>Draft 2.5</strong>：実機ステップ0／スイッチ区間A/B／新PC高密度×3の証跡を反映。r18全4run FailによりD4 gate未成立、残りのlegacy検証はr7を使用。PC採用と旧PC原因証明を分離し、phase 0はlow×3＋high合計30の段階qualification、100run soakはphase 4へ集約。現行r7ログからの再アームp99算出を禁止し、marker実装後の別計画へ分離。R7取得系matched buildで旧→新driver単変数A/Bを行う順序へ更新。<strong>Draft 2.4</strong>：gate 定義表・保存の権威・store 一覧・受け入れ表・フェーズ図の具体入力を canonical v2 へ直接更新。<strong>Draft 2.3</strong>：D13 の gate 出力契約をcanonical v2へ改訂。<strong>Draft 2.2</strong>：D19のAEAD実装層をStoreラッパへ確定。<strong>Draft 2.1</strong>：cross-review反映。<strong>Draft 2.0</strong>：D20〜D22と横断ロードマップ同期を追加）</span>
-    <span class="doc-meta-item"><strong>Current Revision:</strong> <strong>Draft 4.3</strong>（2026-07-22：P0-S1／P0-S2 を <strong>completed</strong> へ更新。phase PR <a href="https://github.com/yanagihashitc/AnalogBoard/pull/4">#4</a>（head <code>e6e9e9aae48f84e3f894dc09f5c931dc215e1223</code>、merge <code>580f1d2af9cb2f93e28dfcccc3c41b76e31677ae</code>）と Advance closeout PR <a href="https://github.com/yanagihashitc/AnalogBoard/pull/5">#5</a>（head <code>c0f6786bf09b754da0875ed098fa4c82a6c7f604</code>、merge <code>2a4bd937383f16a58d3d3b6f57e311ff942ce813</code>）の merged／Bugbot success、owner-approved equivalent、clean worktree・todo Active空、C++ 4構成 CTest 3/3（writer 470877／KAT 95）、host Python 82/82、gcsa KAT 2/2、joint 269/35、sharding 37/9 の中央独立再実行を根拠とする。handoff ID <code>AnalogBoard:P0-S1-P0-S2:580f1d2af9cb2f93e28dfcccc3c41b76e31677ae</code>、report SHA-256 <code>3a451646d741f4428c499b1ea00b0abf6a11a401e92460b0a1933d839d75b6f4</code>。受け入れ基準・D1〜D23・round-robin決定は変更しない。A-4b／P0-C4／初期コーパスgate／scatter／D17 golden regression／Frozen v1／Phase 0はopen）</span>
+    <span class="doc-meta-item"><strong>Current Revision:</strong> <strong>Draft 4.5</strong>（2026-07-22：P0-R1のasinh authority gapをsame-scope owner amendmentで解消。<code>AB-DISPLAY-TRANSFORM-v1</code>としてforward <code>asinh(raw / 150.0)</code>、inverse <code>150.0 * sinh(display)</code>、float64 cofactor <code>150.0</code>、raw ADC-linear authority、変換前の非有限event-pair除外／明示count、transform単体境界のtyped error、forward absolute <code>1e-12</code>／inverse <code>max(1e-12, abs(raw) * 1e-12)</code>を固定。tracked fixture pathを<code>docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json</code>とし、独立標準ライブラリreference＋provenanceを必須化、fixture hashは作成後checkpointでのみ固定する。linear／log／biexpはsys_app HEAD <code>c4583a995b6a3855791ae72bca7356eb49ef5c90</code>の既存authorityを継続し、gcsa現行densityにasinh accepted implementation／fixtureがないこと、旧<code>np.arcsinh(values / 150)</code>は参考provenanceに限ることを明記。Windowsでexact SDK <code>10.0.302</code>／Desktop Runtime <code>10.0.10</code> availabilityをlive確認し、P0-R1を<strong>planned</strong>へ戻してamended goalのResumeから実行可能とした。Step ID、hard threshold／timing window、<code>AB-PERF-REF-v1</code>、dependency／checkpoint pin、Phase 0／Phase 2境界は不変。P0-C4／初期コーパスgate／D17 golden regression／A-4b／Frozen v1／Phase 0はopenのまま。<strong>Draft 4.4</strong>（2026-07-22：scatter successorへ安定Step ID <strong>P0-R1</strong>を付与し、Phase 0に限定した描画経路選定scope、hard fixture、数値性能gate、<code>AB-PERF-REF-v1</code>、checkpoint profile、dependency pinをowner決定として固定。D1はライフサイクル上のowner amendmentにより <strong>C#/.NET 10 WPF</strong>へ更新し、exact toolchainを SDK <code>10.0.302</code>／Desktop Runtime <code>10.0.10</code>／<code>net10.0-windows</code> Release x64へpinした。preparatory PR <a href="https://github.com/yanagihashitc/AnalogBoard/pull/6">#6</a>（head <code>c90a5073527a861472fc33f1a6e60369db9314df</code>、merge <code>0ef90460179bd9e0a2c04281263208044754c987</code>、Cursor Bugbot success、head／merge tree同一）でscope-neutral routerとversioned P0-R1 checkpoint profileを導入済み。正式goalはdispatch済みだが、19:38 JSTの現環境確認でWindows側SDKなし（Runtimeは3.1.32のみ）だったため、P0-R1は <strong>blocked</strong> としexact SDK/runtime availability後に同じgoalでRunする。P0-C4／初期コーパスgate／D17 golden regression／A-4b／Frozen v1／Phase 0はopenのまま。<strong>Draft 4.3</strong>（2026-07-22：P0-S1／P0-S2 を <strong>completed</strong> へ更新。phase PR <a href="https://github.com/yanagihashitc/AnalogBoard/pull/4">#4</a>（head <code>e6e9e9aae48f84e3f894dc09f5c931dc215e1223</code>、merge <code>580f1d2af9cb2f93e28dfcccc3c41b76e31677ae</code>）と Advance closeout PR <a href="https://github.com/yanagihashitc/AnalogBoard/pull/5">#5</a>（head <code>c0f6786bf09b754da0875ed098fa4c82a6c7f604</code>、merge <code>2a4bd937383f16a58d3d3b6f57e311ff942ce813</code>）の merged／Bugbot success、owner-approved equivalent、clean worktree・todo Active空、C++ 4構成 CTest 3/3（writer 470877／KAT 95）、host Python 82/82、gcsa KAT 2/2、joint 269/35、sharding 37/9 の中央独立再実行を根拠とする。handoff ID <code>AnalogBoard:P0-S1-P0-S2:580f1d2af9cb2f93e28dfcccc3c41b76e31677ae</code>、report SHA-256 <code>3a451646d741f4428c499b1ea00b0abf6a11a401e92460b0a1933d839d75b6f4</code>。受け入れ基準・D1〜D23・round-robin決定は変更しない。A-4b／P0-C4／初期コーパスgate／scatter／D17 golden regression／Frozen v1／Phase 0はopen）</span>
     <span class="doc-meta-item"><strong>Audience:</strong> オーナー／開発チーム</span>
     <span class="doc-meta-item"><strong>Source:</strong> prompt.md ＋ 2件のコードベース調査</span>
   </div>
@@ -786,7 +786,7 @@ pre {
         現行 AnalogBoard は Windows の MFC ダイアログアプリ（<code>AnalogBoard_TestApp</code>）＋ Cypress CyAPI をラップする DLL（<code>AnalogBoard_Dll</code>）で、FX3 USB3 経由で FPGA ボードから高速多パラメータ計測データを取得する。本プランは、オーナーの7要求（直感的UI・新ドライバ対応・堅牢化・リアルタイム scatter/histogram/gating・4GB制限撤廃・自動再接続・診断ログ）を満たすための再構築方針を定める。
       </p>
       <p>
-        2件の多エージェント調査（コード・FPGA仕様・git履歴・現場ログの横断精査）と、オーナーからの重要な追加情報（後述の「真因」）を突き合わせた結論は<strong>「ストラングラー型リビルド」</strong>である。initial commit へ戻す全面やり直しは推奨しない — それは現場で鍛えられた実証済み資産（テスト済みポリシー群・レジスタ意味論・SimRunner）を捨て、god class と欠陥DLLの骨格へ後退することを意味する。代わりに、<strong>UI・描画・オーケストレーションは新スタックで作り直し、取得・通信コアはネイティブ C++ の新設計としつつ実機実証済み資産を移植</strong>する（移植baselineは<strong>r7</strong>＝2026-07-19 D4 owner gateで移植例外承認。dev限定の回復policyはheader単位でTier2回帰つきcherry-pick）。UIスタックの推奨は <strong>C#/.NET 8 WPF ＋ ネイティブ C++ コア（C ABI）</strong>。
+        2件の多エージェント調査（コード・FPGA仕様・git履歴・現場ログの横断精査）と、オーナーからの重要な追加情報（後述の「真因」）を突き合わせた結論は<strong>「ストラングラー型リビルド」</strong>である。initial commit へ戻す全面やり直しは推奨しない — それは現場で鍛えられた実証済み資産（テスト済みポリシー群・レジスタ意味論・SimRunner）を捨て、god class と欠陥DLLの骨格へ後退することを意味する。代わりに、<strong>UI・描画・オーケストレーションは新スタックで作り直し、取得・通信コアはネイティブ C++ の新設計としつつ実機実証済み資産を移植</strong>する（移植baselineは<strong>r7</strong>＝2026-07-19 D4 owner gateで移植例外承認。dev限定の回復policyはheader単位でTier2回帰つきcherry-pick）。UIスタックは2026-07-22のD1 owner amendmentにより <strong>C#/.NET 10 WPF ＋ ネイティブ C++ コア（C ABI）</strong>。
       </p>
       <p>
         最大の技術リスクだった「18回の現場イテレーションでも閉じなかった高密度EP6タイムアウト」は、オーナーの調査により<strong>物理層（機械側ケーブル先端のインラインon/off切替スイッチ）が主要因</strong>と判明し、これを外すことで Win10/Win11 とも高密度で96ウェル1枚を完走できるレベルまで解消した（この判明が説明するのは高密度EP6タイムアウト＝Type A系であり、後の実機確認で判明した別軸事象——r18系の<code>queue_full_timeout</code>、driver 1.3.0.4のSet後EP4 failure（DFX因果・D23）、旧driverで散発したEP4 failure／Type B stall（因果未確定・open note）——はこの限りではない）。この判明により最大リスクはブロッカーから大幅に格下げされ、通信コアの再設計は「未診断問題の引き継ぎ」ではなく「堅牢化・自動再接続・4GB再アームのための設計改善」に純化する。加えて実機アクセスが希少という制約に対し、<strong>実機通信を録画して決定論的に再生するエミュレータ（Tier 1〜3、2枚目FX3をデバイスエミュレータとする HIL を初期から含む）</strong>を一級ワークストリームとして構築し、日常開発・回帰・UI/描画開発を実機ゼロで回せるようにする。
@@ -801,7 +801,7 @@ pre {
         <div class="card card--accent-blue">
           <div class="card-label">推奨スタック</div>
           <div class="card-value">WPF ＋ C++コア</div>
-          <div class="card-detail">C#/.NET 8 WPF（UI）＋ ネイティブ C++ コア（C ABI）。生データはネイティブに閉じる。</div>
+          <div class="card-detail">C#/.NET 10 WPF（UI）＋ ネイティブ C++ コア（C ABI）。生データはネイティブに閉じる。</div>
         </div>
         <div class="card card--accent-amber">
           <div class="card-label">真因判明</div>
@@ -819,11 +819,11 @@ pre {
     <!-- ===== DECISIONS ===== -->
     <section id="decisions">
       <h2>確定した意思決定</h2>
-      <p>オーナーと確定した23件（D1〜D18：2026-07-03〜06、D19〜D22：2026-07-09〜10 の統合検討スタディ後に確定、D23：2026-07-16 DFX A-B-A後に確定）。以降の設計はこれを前提とする。</p>
+      <p>オーナーと確定した23件（D1〜D18：2026-07-03〜06、D19〜D22：2026-07-09〜10 の統合検討スタディ後に確定、D23：2026-07-16 DFX A-B-A後に確定。D1は2026-07-22に.NET 10へamend）。以降の設計はこれを前提とする。</p>
       <table class="spec-table">
         <thead><tr><th>#</th><th>論点</th><th>決定</th><th>要点</th></tr></thead>
         <tbody>
-          <tr><td>D1</td><td>UIスタック</td><td><strong>C#/.NET 8 WPF ＋ ネイティブC++コア</strong></td><td>フォーム系UIとログ基盤が最速。生データはC++に閉じGCを触れさせない。</td></tr>
+          <tr><td>D1</td><td>UIスタック</td><td><strong>C#/.NET 10 WPF ＋ ネイティブC++コア</strong></td><td>フォーム系UIとログ基盤が最速。生データはC++に閉じGCを触れさせない。<strong>Amendment（2026-07-22 owner決定）</strong>：当初の.NET 8からサポートライフサイクルを踏まえて.NET 10へ更新。P0-R1 exact pinはSDK <code>10.0.302</code>／Desktop Runtime <code>10.0.10</code>／<code>net10.0-windows</code> Release x64。</td></tr>
           <tr><td>D2</td><td>4GB破棄の許容度</td><td><strong>実測後に判断</strong></td><td>既存logs/のfill/drainレートで判定。まずホスト側再アーム、FW変更は要否を測定で決める。</td></tr>
           <tr><td>D3</td><td>FPGA FW改変</td><td><strong>段階的（並行判断）</strong></td><td>ホスト側再アームを先行、リングバッファ＋abortレジスタは並行で発注判断。リビルドをブロックしない。</td></tr>
           <tr><td>D4</td><td>移植ベースライン</td><td><strong>r7移植例外を承認（2026-07-19 owner gate通過）</strong></td><td>当初決定「r18実機テスト後にdev」は、2026-07-14の直結A/Bでr18相当がlow 3/3＋high 1/1全て<code>queue_full_timeout</code>（<code>-20013</code>）となり採用gate不成立。<strong>2026-07-19のowner gateで「r7からの移植例外」を承認</strong>——移植baselineは実機実証済みr7（Phase 0の全gate証跡＝Gate B閉鎖33/33・N leg・re-arm baselineはr7系buildで取得）。dev限定の回復policy（例：<code>Ep6TimeoutRecoveryPolicy.h</code>）はheader単位でTier2回帰つきcherry-pick可。devの<code>queue_full_timeout</code>修正・再gateはcritical path外の任意作業とし、フェーズ1着手をブロックしない。</td></tr>
@@ -969,7 +969,7 @@ pre {
       <figure class="diagram-container">
         <div class="mermaid">
 flowchart TB
-  subgraph UI["UI 層 &#40;C# / .NET 8 WPF&#41;"]
+  subgraph UI["UI 層 &#40;C# / .NET 10 WPF&#41;"]
     GAIN["ゲイン 1スライダー &#43; 詳細エキスパンダ"]
     PLOT["リアルタイム scatter / histogram / GMI波形 &#40;マルチプロット・タイル毎に表示gate選択&#41;"]
     GATE["gating &#40;矩形/ポリゴン&#41; — sys_app / gcsa 互換"]
@@ -1157,7 +1157,7 @@ flowchart TB
           </tr>
           <tr>
             <td><code>UX-04</code></td><td>FR-02</td>
-            <td><strong>表示スケール切替</strong>：軸ごとに log/biexp/asinh を表示のみ変換。保存値・gate座標は生ADC線形のまま（下流契約と一致、sys_app と同じ「表示時のみ変換」思想）。変換後空間での密度ビニングをフェーズ0描画プロトタイプの要件に含める。</td>
+            <td><strong>表示スケール切替</strong>：軸ごとに linear/log/biexp/asinh を表示のみ変換。保存値・gate座標は生ADC線形のまま（下流契約と一致、sys_app と同じ「表示時のみ変換」思想）。P0-R1では linear/log/biexp は既存sys_app authority、asinhはowner-pinned <code>AB-DISPLAY-TRANSFORM-v1</code>に従い、変換後空間での密度ビニングをフェーズ0描画プロトタイプの要件に含める。</td>
             <td><span class="badge badge-should">Should</span></td><td>中</td>
             <td><span class="badge badge-confirmed">確定</span></td>
           </tr>
@@ -2149,8 +2149,8 @@ flowchart LR
         <tbody>
           <tr>
             <td><strong>0 地固め</strong></td>
-            <td>実機確認（<strong>2026-07-17時点：実機gateの主要残件を消化</strong>。Step 0／スイッチA/B／D17確認完了、新PC high×3は参考証跡としてclosed。DFX A-B-A＝session <code>20260716_111343</code>で因果確認→<strong>D23＝NoDfx正式採用</strong>。D23 session <code>20260716_2</code>（判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>）でN leg＝N0／N-smoke Pass＋30 valid high cycle非formal aggregate、R＝rollback Pass、<strong>B leg＝Gate B条件付きPass・closed（2026-07-17）</strong>、legacy re-arm baseline取得済み、2026-07-17 characterization＋USBPcap captureを回収。実機gateは全て決着——<strong>D4 owner gate＝r7移植例外承認・N formal soak＝phase 4集約（いずれも2026-07-19 オーナー承認）</strong>）、初期録画コーパス（<code>artifacts/field-session/2026-07-17-characterization/</code>のbin＋pcapが初期候補。<strong>Step ID＝P0-C1〜P0-C4</strong>：C1〜C3＝USBPcap protocol baseline（<strong>completed</strong>・PR #2 merged 2026-07-20T18:33:20Z・merge <code>f4ea8ffb</code>・中央受領 2026-07-21）、C4＝bin／cfg／telemetry の index 化（<strong>planned・別 scope</strong>））、scatter描画プロトタイプ（UX-04／FR-13）、Zarrライタ往復プロトタイプ（<strong>Step ID＝P0-S1</strong>。D19暗号化込み・c-blosc＋最小自作ライタ）、パーティションシャーディング決着（<strong>Step ID＝P0-S2</strong>）、出力契約凍結（D21可視性契約・min/max）。P0-S1／P0-S2 は 2026-07-22 に <strong>completed</strong>（<a href="../reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json">P0-S1 joint evidence</a>・<a href="../reference/zarr-store-contract/phase0-roundtrip/sharding-decision.md">P0-S2 decision</a>、PR #4／#5 merged、中央独立再検証Pass）。</td>
-            <td>Gate A reference closure（済）、Gate B/C inventory＋実機結果（<strong>Gate B条件付き閉鎖済み・Gate CはN legへ移行済み</strong>）、D4 owner gate（<strong>済＝r7移植例外承認 2026-07-19</strong>）、legacy re-arm baseline（<strong>取得済み</strong>）、確認済みD17対応のgolden regression化、初期コーパス取得（<strong>P0-C1〜P0-C4 の全完了で閉じる</strong>。P0-C1〜C3は<strong>completed</strong>（PR #2 merged 2026-07-20・中央受領 2026-07-21）、P0-C4は<strong>planned</strong>——gateは未完のまま）、描画成立、暗号化Zarr往復成立（<strong>P0-S1＝completed</strong>）、シャーディング決着（<strong>P0-S2＝round-robin採用・completed</strong>）、出力契約凍結。再アームの最終合否は新engineのphase 4で再実施。</td>
+            <td>実機確認（<strong>2026-07-17時点：実機gateの主要残件を消化</strong>。Step 0／スイッチA/B／D17確認完了、新PC high×3は参考証跡としてclosed。DFX A-B-A＝session <code>20260716_111343</code>で因果確認→<strong>D23＝NoDfx正式採用</strong>。D23 session <code>20260716_2</code>（判定build <code>r7-driver-telemetry-graceful-stop-20260716T1314JST</code>）でN leg＝N0／N-smoke Pass＋30 valid high cycle非formal aggregate、R＝rollback Pass、<strong>B leg＝Gate B条件付きPass・closed（2026-07-17）</strong>、legacy re-arm baseline取得済み、2026-07-17 characterization＋USBPcap captureを回収。実機gateは全て決着——<strong>D4 owner gate＝r7移植例外承認・N formal soak＝phase 4集約（いずれも2026-07-19 オーナー承認）</strong>）、初期録画コーパス（<code>artifacts/field-session/2026-07-17-characterization/</code>のbin＋pcapが初期候補。<strong>Step ID＝P0-C1〜P0-C4</strong>：C1〜C3＝USBPcap protocol baseline（<strong>completed</strong>・PR #2 merged 2026-07-20T18:33:20Z・merge <code>f4ea8ffb</code>・中央受領 2026-07-21）、C4＝bin／cfg／telemetry の index 化（<strong>planned・別 scope</strong>））、bounded real-time visualization path decision（<strong>Step ID＝P0-R1</strong>、FR-02／FR-13／UX-04／UX-20、<strong>planned＝<code>AB-DISPLAY-TRANSFORM-v1</code> amendmentとexact SDK/runtime availability確認済み、amended goalのResumeで再開可能</strong>）、Zarrライタ往復プロトタイプ（<strong>Step ID＝P0-S1</strong>。D19暗号化込み・c-blosc＋最小自作ライタ）、パーティションシャーディング決着（<strong>Step ID＝P0-S2</strong>）、出力契約凍結（D21可視性契約・min/max）。P0-S1／P0-S2 は 2026-07-22 に <strong>completed</strong>（<a href="../reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json">P0-S1 joint evidence</a>・<a href="../reference/zarr-store-contract/phase0-roundtrip/sharding-decision.md">P0-S2 decision</a>、PR #4／#5 merged、中央独立再検証Pass）。</td>
+            <td>Gate A reference closure（済）、Gate B/C inventory＋実機結果（<strong>Gate B条件付き閉鎖済み・Gate CはN legへ移行済み</strong>）、D4 owner gate（<strong>済＝r7移植例外承認 2026-07-19</strong>）、legacy re-arm baseline（<strong>取得済み</strong>）、確認済みD17対応のgolden regression化、初期コーパス取得（<strong>P0-C1〜P0-C4 の全完了で閉じる</strong>。P0-C1〜C3は<strong>completed</strong>（PR #2 merged 2026-07-20・中央受領 2026-07-21）、P0-C4は<strong>planned</strong>——gateは未完のまま）、描画成立（<strong>P0-R1＝planned</strong>。hard numeric gateは本節の契約、<code>AB-DISPLAY-TRANSFORM-v1</code>とexact SDK/runtime availabilityを確認済みでamended goalのResumeから実行可能）、暗号化Zarr往復成立（<strong>P0-S1＝completed</strong>）、シャーディング決着（<strong>P0-S2＝round-robin採用・completed</strong>）、出力契約凍結。再アームの最終合否は新engineのphase 4で再実施。</td>
           </tr>
           <tr>
             <td><strong>1 ネイティブコア</strong></td>
@@ -2179,6 +2179,90 @@ flowchart LR
           </tr>
         </tbody>
       </table>
+
+      <h3 id="p0-r1">P0-R1 — bounded real-time visualization path decision</h3>
+      <div class="callout callout-info">
+        <div class="callout-title"><span class="badge badge-confirmed">Owner decision 2026-07-22</span>&nbsp;Phase 0で描画経路だけをboundedに選定する</div>
+        <p><strong>安定Step IDはP0-R1の1件</strong>。FR-02／FR-13／UX-04／UX-20をtraceし、密度scatter、表示時transform、固定上限GMI、最小multi-tile、producer/UI schedulerをisolated prototypeで検証する。4つのrecommended batchは実行上の分割であり、別Step IDにはしない。Phase 2のproduction WPF shell、完全なtile editor、gate editor、recipe／UI状態永続化、AcquisitionEngine／C ABI／実機経路はscope外。</p>
+      </div>
+
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>P0-R1 frozen contract</th></tr></thead>
+        <tbody>
+          <tr><td>Status／traceability</td><td><span class="badge badge-assumption">planned</span> <code>P0-R1</code>。same-scope owner amendmentでasinh authorityを<code>AB-DISPLAY-TRANSFORM-v1</code>として固定し、.NET SDK <code>10.0.302</code>／Desktop Runtime <code>10.0.10</code> availabilityをlive確認済み。amended goalのResumeから実行再開可能。source anchors＝<code>FR-02</code>／<code>FR-13</code>／<code>UX-04</code>／<code>UX-20</code>。</td></tr>
+          <tr><td>Hard scatter fixture</td><td><strong>100,001 events</strong>（「10万点超」を直接満たす境界）を<strong>512×512</strong> density targetへ継続更新。event objectをWPFへ渡さず、transform後空間でbinningする。</td></tr>
+          <tr><td>Hard combined fixture</td><td>上記512×512 scatter＋<strong>512×512 GMI tile</strong>。GMIは選択1ch、最大<strong>100波形×2400 sample</strong>。producerはUIを待たず、feedごとのpending workは最大1。</td></tr>
+          <tr><td>Observation only</td><td><strong>131,072 events（2<sup>17</sup>）／1024×1024 scatter／3 tiles（scatter×2＋GMI×1）</strong>はheadroom記録のみ。hard gateの代替・免除・再定義に使わない。</td></tr>
+          <tr><td>Reference machine</td><td>Gate Bで採用した新取得PCをversioned profile <code>AB-PERF-REF-v1</code>として最終性能認定に使う。compatible Windows PCでcorrectness／performance smokeを回してよいが、official passはreference profile上だけ。別PCへ置換する場合は同じfixture／thresholdを維持し、owner-approved rebaselineで<code>v2</code>を作り、旧evidenceを保存する。</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="p0-r1-display-transform">P0-R1 display transform authority</h3>
+      <div class="callout callout-success">
+        <div class="callout-title"><span class="badge badge-confirmed">Owner amendment 2026-07-22</span>&nbsp;<code>AB-DISPLAY-TRANSFORM-v1</code></div>
+        <p>linear／log／biexpは既存sys_app authorityを継続利用し、asinhだけを本amendmentで共有表示契約として初めて固定する。旧gcsa仕様の<code>np.arcsinh(values / 150)</code>は参考provenanceであり、それ単独をaccepted implementationまたはfixture authorityとして扱わない。本契約は表示専用で、gcsa／sys_appを本scopeから直接変更しない。将来asinhを下流へ追加する場合も同じContract IDと式を使う。</p>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>Contract surface</th><th>Canonical rule</th></tr></thead>
+        <tbody>
+          <tr><td>Contract ID／cofactor</td><td><code>AB-DISPLAY-TRANSFORM-v1</code>。cofactorはfloat64 <code>150.0</code>固定。</td></tr>
+          <tr><td>Forward</td><td><code>display = asinh(raw / 150.0)</code></td></tr>
+          <tr><td>Inverse</td><td><code>raw = 150.0 * sinh(display)</code></td></tr>
+          <tr><td>Raw authority</td><td>raw pulse featureとgate座標はADC-linear値を権威とする。表示変換値を保存せず、raw fixture／gate coordinateを上書きしない。</td></tr>
+          <tr><td>Finite policy</td><td>density処理はx/yのどちらかが非有限のevent pairを<strong>変換前</strong>に除外し、除外数を明示的に計上する。transform単体境界へ非有限値が渡された場合はtyped errorでfail-loudにする。</td></tr>
+          <tr><td>Tolerance</td><td>forwardはabsolute <code>1e-12</code>。inverseは<code>max(1e-12, abs(raw) * 1e-12)</code>。</td></tr>
+          <tr><td>Fixture coverage</td><td>負値、負のゼロ、ゼロ、正値、cofactor境界、大値を含める。expected値をAnalogBoard production実装自身から生成せず、独立した標準ライブラリ参照で作成してprovenanceを記録する。</td></tr>
+          <tr><td>Tracked fixture</td><td><code>docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json</code>。P0-R1実装batchで作成し、fixture SHA-256は作成後のBatch Checkpoint evidenceへ固定する。存在前のhashをplan／goalへ推測記載しない。</td></tr>
+        </tbody>
+      </table>
+      <table class="spec-table">
+        <thead><tr><th>Accepted authority</th><th>Immutable identity</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td>sys_app commit</td><td><code>c4583a995b6a3855791ae72bca7356eb49ef5c90</code></td><td>linear／log／biexp authorityのrepository pin</td></tr>
+          <tr><td><code>apps/api/src/utils/transforms.py</code></td><td>blob <code>6b66020f2e704226ed3a89cfbb2587d2d0a90141</code></td><td>biexponential／logicle実装</td></tr>
+          <tr><td><code>apps/api/src/services/visualization_axis_transforms.py</code></td><td>blob <code>11ea3bed1093b79a070eabb30da8b7d8fbe71369</code></td><td>linear／log／biexp axis dispatch</td></tr>
+          <tr><td><code>apps/api/tests/test_transforms.py</code></td><td>blob <code>7a88637f6a553e44558df0be14a8f5d0f1d6127a</code></td><td>biexp reference／boundary fixture</td></tr>
+          <tr><td><code>apps/api/src/services/visualization_binning.py</code></td><td>blob <code>b277275e415a63b5975dd4fed50949119c766159</code></td><td>表示変換後のbinning integration</td></tr>
+          <tr><td><code>apps/api/tests/test_visualization_service_binning.py</code></td><td>blob <code>1b351743c2ec0d76dc15e6bc8b7c1c53d6626c1f</code></td><td>binning boundary／fallback fixture</td></tr>
+          <tr><td>gcsa <code>src/gcsa/viz/density.py</code></td><td>commit <code>25a7fd4776473b1f1b0ab78ed422e3fd1215681c</code>、blob <code>eddb0aa088822a3b2b37438efabd2a30bc8a3619</code></td><td>density authority。現行accepted surfaceにasinh実装／fixtureはない</td></tr>
+          <tr><td>asinh</td><td><code>AB-DISPLAY-TRANSFORM-v1</code></td><td>本owner amendmentの式・finite policy・tolerance・tracked fixtureが唯一のaccepted authority。AnalogBoard独自formula禁止違反には当たらない</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="p0-r1-performance">P0-R1 hard performance gate</h3>
+      <p>各hard scenarioは<strong>30秒warm-up後、60秒計測を独立に3回</strong>行い、3 runすべてが該当閾値を満たすこと。owner-equivalent evidenceだけで数値missをPassへ変更しない。machine／toolchain／fixture／clock／raw sample／unit／run別結果が欠ける場合はincompleteとしてfail-loudにする。</p>
+      <table class="spec-table">
+        <thead><tr><th>Surface</th><th>Hard threshold（各runで独立判定）</th></tr></thead>
+        <tbody>
+          <tr><td>Single scatter／combined scatter</td><td>delivered update rate <strong>≥30.0 fps</strong>、frame time <strong>p95 ≤33.3 ms</strong>、<strong>max ≤100 ms</strong>。</td></tr>
+          <tr><td>Combined GMI／UI input</td><td>GMI <strong>≥5.0 updates/s</strong>、最大update interval <strong>≤500 ms</strong>。UI dispatcher/input latency <strong>p95 ≤100 ms</strong>、<strong>max ≤250 ms</strong>。</td></tr>
+          <tr><td>Producer publication</td><td>producer側にawait／UI lock／unbounded queueなし。publish <strong>p99 ≤1 ms</strong>、pending <strong>max 1/feed</strong>、置換／coalesce数を明示記録。</td></tr>
+          <tr><td>Managed allocation</td><td>steady-state <strong>≤64 KiB/frame</strong>。event数を1→100,001へ増やした差分 <strong>≤8 KiB/frame</strong>。</td></tr>
+          <tr><td>10-minute soak</td><td>retained managed heap growth <strong>≤8 MiB</strong>、private bytes growth <strong>≤max(32 MiB, start baselineの10%)</strong>。</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="p0-r1-dependencies">P0-R1 dependency／checkpoint pin</h3>
+      <table class="spec-table">
+        <thead><tr><th>Pin</th><th>契約</th></tr></thead>
+        <tbody>
+          <tr><td>.NET／target</td><td>SDK <code>10.0.302</code>、Desktop Runtime <code>10.0.10</code>、<code>net10.0-windows</code>、Release x64。<code>global.json</code>は<code>rollForward: disable</code>／<code>allowPrerelease: false</code>。</td></tr>
+          <tr><td>Renderer／packages</td><td>built-in WPF <code>WriteableBitmap</code>＋preallocated buffer。rendering／test／benchmarkの<strong>external NuGet package count＝0</strong>、local network restore禁止。外部rendererまたはversion変更はStop Conditionで、task_management amendmentなしに進めない。</td></tr>
+          <tr><td>Offline SDK</td><td>ZIP URL <code>https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-win-x64.zip</code>、SHA-512 <code>7d170ed75fa9af34c00646621d92011dbd71943952e2787cd15df9be78e6452b55dadef34d7eff77b802e6af4959e071a55855ac649afeac70901c3a2a258716</code>。binaryはGitへ入れず、URL／hash／size／licenseをtracked manifestへ記録する。</td></tr>
+          <tr><td>Checkpoint router</td><td><code>.agent/refactor.md</code>／<code>.agent/review.md</code>はscope-neutral router。goalがprofile pathとGit blob SHAをpinし、routerがpath confinement／tracked regular file／working-tree blob一致をfail-closedで検証する。</td></tr>
+          <tr><td>P0-R1 profiles</td><td><code>.agent/checkpoint-profiles/p0-r1-v1/refactor.md</code>（blob <code>dc93c4e6ce7a2286fdb46fad41ebc80123ea0da5</code>）／<code>.agent/checkpoint-profiles/p0-r1-v1/review.md</code>（blob <code>b0522355c4f0641030d977a7c168d845aeb41ec9</code>）。旧P0-S profileはversioned historyとして保持する。</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="p0-r1-acceptance">P0-R1 acceptance</h3>
+      <ol>
+        <li>deterministic synthetic aggregate frameを使い、linear／log／biexpは上記sys_app authority、asinhは<code>AB-DISPLAY-TRANSFORM-v1</code>の独立標準ライブラリfixtureに従って<strong>表示時だけ</strong>適用する。raw ADC-linear pulse featuresとgate-coordinate fixtureはbyte/value不変で、変換前の非有限pair除外数、transform単体境界のtyped error、bin count／範囲外／raster identityをtestする。</li>
+        <li>hard scatter／combined fixtureが<code>AB-PERF-REF-v1</code>上で全数値gateを各run独立に通過し、headroom観測と明確に分離された再現可能evidenceを残す。</li>
+        <li>GMI inputは選択1ch・最大100×2400へbounded。scatter／GMI／UI inputが互いをstarveせず、producerはUIを待たず、latest-frame coalescingとgeneration orderingが観測可能である。</li>
+        <li>採用描画方式を1つに決め、成立／不成立候補、correctness、performance、dependency／license、CPU/GPU behavior、fallback、Phase 2への移植境界をbounded decision evidenceへ記録する。prototype結果をproduction throughput保証へ昇格しない。</li>
+        <li>prototype UI文字列は<code>.resx</code>、density paletteはcolorblind-safe。<code>MessageBox</code>、raw stream越境、per-event WPF object、unbounded history、実測payload／secret／generated binaryのGit混入を禁止する。</li>
+        <li>P0-R1 PRのhuman mergeとlive evidence検証後にのみcompletedとする。P0-C4、初期コーパスgate、D17 golden regression、A-4b、Frozen v1、Phase 0、Phase 2 UIはopenのまま。</li>
+      </ol>
     </section>
 
     <!-- ===== NFR ===== -->
@@ -2190,8 +2274,8 @@ flowchart LR
         </thead>
         <tbody>
           <tr><td>性能</td><td>EP6バルクストリーミングを取りこぼさない</td><td><code>約200MB/s 持続</code></td><td><span class="badge badge-must">Must</span></td></tr>
-          <tr><td>性能</td><td>リアルタイムscatterのライブ更新</td><td><code>10万点超 @ インタラクティブfps</code></td><td><span class="badge badge-must">Must</span></td></tr>
-          <tr><td>性能</td><td>GMI波形ライブ表示（FR-13）</td><td><code>〜100波形オーバーレイ @ 数Hz更新（取得ホットパス外・スナップショット供給）</code></td><td><span class="badge badge-should">Should</span></td></tr>
+          <tr><td>性能</td><td>リアルタイムscatterのライブ更新</td><td><code>P0-R1 hard＝100,001 events・512×512・≥30.0 fps・p95 ≤33.3 ms・max ≤100 ms</code></td><td><span class="badge badge-must">Must</span></td></tr>
+          <tr><td>性能</td><td>GMI波形ライブ表示（FR-13）</td><td><code>P0-R1 combined＝選択1ch・100×2400・≥5.0 updates/s・max interval ≤500 ms</code></td><td><span class="badge badge-should">Should</span></td></tr>
           <tr><td>信頼性</td><td>USBタイムアウト時の自動再接続</td><td><code>物理抜き差し不要</code></td><td><span class="badge badge-must">Must</span></td></tr>
           <tr><td>信頼性</td><td>4GB再アーム窓</td><td><code>p99 &lt; 1s（測定・ゲート化）</code></td><td><span class="badge badge-should">Should</span></td></tr>
           <tr><td>堅牢性</td><td>UIハングが取得ホットパスを乱さない</td><td><code>取得コア分離（別スレッド/別プロセス）</code></td><td><span class="badge badge-must">Must</span></td></tr>
@@ -2255,7 +2339,7 @@ flowchart LR
       </div>
       <div class="risk-card risk-card--high">
         <div class="risk-header"><span class="badge badge-risk-high">High</span><span class="risk-title">リアルタイム描画経路の未検証</span></div>
-        <div class="risk-body">10万点超のライブscatter＋点ごとのgate着色＋lasso判定＋連動histogramを取得中に成立させる要件は既製チャートライブラリでは満たせない可能性。<strong>対策：</strong>スタック確定前に密度ビニングscatterの描画経路を合成10万イベントで先行プロトタイプ。ライブラリは「pro」でなく「risk」として扱う。</div>
+        <div class="risk-body">10万点超のライブscatter＋点ごとのgate着色＋lasso判定＋連動histogramを取得中に成立させる要件は既製チャートライブラリでは満たせない可能性。<strong>対策：</strong>P0-R1で100,001 events／512×512のhard fixtureとcombined GMIを<code>AB-PERF-REF-v1</code>上の数値gateにかけ、built-in WPF <code>WriteableBitmap</code>＋preallocated bufferをdependency-free候補として先行検証する。外部libraryはStop Conditionとし、未承認downloadや数値missの迂回に使わない。</div>
       </div>
       <div class="risk-card risk-card--low">
         <div class="risk-header"><span class="badge badge-risk-low">Low</span><span class="risk-title">gcsa/sys_app互換（契約抽出済み・物理ch順確認済み）</span></div>
@@ -2361,7 +2445,7 @@ flowchart LR
 </div>
 
 <footer class="doc-footer">
-  <p>Generated 2026-07-03 / Last updated 2026-07-22 — <strong>AnalogBoard 再構築プラン Draft 4.3</strong>。codex cross-review（証跡整合）＋owner gate 2026-07-19（D4＝r7移植例外・N formal soak＝phase 4集約）＋prompt.md ＋ コードベース調査 ＋ オーナー追加情報 ＋ 2026-07-14実機証跡 ＋ 2026-07-15 Gate B/C返却証跡 ＋ 2026-07-16 DFX A-B-A（session 20260716_111343）／owner decision D23（NoDfx採用） ＋ 2026-07-16〜17 D23 NoDfx dual-driver session（session 20260716_2・Gate B条件付き閉鎖・re-arm baseline） ＋ 2026-07-17 characterization／USBPcap capture証跡（artifacts/field-session/2026-07-17-characterization/）＋ P0-S1 D19保護込みjoint evidence／P0-S2 sharding comparison・round-robin決定（2026-07-22 completed、PR #4／#5 merged・中央独立再検証Pass）＋ remote validation source commit <code>d760e90</code>（最終field diagnostic source／focused tests／build再現資材）＋ repository-maintenance archive整理より作成。</p>
+  <p>Generated 2026-07-03 / Last updated 2026-07-22 — <strong>AnalogBoard 再構築プラン Draft 4.5</strong>。codex cross-review（証跡整合）＋owner gate 2026-07-19（D4＝r7移植例外・N formal soak＝phase 4集約）＋prompt.md ＋ コードベース調査 ＋ オーナー追加情報 ＋ 2026-07-14実機証跡 ＋ 2026-07-15 Gate B/C返却証跡 ＋ 2026-07-16 DFX A-B-A（session 20260716_111343）／owner decision D23（NoDfx採用） ＋ 2026-07-16〜17 D23 NoDfx dual-driver session（session 20260716_2・Gate B条件付き閉鎖・re-arm baseline） ＋ 2026-07-17 characterization／USBPcap capture証跡（artifacts/field-session/2026-07-17-characterization/）＋ P0-S1 D19保護込みjoint evidence／P0-S2 sharding comparison・round-robin決定（2026-07-22 completed、PR #4／#5 merged・中央独立再検証Pass）＋ P0-R1 owner decisions（stable Step ID／performance gate／<code>AB-PERF-REF-v1</code>／checkpoint／.NET 10 dependency pin／<code>AB-DISPLAY-TRANSFORM-v1</code> asinh authority）＋ preparatory PR #6 merge <code>0ef90460</code> ＋ remote validation source commit <code>d760e90</code>（最終field diagnostic source／focused tests／build再現資材）＋ repository-maintenance archive整理より作成。</p>
   <p>本ドキュメントは意思決定用の要約・再編である。規範的な仕様は各参照元を参照。図はMermaidをCDNから読み込む（オフライン閲覧時は描画に外部接続が必要）。</p>
 </footer>
 

@@ -97,6 +97,9 @@ __pycache__/
 /prototypes/zarr-store-roundtrip/generated/
 /artifacts/phase0-zarr-roundtrip/
 
+# P0-R1 generated frames, benchmark traces, and performance reports
+/artifacts/phase0-scatter-rendering/
+
 # Coverage artifacts
 coverage/
 

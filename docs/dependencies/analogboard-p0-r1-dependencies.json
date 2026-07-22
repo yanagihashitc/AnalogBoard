@@ -1,0 +1,56 @@
+{
+  "evidence_paths": {
+    "bounded_reference_root": "docs/reference/scatter-rendering/phase0",
+    "generated_artifacts": "artifacts/phase0-scatter-rendering",
+    "verification_wrapper": "scripts/scatter-rendering/verify.ps1"
+  },
+  "external_nuget_packages": [],
+  "format_version": 1,
+  "offline_sdk": {
+    "expected_filename": "dotnet-sdk-10.0.302-win-x64.zip",
+    "license": {
+      "primary": {
+        "installed_path": "C:\\Program Files\\dotnet\\LICENSE.txt",
+        "name": "MIT",
+        "sha256": "7f6839a61ce892b79c6549e2dc5a81fdbd240a0b260f8881216b45b7fda8b45d",
+        "size_bytes": 9519
+      },
+      "third_party_notices": {
+        "installed_path": "C:\\Program Files\\dotnet\\ThirdPartyNotices.txt",
+        "sha256": "deb4427a295e1ed474b0d81c5a0d972c1b550b9a715cda939cdfa9236b1b418f",
+        "size_bytes": 78887
+      }
+    },
+    "policy": "identity record only; do not download, install, or commit the binary",
+    "sha512": "7d170ed75fa9af34c00646621d92011dbd71943952e2787cd15df9be78e6452b55dadef34d7eff77b802e6af4959e071a55855ac649afeac70901c3a2a258716",
+    "size_bytes": 297545270,
+    "size_observation": "HTTP Content-Length observed from the owner-pinned URL on 2026-07-22; archive payload was not downloaded",
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-win-x64.zip"
+  },
+  "renderer": {
+    "external_package_count": 0,
+    "framework": "WPF",
+    "name": "WPF WriteableBitmap",
+    "raster_buffer_policy": "preallocated"
+  },
+  "restore": {
+    "config_path": "prototypes/scatter-rendering/NuGet.Config",
+    "fallback_package_folders": [],
+    "network_enabled": false,
+    "package_sources": [],
+    "project_restore_overrides_allowed": false
+  },
+  "scope": "P0-R1 bounded real-time visualization path decision",
+  "toolchain": {
+    "architecture": "x64",
+    "configuration": "Release",
+    "desktop_runtime_version": "10.0.10",
+    "global_json": {
+      "allow_prerelease": false,
+      "path": "global.json",
+      "roll_forward": "disable"
+    },
+    "sdk_version": "10.0.302",
+    "target_framework": "net10.0-windows"
+  }
+}
