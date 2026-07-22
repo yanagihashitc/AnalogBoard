@@ -2,7 +2,7 @@
 
 Date: 2026-07-22
 
-Local status: `gate_ready` pending phase PR merge and task_management sync
+Local status: phase PR merge verified; task_management acceptance and sync pending
 
 Branch: `feat/phase0-store-roundtrip`
 
@@ -20,20 +20,32 @@ Remote branch: `origin/feat/phase0-store-roundtrip`
   `db1643c50a86f523932c0c11a2f1dea9dd563a44`
 - PR #4 ShellCheck source repair:
   `1333a3e64bff3557ea82c3fbaa68462381c0cb77`
-- Phase PR: [#4](https://github.com/yanagihashitc/AnalogBoard/pull/4)
+- PR #4 review evidence publications:
+  `678df078c2157c5635e775a0bdf41dcab5d40a29`,
+  `8631817c166de2a22073be182a32a83b194b03cc`, and
+  `f89670e2b0636083ce16eec7f4441a2f9825eba6`
+- Terminal feature head / coverage-gate repair:
+  `e6e9e9aae48f84e3f894dc09f5c931dc215e1223`
+- Phase PR: [#4](https://github.com/yanagihashitc/AnalogBoard/pull/4),
+  merged 2026-07-22 15:43:33 JST
+- Merge SHA / current `origin/main` at the Advance audit:
+  `580f1d2af9cb2f93e28dfcccc3c41b76e31677ae`
 - Batch 4 terminal publication at its closeout: local `HEAD`, the same-name
   remote-tracking ref, and
   `git ls-remote --heads origin feat/phase0-store-roundtrip` all resolved to
   the Batch 4 SHA; the tracked worktree was clean at verification. The active
   todo was empty and the completed Batch 4 was present in the ignored local
   todo archive.
-- The PR review follow-up uses the latest immutable source commit above plus
-  this evidence-only descendant; terminal parity is verified after push.
+- The PR review follow-ups use the immutable source commits above plus their
+  evidence-only descendants. The final feature head, local tracking ref, and
+  remote head all resolve to `e6e9e9a...`; that head is a parent/ancestor of
+  the merge commit on `origin/main`.
 - Base: `origin/main` at
   `807b44106dce35fe1f6b8f91b37e130ea69b3cb9`
 
-No merge is authorized by this handoff. P0-S1/P0-S2 become `completed` only
-after the phase PR is merged and task_management accepts the evidence.
+The phase PR merge condition is satisfied. P0-S1/P0-S2 may become `completed`
+when task_management accepts this evidence and synchronizes the source-plan
+status, mirror, and roadmap; this repository does not edit the central files.
 
 ## Accepted downstream and toolchain identity
 

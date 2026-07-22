@@ -2,9 +2,9 @@
 
 ## 対象プラン
 
-- [AnalogBoard rebuild plan](../plans/260710-analogboard-rebuild-plan.html)
-- [Checklist](../operations/zarr-store-contract/2026-07-22-p0-s-roundtrip-checklist.md)
-- [Process Log INDEX](INDEX.md)
+- [AnalogBoard rebuild plan](../../plans/260710-analogboard-rebuild-plan.html)
+- [Checklist](2026-07-22-p0-s-roundtrip-checklist.md)
+- [Process Log INDEX](../../process_log/INDEX.md)
 
 ## Scope
 
@@ -77,6 +77,8 @@ measurement data, and sibling-repository writes remain out of scope.
 | 2026-07-22 14:56 | PR #4 ShellCheck evidence regeneration | Published the authorized ShellCheck source revision, rebound the 18-file joint provenance and dependent hash chain, and reran the complete focused gate | pass; evidence publication commit pending | source commit `1333a3e64bff3557ea82c3fbaa68462381c0cb77`; ShellCheck 0.9.0 zero findings; approved/reproduced Release/Debug each CTest 3/3 with writer 470877 and KAT 95; host Python 82/82; fresh reader KAT 2/2; joint 269/35; sharding 37/9; golden `d5fb8b27...`; comparison `1cd82994...`; decision `084433cc...`; manifest `237b4b54...` | coverage not collected; sharding wall times remain explicitly non-semantic; no generated store tracked | create the evidence-only commit, push both commits, and verify terminal parity |
 | 2026-07-22 15:19 | Coverage follow-up | Ran the requested 80% OpenCppCoverage gate, repaired the pre-existing UTF-8 compile and missing-adjacent-PDB blockers, temporarily attached the existing ignored real-data fixture tree by Windows junction, and removed all temporary junction/PDB state afterward | pass | initial Red: CP932 miscompile then 0/0 coverage; full legacy unit matrix passed with WaveDataFileIO 9438/9438 and FPGA 417/417; final Cobertura `coverage/fpga_coverage.xml` reports 221/221 lines, 100.00%, threshold 80%; junction and restored PDB absent after cleanup | existing C4996 `sprintf` and C4189 unused-variable warnings remain in the legacy FPGA test; coverage XML and binaries are ignored; no production or fixture content changed | review the two-file build-tooling diff; commit/push only with explicit authorization |
 | 2026-07-22 15:32 | Coverage warning closure | Replaced all 20 legacy unsafe test-message format calls with size-bounded `sprintf_s` calls and removed three side-effect-free unused register reads | pass; C4996/C4189 absent from final compile | warning-free MSVC build output for the affected test; FPGA 417/417; WaveDataFileIO 9438/9438; all eight remaining suites pass; Cobertura 221/221 lines (100.00%) against the 80% threshold; `data` junction and temporary adjacent PDB absent after cleanup | ignored coverage output and fixture data remain outside publication; no production code changed | inspect and publish the authorized coverage-tooling/test cleanup |
+| 2026-07-22 15:43 | Phase PR / human merge | GitHub merged the completed feature branch into `main` after the repository-local phase checkpoint stopped at the human gate | merged | PR [#4](https://github.com/yanagihashitc/AnalogBoard/pull/4); head `e6e9e9aae48f84e3f894dc09f5c931dc215e1223`; merge `580f1d2af9cb2f93e28dfcccc3c41b76e31677ae`; merged 2026-07-22 15:43:33 JST; Cursor Bugbot success | repository Actions workflow/check-run is absent; existing focused verification remains the technical gate | run the fixed Advance audit and hand off immutable evidence to task_management |
+| 2026-07-22 16:08 | Advance / completion audit | Refetched `main`, re-read the fixed goal/prompt policy, confirmed all four product batches and PR follow-ups in the todo archive, and verified the merge against local and remote Git state | pass; repository-local phase merge criteria satisfied | clean tracked worktree before closeout edits; `tasks/todo.md` Active empty before registering this closeout; feature head equals remote head and is an ancestor of `origin/main`; `origin/main=580f1d2...`; PR state `MERGED` | task_management acceptance, mirror/roadmap synchronization, A-4b, P0-C4, scatter, D17, Frozen v1, and Phase 0 remain outside this closeout | archive the completed operational records and publish the docs-only closeout |
 
 ## Retained limits to track
 

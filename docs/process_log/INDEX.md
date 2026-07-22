@@ -7,13 +7,13 @@
 
 | Date | Feature | Log |
 |---|---|---|
-| 2026-07-22 | P0-S1/P0-S2 product execution | [log](2026-07-22-p0-s-roundtrip-log.md) |
 | 2026-07-21 | P0-S dependency preflight | [log](2026-07-21-p0-s-dependency-preflight-log.md) |
 
 ## Archived Logs
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-22 | P0-S1/P0-S2 product execution | [log](../archive/zarr-store-contract/2026-07-22-p0-s-roundtrip-log.md) |
 | 2026-07-22 | Zarr validator review follow-up | [log](../archive/review-findings/2026-07-22-zarr-validator-review-followup-log.md) |
 | 2026-07-22 | PR #3 Claude review fixer | [log](../archive/review-findings/2026-07-22-pr3-claude-review-fixer-log.md) |
 | 2026-07-22 | Zarr roundtrip review fixes | [log](../archive/review-findings/2026-07-22-zarr-roundtrip-review-fixes-log.md) |
