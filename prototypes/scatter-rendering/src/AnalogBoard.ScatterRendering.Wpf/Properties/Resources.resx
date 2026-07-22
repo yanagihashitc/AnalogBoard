@@ -15,6 +15,15 @@
   <data name="ApplicationName" xml:space="preserve">
     <value>AnalogBoard Scatter Rendering Prototype</value>
   </data>
+  <data name="HarnessOwnerDispatcherRequired" xml:space="preserve">
+    <value>Combined visualization harness access must run on its owner dispatcher.</value>
+  </data>
+  <data name="HarnessCopyBufferLengthMismatch" xml:space="preserve">
+    <value>Combined visualization copy destination must equal {0} bytes; actual: {1}.</value>
+  </data>
+  <data name="HarnessFrameShapeMismatch" xml:space="preserve">
+    <value>{0} raster frame must match surface size {1}x{2}; actual: {3}x{4}.</value>
+  </data>
   <data name="StatusReady" xml:space="preserve">
     <value>Ready</value>
   </data>

@@ -45,6 +45,7 @@ bld/
 *.tli
 *.tmp
 *.rsp
+!prototypes/scatter-rendering/Directory.Build.rsp
 *.pgc
 *.pgd
 *.meta

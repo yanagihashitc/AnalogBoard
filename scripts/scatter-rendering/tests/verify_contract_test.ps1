@@ -202,6 +202,9 @@ function New-ContractFixture {
 '@ | Set-Content -LiteralPath (Join-Path $wpfRoot 'AnalogBoard.ScatterRendering.Wpf.csproj') -Encoding UTF8
     @'
 <root>
+  <data name="HarnessCopyBufferLengthMismatch"><value>copy</value></data>
+  <data name="HarnessFrameShapeMismatch"><value>shape</value></data>
+  <data name="HarnessOwnerDispatcherRequired"><value>dispatcher</value></data>
   <data name="SurfaceBufferLengthMismatch"><value>buffer</value></data>
   <data name="SurfaceDisposed"><value>disposed</value></data>
   <data name="SurfaceGenerationNotIncreasing"><value>generation</value></data>
@@ -241,6 +244,40 @@ function Add-FixtureXml {
 }
 
 $null = Assert-P0R1RepositoryDependencyContract -RepositoryRoot $RepositoryRoot
+$responseFileRelativePath = 'prototypes/scatter-rendering/Directory.Build.rsp'
+$null = & git -C $RepositoryRoot check-ignore -q -- $responseFileRelativePath
+if ($LASTEXITCODE -eq 0) {
+    throw "P0-R1 tracked build response file must not be ignored: $responseFileRelativePath."
+}
+if ($LASTEXITCODE -ne 1) {
+    throw "git check-ignore failed while validating $responseFileRelativePath with exit code $LASTEXITCODE."
+}
+$ambientEnvironment = [ordered]@{
+    SystemRoot = 'C:\Windows'
+    TEMP = 'C:\Temp'
+    Optimize = 'false'
+    DefineConstants = 'AMBIENT_DEFINE'
+    DirectoryBuildTargetsPath = 'C:\outside\Directory.Build.targets'
+    DOTNET_STARTUP_HOOKS = 'C:\outside\hook.dll'
+    DOTNET_NOLOGO = '0'
+    COMPlus_TieredCompilation = '0'
+}
+$sanitizedEnvironment = Get-P0R1SanitizedDotNetEnvironment -Environment $ambientEnvironment
+Assert-Equal -Actual $sanitizedEnvironment['SystemRoot'] -Expected 'C:\Windows' -Message 'Sanitized environment retains SystemRoot'
+Assert-Equal -Actual $sanitizedEnvironment['TEMP'] -Expected 'C:\Temp' -Message 'Sanitized environment retains TEMP'
+Assert-Equal -Actual $sanitizedEnvironment['DOTNET_CLI_TELEMETRY_OPTOUT'] -Expected '1' -Message 'Sanitized environment pins telemetry opt-out'
+Assert-Equal -Actual $sanitizedEnvironment['DOTNET_NOLOGO'] -Expected '1' -Message 'Sanitized environment pins no-logo'
+Assert-Equal -Actual $sanitizedEnvironment['MSBUILDDISABLENODEREUSE'] -Expected '1' -Message 'Sanitized environment disables MSBuild node reuse'
+Assert-Equal -Actual $sanitizedEnvironment['DOTNET_CLI_USE_MSBUILD_SERVER'] -Expected '0' -Message 'Sanitized environment disables the MSBuild server'
+foreach ($forbiddenName in @(
+    'Optimize',
+    'DefineConstants',
+    'DirectoryBuildTargetsPath',
+    'DOTNET_STARTUP_HOOKS',
+    'COMPlus_TieredCompilation'
+)) {
+    Assert-Equal -Actual $sanitizedEnvironment.ContainsKey($forbiddenName) -Expected $false -Message "Sanitized environment removes $forbiddenName"
+}
 $installedLicense = Assert-P0R1DependencyManifestContract `
     -ManifestPath (Join-Path $RepositoryRoot 'docs\dependencies\analogboard-p0-r1-dependencies.json')
 Assert-Equal -Actual $installedLicense.PrimaryInstalledPath -Expected 'C:\Program Files\dotnet\LICENSE.txt' -Message 'Primary license path'
@@ -480,12 +517,12 @@ try {
     $missingResourceKey = New-ContractFixture -Root (Join-Path $temporaryRoot 'missing-resource-key')
     $missingResourceKeyPath = Join-Path $missingResourceKey 'src\AnalogBoard.ScatterRendering.Wpf\Properties\Resources.resx'
     [xml]$missingResourceKeyXml = Get-Content -LiteralPath $missingResourceKeyPath -Raw -Encoding UTF8
-    $missingResourceKeyNode = $missingResourceKeyXml.SelectSingleNode("/root/data[@name='SurfaceWrongThread']")
+    $missingResourceKeyNode = $missingResourceKeyXml.SelectSingleNode("/root/data[@name='HarnessOwnerDispatcherRequired']")
     $null = $missingResourceKeyNode.ParentNode.RemoveChild($missingResourceKeyNode)
     $missingResourceKeyXml.Save($missingResourceKeyPath)
     Assert-ThrowsExact -Action {
         Get-P0R1PrototypeState -PrototypeRoot $missingResourceKey
-    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 WPF resource key is absent: SurfaceWrongThread.'
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 WPF resource key is absent: HarnessOwnerDispatcherRequired.'
 
     $messageBoxSource = New-ContractFixture -Root (Join-Path $temporaryRoot 'message-box-source')
     $messageBoxSourcePath = Join-Path $messageBoxSource 'src\AnalogBoard.ScatterRendering.Wpf\Forbidden.cs'
@@ -596,6 +633,19 @@ try {
         Assert-P0R1RestoreIsolation -PrototypeRoot $wrongReference
     } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage "ProjectReference from 'src/AnalogBoard.ScatterRendering.Core/AnalogBoard.ScatterRendering.Core.csproj' to 'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj' is not allowed."
 
+    # Given: A stale generated wildcard target beneath one exact project root.
+    # When: Generated build roots are cleared before restore/build.
+    # Then: The unpinned target and its obj root are gone without touching source.
+    $generatedFixture = New-ContractFixture -Root (Join-Path $temporaryRoot 'generated-input')
+    $generatedObj = Join-Path $generatedFixture 'src\AnalogBoard.ScatterRendering.Core\obj'
+    $null = New-Item -ItemType Directory -Path $generatedObj -Force
+    '<Project><PropertyGroup><Optimize>false</Optimize></PropertyGroup></Project>' |
+        Set-Content -LiteralPath (Join-Path $generatedObj 'AnalogBoard.ScatterRendering.Core.csproj.evil.targets') -Encoding UTF8
+    $clearResult = Clear-P0R1GeneratedBuildRoots -PrototypeRoot $generatedFixture
+    Assert-Equal -Actual $clearResult.RemovedRootCount -Expected 1 -Message 'Generated root removal count'
+    Assert-Equal -Actual (Test-Path -LiteralPath $generatedObj) -Expected $false -Message 'Generated obj root removal'
+    Assert-Equal -Actual (Test-Path -LiteralPath (Join-Path $generatedFixture 'src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj')) -Expected $true -Message 'Generated cleanup source preservation'
+
     # Given: One valid bounded final test summary.
     # When: It is parsed.
     # Then: Exact total/passed/failed counts are returned.
@@ -631,6 +681,8 @@ try {
     Assert-Equal -Actual $observation -Expected $observationJson -Message 'Development observation JSON'
 
     foreach ($invalidObservation in @(
+        @{ Json = $observationJson.Replace('"official_acceptance":false', '"official_acceptance":true,"official_acceptance":false'); Expected = 'P0-R1 development observation must not contain duplicate JSON property names: official_acceptance.' },
+        @{ Json = $observationJson.Replace('"machine":"fixture"', '"unexpected":0,"machine":"fixture"'); Expected = 'P0-R1 development observation must contain only the exact versioned field set.' },
         @{ Json = $observationJson.Replace('"development_only":true', '"development_only":false'); Expected = 'P0-R1 observation must be development-only and must not claim official acceptance.' },
         @{ Json = $observationJson.Replace('"development_only":true', '"development_only":"true"'); Expected = 'P0-R1 development observation field must be a JSON boolean: development_only.' },
         @{ Json = $observationJson.Replace('"official_acceptance":false', '"official_acceptance":"false"'); Expected = 'P0-R1 development observation field must be a JSON boolean: official_acceptance.' },
@@ -660,6 +712,47 @@ try {
         )
     } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 development observation field is absent: coalesced_frames.'
 
+    # Given: Separate combined and headroom development summaries.
+    # When: Their exact schemas and correlations are parsed.
+    # Then: Neither can claim or substitute for official acceptance.
+    $combinedJson = '{"schema_id":"analogboard.scatter-rendering.combined-development-observation.v1","observation_kind":"hard-combined-compatible-pc-smoke","development_only":true,"official_acceptance":false,"may_substitute_official":false,"fixture_id":"AB-P0-R1-HARD-COMBINED-v1","event_count":100001,"scatter_width":512,"scatter_height":512,"gmi_width":512,"gmi_height":512,"selected_gmi_channel":"fsGMI","gmi_waveform_count":100,"gmi_sample_count":2400,"warmup_iterations":3,"measurement_iterations":10,"combined_iteration_ms_p95":8.5,"combined_iteration_ms_max":9.0,"scatter_delivered_update_rate_hz":110.0,"gmi_delivered_update_rate_hz":110.0,"gmi_max_update_interval_ms":9.0,"input_latency_ms_p95":0.5,"input_latency_ms_max":0.7,"allocated_bytes_per_iteration":2424,"scatter_publish_p99_ms":0.04,"gmi_publish_p99_ms":0.01,"scatter_pending_frame_max":1,"scatter_pending_callback_max":1,"gmi_pending_frame_max":1,"gmi_pending_callback_max":1,"scatter_rendered_count":13,"gmi_rendered_count":13,"scatter_coalesced_count":0,"gmi_coalesced_count":0,"input_sentinel_count":10,"dispatcher_priority_contract":"Input_above_Background","scatter_raster_sha256":"255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780","gmi_raster_sha256":"d02e42158d6b89d39b342a307557dcc3013f908f49e6e7f3d4f43edbb4393c88","machine":"fixture"}'
+    $combined = Get-P0R1CombinedDevelopmentObservation -OutputLines @(
+        "COMBINED_DEVELOPMENT_OBSERVATION $combinedJson"
+    )
+    Assert-Equal -Actual $combined -Expected $combinedJson -Message 'Combined development observation JSON'
+    foreach ($case in @(
+        @{ Json = $combinedJson.Replace('"official_acceptance":false', '"official_acceptance":true,"official_acceptance":false'); Expected = 'P0-R1 combined development observation must not contain duplicate JSON property names: official_acceptance.' },
+        @{ Json = $combinedJson.Replace('"may_substitute_official":false', '"may_substitute_official":true'); Expected = 'P0-R1 combined observation must remain development-only, non-official, and non-substituting.' },
+        @{ Json = $combinedJson.Replace('"gmi_pending_frame_max":1', '"gmi_pending_frame_max":2'); Expected = 'P0-R1 combined observation pending maxima must equal one per feed.' },
+        @{ Json = $combinedJson.Replace('"input_sentinel_count":10', '"input_sentinel_count":9'); Expected = 'P0-R1 combined observation fixed iteration counts are inconsistent.' },
+        @{ Json = $combinedJson.Replace('"gmi_delivered_update_rate_hz":110.0', '"gmi_delivered_update_rate_hz":0.0'); Expected = 'P0-R1 combined observation delivered update rates must be positive.' },
+        @{ Json = $combinedJson.Replace('"combined_iteration_ms_max":9.0', '"combined_iteration_ms_max":"9.0"'); Expected = 'P0-R1 combined observation field must be a JSON number: combined_iteration_ms_max.' }
+    )) {
+        Assert-ThrowsExact -Action {
+            Get-P0R1CombinedDevelopmentObservation -OutputLines @(
+                "COMBINED_DEVELOPMENT_OBSERVATION $($case.Json)"
+            )
+        } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage $case.Expected
+    }
+
+    $headroomJson = '{"schema_id":"analogboard.scatter-rendering.headroom-development-observation.v1","observation_kind":"three-tile-headroom-compatible-pc","development_only":true,"official_acceptance":false,"may_substitute_hard_gate":false,"fixture_id":"AB-P0-R1-HEADROOM-v1","event_count":131072,"width":1024,"height":1024,"tile_count":3,"scatter_tile_count":2,"gmi_tile_count":1,"selected_gmi_channel":"fsGMI","gmi_waveform_count":100,"gmi_sample_count":2400,"warmup_iterations":1,"measurement_iterations":3,"three_tile_iteration_ms_p95":28.0,"three_tile_iteration_ms_max":29.0,"allocated_bytes_per_iteration":192,"scatter_a_raster_sha256":"0ffd755ea97e90ab1f8a186cc20e58f30378196be0d6ba3b1d068cb5b59afa45","scatter_b_raster_sha256":"9c1c255558b089f96eeb6336c55b0fbe254b05f47ea815c6e230ca05e8b31b17","gmi_raster_sha256":"417e8cf7f21ab09680e98a2aa6b7aabd0479a3457a52e55f15b6b3d41bd1156b","machine":"fixture"}'
+    $headroom = Get-P0R1HeadroomDevelopmentObservation -OutputLines @(
+        "HEADROOM_DEVELOPMENT_OBSERVATION $headroomJson"
+    )
+    Assert-Equal -Actual $headroom -Expected $headroomJson -Message 'Headroom development observation JSON'
+    foreach ($case in @(
+        @{ Json = $headroomJson.Replace('"official_acceptance":false', '"official_acceptance":true,"official_acceptance":false'); Expected = 'P0-R1 headroom development observation must not contain duplicate JSON property names: official_acceptance.' },
+        @{ Json = $headroomJson.Replace('"may_substitute_hard_gate":false', '"may_substitute_hard_gate":true'); Expected = 'P0-R1 headroom observation must remain development-only, non-official, and non-substituting.' },
+        @{ Json = $headroomJson.Replace('"tile_count":3', '"tile_count":2'); Expected = 'P0-R1 headroom observation must use 131072 events, 1024-square output, and exactly three tiles.' },
+        @{ Json = $headroomJson.Replace('"three_tile_iteration_ms_max":29.0', '"three_tile_iteration_ms_max":27.0'); Expected = 'P0-R1 headroom observation maximum must be greater than or equal to p95.' }
+    )) {
+        Assert-ThrowsExact -Action {
+            Get-P0R1HeadroomDevelopmentObservation -OutputLines @(
+                "HEADROOM_DEVELOPMENT_OBSERVATION $($case.Json)"
+            )
+        } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage $case.Expected
+    }
+
     # Given: A complete scaffold and a successful fake dotnet boundary.
     # When: Focused verification is orchestrated.
     # Then: Commands are isolated and the bounded test summary reaches the result.
@@ -670,7 +763,7 @@ try {
         $output = switch ($Arguments[0]) {
             '--version' { @('10.0.302') }
             '--list-runtimes' { @('Microsoft.WindowsDesktop.App 10.0.10 [C:\dotnet]') }
-            'run' { @("OBSERVATION $observationJson", 'PASS fixture', 'SUMMARY total=2 passed=2 failed=0') }
+            'run' { @("OBSERVATION $observationJson", "COMBINED_DEVELOPMENT_OBSERVATION $combinedJson", "HEADROOM_DEVELOPMENT_OBSERVATION $headroomJson", 'PASS fixture', 'SUMMARY total=2 passed=2 failed=0') }
             default { @('fixture command passed') }
         }
         return [pscustomobject]@{ ExitCode = 0; Output = $output }
@@ -686,11 +779,16 @@ try {
     Assert-Equal -Actual $result.TestsPassed -Expected 2 -Message 'Focused tests passed'
     Assert-Equal -Actual $result.TestsFailed -Expected 0 -Message 'Focused tests failed'
     Assert-Equal -Actual $result.DevelopmentObservation -Expected $observationJson -Message 'Focused development observation'
+    Assert-Equal -Actual $result.CombinedDevelopmentObservation -Expected $combinedJson -Message 'Focused combined observation'
+    Assert-Equal -Actual $result.HeadroomDevelopmentObservation -Expected $headroomJson -Message 'Focused headroom observation'
     Assert-Equal -Actual $calls.Count -Expected 5 -Message 'dotnet command count'
     Assert-Contains -Actual $calls[2].Arguments -Expected '--configfile' -Message 'Restore config isolation'
+    Assert-Contains -Actual $calls[2].Arguments -Expected '--disable-build-servers' -Message 'Restore build-server isolation'
     Assert-Contains -Actual $calls[3].Arguments -Expected '--no-restore' -Message 'Build restore isolation'
+    Assert-Contains -Actual $calls[3].Arguments -Expected '--disable-build-servers' -Message 'Build server isolation'
     Assert-Contains -Actual $calls[4].Arguments -Expected '--no-build' -Message 'Runner build isolation'
     Assert-Contains -Actual $calls[4].Arguments -Expected '--no-restore' -Message 'Runner restore isolation'
+    Assert-Contains -Actual $calls[4].Arguments -Expected '--disable-build-servers' -Message 'Runner build-server isolation'
 
     # Given: A dynamic subprocess failure during restore.
     # When/Then: Only the dedicated dynamic-output helper uses pattern matching.
@@ -721,6 +819,35 @@ finally {
 # When: Its exact dependency, graph, solution, WPF, and test-runner contracts are checked.
 # Then: It is accepted only after Debug mappings are removed.
 $realPrototype = Join-Path $RepositoryRoot 'prototypes\scatter-rendering'
+$realProject = Join-Path $realPrototype 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
+$ambientProbeNames = @('Optimize', 'DefineConstants', 'DOTNET_STARTUP_HOOKS', 'COMPlus_TieredCompilation')
+$priorAmbientProbeValues = @{}
+try {
+    foreach ($variableName in $ambientProbeNames) {
+        $priorAmbientProbeValues[$variableName] = [Environment]::GetEnvironmentVariable($variableName, 'Process')
+    }
+    [Environment]::SetEnvironmentVariable('Optimize', 'false', 'Process')
+    [Environment]::SetEnvironmentVariable('DefineConstants', 'AMBIENT_DEFINE', 'Process')
+    [Environment]::SetEnvironmentVariable('DOTNET_STARTUP_HOOKS', 'C:\outside\hook.dll', 'Process')
+    [Environment]::SetEnvironmentVariable('COMPlus_TieredCompilation', '0', 'Process')
+    $sanitizedProbe = Invoke-P0R1SanitizedDotNet `
+        -Arguments @('msbuild', $realProject, '-nologo', '-getProperty:Optimize', '-p:Configuration=Release', '-p:Platform=x64') `
+        -WorkingDirectory $realPrototype
+    Assert-Equal -Actual $sanitizedProbe.ExitCode -Expected 0 -Message 'Sanitized child process exit code'
+    $sanitizedProbeLines = @($sanitizedProbe.Output | Where-Object { $_.Trim() -ne '' })
+    Assert-Equal -Actual $sanitizedProbeLines[$sanitizedProbeLines.Count - 1].Trim() -Expected 'true' -Message 'Sanitized child ignores ambient Optimize'
+    $sharedCompilationProbe = Invoke-P0R1SanitizedDotNet `
+        -Arguments @('msbuild', $realProject, '-nologo', '-getProperty:UseSharedCompilation', '-p:Configuration=Release', '-p:Platform=x64') `
+        -WorkingDirectory $realPrototype
+    Assert-Equal -Actual $sharedCompilationProbe.ExitCode -Expected 0 -Message 'Shared compilation probe exit code'
+    $sharedCompilationLines = @($sharedCompilationProbe.Output | Where-Object { $_.Trim() -ne '' })
+    Assert-Equal -Actual $sharedCompilationLines[$sharedCompilationLines.Count - 1].Trim() -Expected 'false' -Message 'Shared compiler server disabled'
+}
+finally {
+    foreach ($variableName in $ambientProbeNames) {
+        [Environment]::SetEnvironmentVariable($variableName, $priorAmbientProbeValues[$variableName], 'Process')
+    }
+}
 $null = Assert-P0R1RestoreIsolation -PrototypeRoot $realPrototype
 $realState = Get-P0R1PrototypeState -PrototypeRoot $realPrototype
 Assert-Equal -Actual $realState.ProjectCount -Expected 3 -Message 'Real scaffold project count'
@@ -734,7 +861,10 @@ foreach ($requiredToken in @(
     'tests_total=',
     'tests_passed=',
     'tests_failed=',
-    'development_observation='
+    'development_observation=',
+    'combined_development_observation=',
+    'headroom_development_observation=',
+    'renderer_decision='
 )) {
     if ($wrapperSource -notmatch [regex]::Escape($requiredToken)) {
         throw "verify.ps1 is missing required contract token: $requiredToken"
@@ -744,6 +874,195 @@ $environmentIndex = $wrapperSource.IndexOf("`$env:DOTNET_CLI_WORKLOAD_UPDATE_NOT
 $dotnetIndex = $wrapperSource.IndexOf('Invoke-P0R1FocusedVerification', [StringComparison]::Ordinal)
 if ($environmentIndex -lt 0 -or $environmentIndex -gt $dotnetIndex) {
     throw 'The workload-update notification guard must be set before every dotnet invocation.'
+}
+$sourceEvidenceIndex = $wrapperSource.IndexOf('Assert-P0R1RendererDecisionContract', [StringComparison]::Ordinal)
+if ($sourceEvidenceIndex -lt 0 -or $sourceEvidenceIndex -gt $dotnetIndex) {
+    throw 'Renderer/source evidence must be validated before restore, build, or test execution.'
+}
+$rendererDecision = Assert-P0R1RendererDecisionContract -RepositoryRoot $RepositoryRoot
+Assert-Equal -Actual $rendererDecision.DecisionId -Expected 'P0-R1-RENDERER-v1' -Message 'Renderer decision identity'
+Assert-Equal -Actual $rendererDecision.SelectedCandidateId -Expected 'wpf-writeablebitmap-preallocated' -Message 'Renderer selection'
+Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '96dffc30a2704809aefbc3e67bc07c23fcf0d2f48baff94f2b4854a93077250a' -Message 'Measured source tree identity'
+$expectedMeasurementCommand = 'dotnet run --project tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj --configuration Release -p:Platform=x64 --no-build --no-restore --disable-build-servers --'
+foreach ($relativeEvidencePath in @(
+    'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
+    'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json'
+)) {
+    $evidence = Get-Content -LiteralPath (Join-Path $RepositoryRoot $relativeEvidencePath) -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    Assert-Equal -Actual $evidence.measurement_command -Expected $expectedMeasurementCommand -Message "Isolated measurement command: $relativeEvidencePath"
+}
+
+$duplicateRendererRoot = Join-Path ([IO.Path]::GetTempPath()) ("p0r1-renderer-duplicate-" + [guid]::NewGuid().ToString('N'))
+try {
+    foreach ($relativePath in @(
+        'docs/dependencies/analogboard-p0-r1-dependencies.json',
+        'docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
+        'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json',
+        'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
+    )) {
+        $destination = Join-Path $duplicateRendererRoot $relativePath
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force
+        Copy-Item -LiteralPath (Join-Path $RepositoryRoot $relativePath) -Destination $destination
+    }
+    $duplicateDecisionPath = Join-Path $duplicateRendererRoot 'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
+    $duplicateDecision = (Get-Content -LiteralPath $duplicateDecisionPath -Raw -Encoding UTF8).Replace(
+        '"official_acceptance": false,',
+        '"official_acceptance": true, "official_acceptance": false,'
+    )
+    Set-Content -LiteralPath $duplicateDecisionPath -Value $duplicateDecision -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RendererDecisionContract -RepositoryRoot $duplicateRendererRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 renderer decision must not contain duplicate JSON property names: official_acceptance.'
+}
+finally {
+    Remove-Item -LiteralPath $duplicateRendererRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+$sourceDriftOuter = Join-Path ([IO.Path]::GetTempPath()) ("p0r1-source-drift-" + [guid]::NewGuid().ToString('N'))
+$sourceDriftRoot = Join-Path $sourceDriftOuter 'repo'
+try {
+    foreach ($relativePath in @(
+        'docs/dependencies/analogboard-p0-r1-dependencies.json',
+        'docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
+        'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json',
+        'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
+    )) {
+        $destination = Join-Path $sourceDriftRoot $relativePath
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force
+        Copy-Item -LiteralPath (Join-Path $RepositoryRoot $relativePath) -Destination $destination
+    }
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'global.json') -Destination $sourceDriftRoot
+    $sourceDestination = Join-Path $sourceDriftRoot 'prototypes/scatter-rendering'
+    $null = New-Item -ItemType Directory -Path $sourceDestination -Force
+    foreach ($rootFile in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering') -File -Force) {
+        Copy-Item -LiteralPath $rootFile.FullName -Destination $sourceDestination
+    }
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/src') -Destination $sourceDestination -Recurse
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/tests') -Destination $sourceDestination -Recurse
+
+    $null = Assert-P0R1RepositoryDependencyContract -RepositoryRoot $sourceDriftRoot
+    $sourcePropsPath = Join-Path $sourceDestination 'Directory.Build.props'
+    (Get-Content -LiteralPath $sourcePropsPath -Raw -Encoding UTF8).Replace(
+        '<DiscoverEditorConfigFiles>false</DiscoverEditorConfigFiles>',
+        '<DiscoverEditorConfigFiles>true</DiscoverEditorConfigFiles>'
+    ) | Set-Content -LiteralPath $sourcePropsPath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RepositoryDependencyContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'Directory.Build.props must disable ancestor editor/global analyzer config discovery.'
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/Directory.Build.props') -Destination $sourcePropsPath -Force
+
+    (Get-Content -LiteralPath $sourcePropsPath -Raw -Encoding UTF8).Replace(
+        '<UseSharedCompilation>false</UseSharedCompilation>',
+        '<UseSharedCompilation>true</UseSharedCompilation>'
+    ) | Set-Content -LiteralPath $sourcePropsPath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RepositoryDependencyContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'Directory.Build.props must disable shared compiler-server reuse.'
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/Directory.Build.props') -Destination $sourcePropsPath -Force
+
+    foreach ($terminator in @(
+        'Directory.Build.targets',
+        'Directory.Packages.props',
+        'Directory.Solution.props',
+        'Directory.Solution.targets',
+        'Directory.Build.rsp'
+    )) {
+        $terminatorPath = Join-Path $sourceDestination $terminator
+        Add-Content -LiteralPath $terminatorPath -Value 'drift'
+        Assert-ThrowsExact -Action {
+            Assert-P0R1RepositoryDependencyContract -RepositoryRoot $sourceDriftRoot
+        } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage "P0-R1 build ancestor terminator hash mismatch: prototypes/scatter-rendering/$terminator."
+        Copy-Item -LiteralPath (Join-Path $RepositoryRoot "prototypes/scatter-rendering/$terminator") -Destination $terminatorPath -Force
+    }
+
+    '<Project><PropertyGroup><Optimize>false</Optimize></PropertyGroup></Project>' |
+        Set-Content -LiteralPath (Join-Path $sourceDriftOuter 'Directory.Build.targets') -Encoding UTF8
+    '/p:Optimize=false' |
+        Set-Content -LiteralPath (Join-Path $sourceDriftOuter 'Directory.Build.rsp') -Encoding UTF8
+    $projectPath = Join-Path $sourceDriftRoot 'prototypes/scatter-rendering/tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj'
+    $propertyOutput = @(
+        & dotnet msbuild $projectPath -nologo -getProperty:Optimize -p:Configuration=Release -p:Platform=x64 2>&1 |
+            ForEach-Object { $_.ToString() }
+    )
+    if ($LASTEXITCODE -ne 0) {
+        throw "Ancestor terminator probe failed: $($propertyOutput -join [Environment]::NewLine)"
+    }
+    $nonEmptyPropertyOutput = @($propertyOutput | Where-Object { $_.Trim() -ne '' })
+    Assert-Equal -Actual $nonEmptyPropertyOutput[$nonEmptyPropertyOutput.Count - 1].Trim() -Expected 'true' -Message 'Ancestor build target/response isolation'
+
+    $userExtensionImportProperties = @(
+        'ImportUserLocationsByWildcardBeforeMicrosoftCommonProps',
+        'ImportUserLocationsByWildcardAfterMicrosoftCommonProps',
+        'ImportUserLocationsByWildcardBeforeMicrosoftCommonTargets',
+        'ImportUserLocationsByWildcardAfterMicrosoftCommonTargets',
+        'ImportUserLocationsByWildcardBeforeMicrosoftCSharpTargets',
+        'ImportUserLocationsByWildcardAfterMicrosoftCSharpTargets'
+    )
+    foreach ($propertyName in $userExtensionImportProperties) {
+        $userExtensionOutput = @(
+            & dotnet msbuild $projectPath -nologo "-getProperty:$propertyName" -p:Configuration=Release -p:Platform=x64 2>&1 |
+                ForEach-Object { $_.ToString() }
+        )
+        if ($LASTEXITCODE -ne 0) {
+            throw "User MSBuild extension isolation probe failed for $propertyName`: $($userExtensionOutput -join [Environment]::NewLine)"
+        }
+        $nonEmptyUserExtensionOutput = @($userExtensionOutput | Where-Object { $_.Trim() -ne '' })
+        Assert-Equal `
+            -Actual $nonEmptyUserExtensionOutput[$nonEmptyUserExtensionOutput.Count - 1].Trim() `
+            -Expected 'false' `
+            -Message "User MSBuild extension import isolation: $propertyName"
+    }
+
+    Add-Content -LiteralPath (Join-Path $sourceDriftRoot 'prototypes/scatter-rendering/src/AnalogBoard.ScatterRendering.Core/AggregateFrame.cs') -Value '// drift'
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RendererDecisionContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 combined development evidence measured source tree hash does not match current prototype sources.'
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/src/AnalogBoard.ScatterRendering.Core/AggregateFrame.cs') -Destination (Join-Path $sourceDriftRoot 'prototypes/scatter-rendering/src/AnalogBoard.ScatterRendering.Core/AggregateFrame.cs') -Force
+
+    $propsPath = Join-Path $sourceDriftRoot 'prototypes/scatter-rendering/Directory.Build.props'
+    (Get-Content -LiteralPath $propsPath -Raw -Encoding UTF8).Replace(
+        '</PropertyGroup>',
+        '<Optimize>false</Optimize></PropertyGroup>'
+    ) | Set-Content -LiteralPath $propsPath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RendererDecisionContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 combined development evidence measured source tree hash does not match current prototype sources.'
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/Directory.Build.props') -Destination $propsPath -Force
+
+    $targetsPath = Join-Path $sourceDriftRoot 'prototypes/scatter-rendering/Directory.Build.targets'
+    '<Project><Target Name="Injected" BeforeTargets="CoreCompile" /></Project>' |
+        Set-Content -LiteralPath $targetsPath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RendererDecisionContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 combined development evidence measured source tree hash does not match current prototype sources.'
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/Directory.Build.targets') -Destination $targetsPath -Force
+
+    $xamlPath = Join-Path $sourceDriftRoot 'prototypes/scatter-rendering/src/AnalogBoard.ScatterRendering.Wpf/Injected.XAML'
+    '<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" />' |
+        Set-Content -LiteralPath $xamlPath -Encoding UTF8
+    (Get-Item -LiteralPath $xamlPath).Attributes =
+        (Get-Item -LiteralPath $xamlPath).Attributes -bor [IO.FileAttributes]::Hidden
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RendererDecisionContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 combined development evidence measured source tree hash does not match current prototype sources.'
+    Remove-Item -LiteralPath $xamlPath -Force
+
+    $ancestorTargetsPath = Join-Path $sourceDriftRoot 'prototypes/Directory.Build.targets'
+    '<Project><PropertyGroup><Optimize>false</Optimize></PropertyGroup></Project>' |
+        Set-Content -LiteralPath $ancestorTargetsPath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Assert-P0R1RendererDecisionContract -RepositoryRoot $sourceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 combined development evidence measured source tree hash does not match current prototype sources.'
+}
+finally {
+    Remove-Item -LiteralPath $sourceDriftOuter -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host 'PASS: scatter-rendering verification contract tests'

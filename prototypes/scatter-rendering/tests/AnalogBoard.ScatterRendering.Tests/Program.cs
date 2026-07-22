@@ -10,9 +10,14 @@ internal static class Program
                 DisplayTransformContractTests.Cases).Concat(
                 DensityBinningContractTests.Cases).Concat(
                 DensityRasterContractTests.Cases).Concat(
+                GmiSnapshotContractTests.Cases).Concat(
+                GmiRasterContractTests.Cases).Concat(
+                RasterFrameLeaseContractTests.Cases).Concat(
                 WriteableBitmapSurfaceContractTests.Cases).Concat(
                 LatestFrameSchedulerContractTests.Cases).Concat(
+                CombinedVisualizationHarnessContractTests.Cases).Concat(
                 DevelopmentPerformanceObservationTests.Cases).Concat(
+                Batch4DevelopmentObservationTests.Cases).Concat(
                 PerformanceMetricSchemaContractTests.Cases).Concat(
                 TestRunnerContractTests.Cases));
     }

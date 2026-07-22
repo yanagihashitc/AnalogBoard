@@ -13,4 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="..\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AnalogBoard.ScatterRendering.Tests" />
+  </ItemGroup>
 </Project>

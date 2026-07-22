@@ -9,6 +9,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <DiscoverEditorConfigFiles>false</DiscoverEditorConfigFiles>
+    <DiscoverGlobalAnalyzerConfigFiles>false</DiscoverGlobalAnalyzerConfigFiles>
     <RestoreIgnoreFailedSources>false</RestoreIgnoreFailedSources>
     <RestoreNoCache>true</RestoreNoCache>
     <RestoreDisableParallel>true</RestoreDisableParallel>

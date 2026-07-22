@@ -9,8 +9,10 @@ synthetic fixture generator, and versioned metric schema. Batch 2 adds the
 accepted display-transform and density-binning correctness seam. Batch 3 adds
 the fixed BGRA density raster, thin built-in `WriteableBitmap` publication,
 pending-one latest-frame scheduling, and bounded development instrumentation.
-GMI, combined fairness, official performance evidence, and the final renderer
-decision remain pending their ordered checkpoints.
+Batch 4 adds bounded selected-channel GMI, combined scatter/GMI/input fairness,
+separate compatible-PC combined/headroom observations, and the renderer-path
+decision. Official reference-PC performance evidence remains pending its Phase
+Checkpoint.
 
 ## Batch 2 correctness evidence
 
@@ -46,6 +48,27 @@ decision remain pending their ordered checkpoints.
   single-slot test-double measurement; real Dispatcher timing remains open. It
   is non-official and does not substitute for the `AB-PERF-REF-v1` Phase
   Checkpoint.
+
+## Batch 4 GMI, combined, and decision evidence
+
+- [`gmi-raster-contract-v1.json`](gmi-raster-contract-v1.json) fixes selected
+  channel order, waveform-major sample order, one display-axis inversion, and
+  deterministic BGRA output; SHA-256
+  `874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08`.
+- The GMI seam accepts exactly one sampled channel and is bounded at 100
+  waveforms by 2,400 samples. It is not a raw acquisition stream.
+- Independent latest-frame schedulers share one Background-priority Dispatcher
+  without sharing a queue. Contract tests prove pending-one per feed, Input
+  preemption, continued-feed fairness, fault isolation, and exact lease return.
+- [`batch4-combined-development-observation.json`](batch4-combined-development-observation.json)
+  and [`batch4-headroom-development-observation.json`](batch4-headroom-development-observation.json)
+  are bounded compatible-PC summaries. Both explicitly prohibit substitution
+  for official hard scenarios.
+- [`renderer-decision-v1.json`](renderer-decision-v1.json) selects built-in WPF
+  `WriteableBitmap.WritePixels` with preallocated BGRA32 buffers for the Phase
+  Checkpoint. It records rejected candidates, dependency/license identity,
+  CPU/compositor boundaries, fallback, maintenance, evidence hashes, and the
+  Phase 2 seam. It is not a production throughput guarantee.
 
 ## Boundaries
 

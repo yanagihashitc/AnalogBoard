@@ -32,6 +32,7 @@ try {
         -Configuration $Configuration `
         -Architecture $Architecture
     $dependency = Assert-P0R1RepositoryDependencyContract -RepositoryRoot $RepositoryRoot
+    $rendererDecision = Assert-P0R1RendererDecisionContract -RepositoryRoot $RepositoryRoot
     $result = Invoke-P0R1FocusedVerification `
         -RepositoryRoot $RepositoryRoot `
         -PrototypeRoot $PrototypeRoot `
@@ -46,6 +47,9 @@ try {
     else {
         Write-Host "tests_total=$($result.TestsTotal) tests_passed=$($result.TestsPassed) tests_failed=$($result.TestsFailed)"
         Write-Host "development_observation=$($result.DevelopmentObservation)"
+        Write-Host "combined_development_observation=$($result.CombinedDevelopmentObservation)"
+        Write-Host "headroom_development_observation=$($result.HeadroomDevelopmentObservation)"
+        Write-Host "renderer_decision=$($rendererDecision.DecisionId):$($rendererDecision.SelectedCandidateId)"
     }
     exit 0
 }

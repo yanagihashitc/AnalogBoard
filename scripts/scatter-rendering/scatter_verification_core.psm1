@@ -14,6 +14,7 @@ $script:ExpectedPrimaryLicenseSha256 = '7f6839a61ce892b79c6549e2dc5a81fdbd240a0b
 $script:ExpectedThirdPartyNoticesPath = 'C:\Program Files\dotnet\ThirdPartyNotices.txt'
 $script:ExpectedThirdPartyNoticesSizeBytes = 78887L
 $script:ExpectedThirdPartyNoticesSha256 = 'deb4427a295e1ed474b0d81c5a0d972c1b550b9a715cda939cdfa9236b1b418f'
+$script:ExpectedDotNetExecutablePath = 'C:\Program Files\dotnet\dotnet.exe'
 $script:SolutionRelativePath = 'AnalogBoard.ScatterRenderingPrototype.sln'
 $script:TestProjectRelativePath = 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
 $script:ExpectedProjectPaths = @(
@@ -21,6 +22,76 @@ $script:ExpectedProjectPaths = @(
     'src/AnalogBoard.ScatterRendering.Wpf/AnalogBoard.ScatterRendering.Wpf.csproj',
     'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj'
 )
+$script:ExpectedAncestorTerminatorHashes = [ordered]@{
+    'prototypes\scatter-rendering\Directory.Build.targets' = '17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea'
+    'prototypes\scatter-rendering\Directory.Packages.props' = 'af799a176bf7be0de5e660924f4bde3444170788e9633399a1f65f0b72c9602f'
+    'prototypes\scatter-rendering\Directory.Solution.props' = '17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea'
+    'prototypes\scatter-rendering\Directory.Solution.targets' = '17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea'
+    'prototypes\scatter-rendering\Directory.Build.rsp' = '6391681febc56125b20d287b6cbb9d0bb52f2a600585ac9d8e66025ed45a4693'
+}
+
+function Get-P0R1SanitizedDotNetEnvironment {
+    param(
+        [Collections.IDictionary]$Environment =
+            ([Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Process))
+    )
+
+    $allowedNames = @(
+        'ALLUSERSPROFILE',
+        'APPDATA',
+        'CommonProgramFiles',
+        'CommonProgramFiles(x86)',
+        'CommonProgramW6432',
+        'COMPUTERNAME',
+        'ComSpec',
+        'HOMEDRIVE',
+        'HOMEPATH',
+        'LOCALAPPDATA',
+        'NUMBER_OF_PROCESSORS',
+        'OS',
+        'PATHEXT',
+        'PROCESSOR_ARCHITECTURE',
+        'PROCESSOR_IDENTIFIER',
+        'PROCESSOR_LEVEL',
+        'PROCESSOR_REVISION',
+        'ProgramData',
+        'ProgramFiles',
+        'ProgramFiles(x86)',
+        'ProgramW6432',
+        'PUBLIC',
+        'SystemDrive',
+        'SystemRoot',
+        'TEMP',
+        'TMP',
+        'USERDOMAIN',
+        'USERNAME',
+        'USERPROFILE',
+        'WINDIR'
+    )
+    $sanitized = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::OrdinalIgnoreCase
+    )
+    foreach ($allowedName in $allowedNames) {
+        foreach ($key in $Environment.Keys) {
+            if ([string]::Equals([string]$key, $allowedName, [StringComparison]::OrdinalIgnoreCase)) {
+                $value = [string]$Environment[$key]
+                if (-not [string]::IsNullOrEmpty($value)) {
+                    $sanitized[$allowedName] = $value
+                }
+                break
+            }
+        }
+    }
+
+    $sanitized['DOTNET_CLI_TELEMETRY_OPTOUT'] = '1'
+    $sanitized['DOTNET_NOLOGO'] = '1'
+    $sanitized['DOTNET_SKIP_FIRST_TIME_EXPERIENCE'] = '1'
+    $sanitized['DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE'] = '1'
+    $sanitized['DOTNET_MULTILEVEL_LOOKUP'] = '0'
+    $sanitized['MSBUILDDISABLENODEREUSE'] = '1'
+    $sanitized['DOTNET_CLI_USE_MSBUILD_SERVER'] = '0'
+    return $sanitized
+}
 
 function Assert-P0R1VerificationSelection {
     param(
@@ -126,6 +197,27 @@ function Assert-P0R1RepositoryDependencyContract {
     if ([string]$propertyGroup.RestoreIgnoreFailedSources -cne 'false' -or
         [string]$propertyGroup.NuGetAudit -cne 'false') {
         throw [InvalidOperationException]::new('Directory.Build.props must fail on unavailable sources and disable network audit.')
+    }
+    if ([string]$propertyGroup.DiscoverEditorConfigFiles -cne 'false' -or
+        [string]$propertyGroup.DiscoverGlobalAnalyzerConfigFiles -cne 'false') {
+        throw [InvalidOperationException]::new(
+            'Directory.Build.props must disable ancestor editor/global analyzer config discovery.'
+        )
+    }
+    if ([string]$propertyGroup.UseSharedCompilation -cne 'false') {
+        throw [InvalidOperationException]::new(
+            'Directory.Build.props must disable shared compiler-server reuse.'
+        )
+    }
+
+    foreach ($relativePath in $script:ExpectedAncestorTerminatorHashes.Keys) {
+        $terminatorPath = Get-RequiredFilePath -Root $resolvedRoot -RelativePath $relativePath
+        $actualHash = (Get-FileHash -LiteralPath $terminatorPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -cne $script:ExpectedAncestorTerminatorHashes[$relativePath]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 build ancestor terminator hash mismatch: $($relativePath.Replace('\', '/'))."
+            )
+        }
     }
 
     $manifestIdentity = Assert-P0R1DependencyManifestContract -ManifestPath $manifestPath
@@ -351,6 +443,44 @@ function Assert-P0R1RestoreIsolation {
     }
 }
 
+function Clear-P0R1GeneratedBuildRoots {
+    param(
+        [Parameter(Mandatory = $true)][string]$PrototypeRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $PrototypeRoot -ErrorAction Stop).Path
+    $rootPrefix = $resolvedRoot.TrimEnd('\') + '\'
+    $removedRootCount = 0
+    foreach ($projectRelativePath in $script:ExpectedProjectPaths) {
+        $projectPath = Join-Path $resolvedRoot $projectRelativePath
+        $projectRoot = Split-Path -Parent $projectPath
+        foreach ($generatedName in @('bin', 'obj')) {
+            $generatedPath = [IO.Path]::GetFullPath((Join-Path $projectRoot $generatedName))
+            if (-not $generatedPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                throw [InvalidOperationException]::new(
+                    "P0-R1 generated root resolves outside the prototype: $generatedPath."
+                )
+            }
+            if (-not (Test-Path -LiteralPath $generatedPath)) {
+                continue
+            }
+            $generatedItem = Get-Item -LiteralPath $generatedPath -Force
+            if (-not $generatedItem.PSIsContainer -or
+                ($generatedItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw [InvalidOperationException]::new(
+                    "P0-R1 generated root must be a non-reparse directory: $generatedPath."
+                )
+            }
+            Remove-Item -LiteralPath $generatedPath -Recurse -Force
+            $removedRootCount++
+        }
+    }
+
+    return [pscustomobject]@{
+        RemovedRootCount = $removedRootCount
+    }
+}
+
 function Get-P0R1PrototypeState {
     param([Parameter(Mandatory = $true)][string]$PrototypeRoot)
 
@@ -520,6 +650,9 @@ function Get-P0R1PrototypeState {
     }
     [xml]$resources = Get-Content -LiteralPath $resourcePath -Raw -Encoding UTF8
     $requiredResourceKeys = @(
+        'HarnessCopyBufferLengthMismatch',
+        'HarnessFrameShapeMismatch',
+        'HarnessOwnerDispatcherRequired',
         'SurfaceBufferLengthMismatch',
         'SurfaceDisposed',
         'SurfaceGenerationNotIncreasing',
@@ -626,6 +759,242 @@ function Get-P0R1TestSummary {
     }
 }
 
+function Assert-P0R1NoDuplicateJsonProperties {
+    param(
+        [Parameter(Mandatory = $true)][string]$Json,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    $containers = [System.Collections.Generic.List[object]]::new()
+    $index = 0
+    while ($index -lt $Json.Length) {
+        $character = $Json[$index]
+        if ($character -eq '"') {
+            $start = $index
+            $index++
+            while ($index -lt $Json.Length) {
+                if ($Json[$index] -eq '\') {
+                    $index += 2
+                    continue
+                }
+                if ($Json[$index] -eq '"') {
+                    break
+                }
+                $index++
+            }
+            if ($index -ge $Json.Length) {
+                break
+            }
+
+            $next = $index + 1
+            while ($next -lt $Json.Length -and [char]::IsWhiteSpace($Json[$next])) {
+                $next++
+            }
+            if ($next -lt $Json.Length -and $Json[$next] -eq ':' -and
+                $containers.Count -gt 0) {
+                $container = $containers[$containers.Count - 1]
+                if ($container.Kind -ceq 'Object') {
+                    $rawPropertyName = $Json.Substring($start, ($index - $start) + 1)
+                    try {
+                        $propertyName = ConvertFrom-Json -InputObject $rawPropertyName -ErrorAction Stop
+                    }
+                    catch {
+                        break
+                    }
+                    if (-not $container.Names.Add([string]$propertyName)) {
+                        throw [InvalidOperationException]::new(
+                            "P0-R1 $Label must not contain duplicate JSON property names: $propertyName."
+                        )
+                    }
+                }
+            }
+        }
+        elseif ($character -eq '{') {
+            $containers.Add([pscustomobject]@{
+                Kind = 'Object'
+                Names = [System.Collections.Generic.HashSet[string]]::new(
+                    [StringComparer]::Ordinal
+                )
+            })
+        }
+        elseif ($character -eq '[') {
+            $containers.Add([pscustomobject]@{ Kind = 'Array'; Names = $null })
+        }
+        elseif (($character -eq '}' -or $character -eq ']') -and
+            $containers.Count -gt 0) {
+            $containers.RemoveAt($containers.Count - 1)
+        }
+        $index++
+    }
+}
+
+function Get-P0R1MeasuredSourceTreeHash {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+    $prototypeRoot = Join-Path $resolvedRoot 'prototypes\scatter-rendering'
+    if (-not (Test-Path -LiteralPath $prototypeRoot -PathType Container)) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 measured source root is absent: prototypes/scatter-rendering.'
+        )
+    }
+
+    $entries = [System.Collections.Generic.SortedDictionary[string, string]]::new(
+        [StringComparer]::Ordinal
+    )
+    foreach ($file in Get-ChildItem -LiteralPath $prototypeRoot -Recurse -File -Force) {
+        $relativePath = $file.FullName.Substring($resolvedRoot.Length + 1).Replace('\', '/')
+        if ($relativePath -match '(^|/)(bin|obj)/') {
+            continue
+        }
+        $entries.Add(
+            $relativePath,
+            (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        )
+    }
+
+    foreach ($relativePath in @(
+        'global.json',
+        'docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json'
+    )) {
+        $absolutePath = Join-Path $resolvedRoot $relativePath
+        if (-not (Test-Path -LiteralPath $absolutePath -PathType Leaf)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 measured external build/run input is absent: $relativePath."
+            )
+        }
+        $entries.Add(
+            $relativePath,
+            (Get-FileHash -LiteralPath $absolutePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        )
+    }
+
+    $ancestorBuildCandidates = @(
+        'Directory.Build.props',
+        'Directory.Build.targets',
+        'Directory.Packages.props',
+        'prototypes/Directory.Build.props',
+        'prototypes/Directory.Build.targets',
+        'prototypes/Directory.Packages.props'
+    )
+    foreach ($relativePath in $ancestorBuildCandidates) {
+        $absolutePath = Join-Path $resolvedRoot $relativePath
+        $value = if (Test-Path -LiteralPath $absolutePath -PathType Leaf) {
+            (Get-FileHash -LiteralPath $absolutePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+        else {
+            '<absent>'
+        }
+        $entries.Add($relativePath, $value)
+    }
+
+    $material = [Text.StringBuilder]::new()
+    foreach ($entry in $entries.GetEnumerator()) {
+        $null = $material.Append($entry.Key).Append('=').Append($entry.Value).Append("`n")
+    }
+
+    $encoding = [Text.UTF8Encoding]::new($false)
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = ([BitConverter]::ToString(
+            $sha256.ComputeHash($encoding.GetBytes($material.ToString()))
+        )).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+    }
+
+    return [pscustomobject]@{
+        Contract = 'sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus global.json and three linked fixtures; six in-repository ancestor candidates use sha256(file) or <absent>)'
+        FileCount = @($entries.Values | Where-Object { $_ -cne '<absent>' }).Count
+        Sha256 = $hash
+    }
+}
+
+function Assert-P0R1MeasuredEvidenceSourceContract {
+    param(
+        [Parameter(Mandatory = $true)][string]$EvidencePath,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][pscustomobject]$MeasuredSourceTree
+    )
+
+    $json = Get-Content -LiteralPath $EvidencePath -Raw -Encoding UTF8
+    Assert-P0R1NoDuplicateJsonProperties -Json $json -Label $Label
+    try {
+        $evidence = $json | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw [InvalidOperationException]::new("P0-R1 $Label must be valid JSON.")
+    }
+    if ($null -eq $evidence.source) {
+        throw [InvalidOperationException]::new("P0-R1 $Label source identity is absent.")
+    }
+
+    $requiredSourceFields = @(
+        'branch', 'base_commit', 'state', 'measured_source_tree_contract',
+        'measured_source_file_count', 'measured_source_tree_sha256'
+    )
+    $actualSourceFields = @($evidence.source.PSObject.Properties.Name)
+    foreach ($fieldName in $requiredSourceFields) {
+        if ($actualSourceFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 $Label source identity field is absent: $fieldName."
+            )
+        }
+    }
+    if ($actualSourceFields.Count -ne $requiredSourceFields.Count) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 $Label source identity must contain the exact field set."
+        )
+    }
+    foreach ($fieldName in @(
+        'branch', 'base_commit', 'state', 'measured_source_tree_contract',
+        'measured_source_tree_sha256'
+    )) {
+        if ($evidence.source.$fieldName -isnot [string] -or
+            [string]::IsNullOrWhiteSpace($evidence.source.$fieldName)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 $Label source identity field must be a non-empty JSON string: $fieldName."
+            )
+        }
+    }
+    if (-not (Test-P0R1JsonInteger -Value $evidence.source.measured_source_file_count) -or
+        [int]$evidence.source.measured_source_file_count -lt 1) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 $Label measured source file count must be a positive integer."
+        )
+    }
+    if ($evidence.source.branch -cne 'perf/phase0-scatter-prototype' -or
+        $evidence.source.base_commit -cne 'f9472c81a2f014a97a0ae186d82e5bc46bab84f9' -or
+        $evidence.source.state -cne
+            'Batch 4 pre-commit worktree; publication commit is recorded by the next checkpoint') {
+        throw [InvalidOperationException]::new(
+            "P0-R1 $Label source branch/base/state identity mismatch."
+        )
+    }
+    if ($evidence.source.measured_source_tree_contract -cne $MeasuredSourceTree.Contract -or
+        [int]$evidence.source.measured_source_file_count -ne $MeasuredSourceTree.FileCount -or
+        $evidence.source.measured_source_tree_sha256 -cne $MeasuredSourceTree.Sha256) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 $Label measured source tree hash does not match current prototype sources."
+        )
+    }
+    $expectedMeasurementCommand =
+        'dotnet run --project tests/AnalogBoard.ScatterRendering.Tests/' +
+        'AnalogBoard.ScatterRendering.Tests.csproj --configuration Release ' +
+        '-p:Platform=x64 --no-build --no-restore --disable-build-servers --'
+    if ($evidence.measurement_command -isnot [string] -or
+        $evidence.measurement_command -cne $expectedMeasurementCommand) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 $Label measurement command does not match the isolated runner contract."
+        )
+    }
+}
+
 function Get-P0R1DevelopmentObservation {
     param(
         [Parameter(Mandatory = $true)]
@@ -645,6 +1014,9 @@ function Get-P0R1DevelopmentObservation {
     }
 
     $json = $observationLines[0].Substring($prefix.Length)
+    Assert-P0R1NoDuplicateJsonProperties `
+        -Json $json `
+        -Label 'development observation'
     try {
         $observation = $json | ConvertFrom-Json -ErrorAction Stop
     }
@@ -682,6 +1054,11 @@ function Get-P0R1DevelopmentObservation {
                 "P0-R1 development observation field is absent: $fieldName."
             )
         }
+    }
+    if ($actualFields.Count -ne $requiredFields.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 development observation must contain only the exact versioned field set.'
+        )
     }
 
     if ([string]$observation.schema_id -cne 'analogboard.scatter-rendering.development-observation.v1') {
@@ -841,24 +1218,721 @@ function Get-P0R1DevelopmentObservation {
     return $json
 }
 
+function Test-P0R1JsonInteger {
+    param([object]$Value)
+
+    return $Value -is [sbyte] -or
+        $Value -is [byte] -or
+        $Value -is [int16] -or
+        $Value -is [uint16] -or
+        $Value -is [int32] -or
+        $Value -is [uint32] -or
+        $Value -is [int64] -or
+        $Value -is [uint64]
+}
+
+function Test-P0R1JsonNumber {
+    param([object]$Value)
+
+    return (Test-P0R1JsonInteger -Value $Value) -or
+        $Value -is [single] -or
+        $Value -is [double] -or
+        $Value -is [decimal]
+}
+
+function ConvertFrom-P0R1ExactObservationLine {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$OutputLines,
+        [Parameter(Mandatory = $true)][string]$Prefix,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string[]]$RequiredFields
+    )
+
+    $matchingLines = @(
+        $OutputLines |
+            Where-Object { $_.StartsWith($Prefix, [StringComparison]::Ordinal) }
+    )
+    if ($matchingLines.Count -ne 1) {
+        throw [InvalidOperationException]::new(
+            "Test runner output must contain exactly one $Label line; found $($matchingLines.Count)."
+        )
+    }
+
+    $json = $matchingLines[0].Substring($Prefix.Length)
+    Assert-P0R1NoDuplicateJsonProperties -Json $json -Label $Label
+    try {
+        $value = $json | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw [InvalidOperationException]::new("P0-R1 $Label must be valid JSON.")
+    }
+
+    $actualFields = @($value.PSObject.Properties.Name)
+    foreach ($fieldName in $RequiredFields) {
+        if ($actualFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 $Label field is absent: $fieldName."
+            )
+        }
+    }
+    if ($actualFields.Count -ne $RequiredFields.Count) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 $Label must contain only the exact versioned field set."
+        )
+    }
+
+    return [pscustomobject]@{
+        Json = $json
+        Value = $value
+    }
+}
+
+function Get-P0R1CombinedDevelopmentObservation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$OutputLines
+    )
+
+    $requiredFields = @(
+        'schema_id',
+        'observation_kind',
+        'development_only',
+        'official_acceptance',
+        'may_substitute_official',
+        'fixture_id',
+        'event_count',
+        'scatter_width',
+        'scatter_height',
+        'gmi_width',
+        'gmi_height',
+        'selected_gmi_channel',
+        'gmi_waveform_count',
+        'gmi_sample_count',
+        'warmup_iterations',
+        'measurement_iterations',
+        'combined_iteration_ms_p95',
+        'combined_iteration_ms_max',
+        'scatter_delivered_update_rate_hz',
+        'gmi_delivered_update_rate_hz',
+        'gmi_max_update_interval_ms',
+        'input_latency_ms_p95',
+        'input_latency_ms_max',
+        'allocated_bytes_per_iteration',
+        'scatter_publish_p99_ms',
+        'gmi_publish_p99_ms',
+        'scatter_pending_frame_max',
+        'scatter_pending_callback_max',
+        'gmi_pending_frame_max',
+        'gmi_pending_callback_max',
+        'scatter_rendered_count',
+        'gmi_rendered_count',
+        'scatter_coalesced_count',
+        'gmi_coalesced_count',
+        'input_sentinel_count',
+        'dispatcher_priority_contract',
+        'scatter_raster_sha256',
+        'gmi_raster_sha256',
+        'machine'
+    )
+    $parsed = ConvertFrom-P0R1ExactObservationLine `
+        -OutputLines $OutputLines `
+        -Prefix 'COMBINED_DEVELOPMENT_OBSERVATION ' `
+        -Label 'combined development observation' `
+        -RequiredFields $requiredFields
+    $observation = $parsed.Value
+
+    foreach ($fieldName in @('development_only', 'official_acceptance', 'may_substitute_official')) {
+        if ($observation.$fieldName -isnot [bool]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 combined observation field must be a JSON boolean: $fieldName."
+            )
+        }
+    }
+    if (-not $observation.development_only -or
+        $observation.official_acceptance -or
+        $observation.may_substitute_official) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation must remain development-only, non-official, and non-substituting.'
+        )
+    }
+
+    $expectedStrings = [ordered]@{
+        schema_id = 'analogboard.scatter-rendering.combined-development-observation.v1'
+        observation_kind = 'hard-combined-compatible-pc-smoke'
+        fixture_id = 'AB-P0-R1-HARD-COMBINED-v1'
+        selected_gmi_channel = 'fsGMI'
+        dispatcher_priority_contract = 'Input_above_Background'
+        scatter_raster_sha256 = '255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780'
+        gmi_raster_sha256 = 'd02e42158d6b89d39b342a307557dcc3013f908f49e6e7f3d4f43edbb4393c88'
+    }
+    foreach ($fieldName in $expectedStrings.Keys) {
+        if ($observation.$fieldName -isnot [string] -or
+            $observation.$fieldName -cne $expectedStrings[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 combined observation identity mismatch: $fieldName."
+            )
+        }
+    }
+    if ($observation.machine -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($observation.machine)) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation machine identity must be a non-empty JSON string.'
+        )
+    }
+
+    $integerFields = @(
+        'event_count', 'scatter_width', 'scatter_height', 'gmi_width', 'gmi_height',
+        'gmi_waveform_count', 'gmi_sample_count', 'warmup_iterations',
+        'measurement_iterations', 'allocated_bytes_per_iteration',
+        'scatter_pending_frame_max', 'scatter_pending_callback_max',
+        'gmi_pending_frame_max', 'gmi_pending_callback_max',
+        'scatter_rendered_count', 'gmi_rendered_count',
+        'scatter_coalesced_count', 'gmi_coalesced_count', 'input_sentinel_count'
+    )
+    foreach ($fieldName in $integerFields) {
+        if (-not (Test-P0R1JsonInteger -Value $observation.$fieldName)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 combined observation field must be an integer JSON number: $fieldName."
+            )
+        }
+        if ([long]$observation.$fieldName -lt 0) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 combined observation integer field must be non-negative: $fieldName."
+            )
+        }
+    }
+    if ([int]$observation.event_count -ne 100001 -or
+        [int]$observation.scatter_width -ne 512 -or
+        [int]$observation.scatter_height -ne 512 -or
+        [int]$observation.gmi_width -ne 512 -or
+        [int]$observation.gmi_height -ne 512 -or
+        [int]$observation.gmi_waveform_count -ne 100 -or
+        [int]$observation.gmi_sample_count -ne 2400) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation fixture shape mismatch.'
+        )
+    }
+    if ([int]$observation.warmup_iterations -ne 3 -or
+        [int]$observation.measurement_iterations -ne 10 -or
+        [long]$observation.scatter_rendered_count -ne 13 -or
+        [long]$observation.gmi_rendered_count -ne 13 -or
+        [int]$observation.input_sentinel_count -ne 10 -or
+        [long]$observation.scatter_coalesced_count -ne 0 -or
+        [long]$observation.gmi_coalesced_count -ne 0) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation fixed iteration counts are inconsistent.'
+        )
+    }
+    if ([int]$observation.scatter_pending_frame_max -ne 1 -or
+        [int]$observation.scatter_pending_callback_max -ne 1 -or
+        [int]$observation.gmi_pending_frame_max -ne 1 -or
+        [int]$observation.gmi_pending_callback_max -ne 1) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation pending maxima must equal one per feed.'
+        )
+    }
+
+    $numberFields = @(
+        'combined_iteration_ms_p95', 'combined_iteration_ms_max',
+        'scatter_delivered_update_rate_hz', 'gmi_delivered_update_rate_hz',
+        'gmi_max_update_interval_ms', 'input_latency_ms_p95', 'input_latency_ms_max',
+        'scatter_publish_p99_ms', 'gmi_publish_p99_ms'
+    )
+    foreach ($fieldName in $numberFields) {
+        if (-not (Test-P0R1JsonNumber -Value $observation.$fieldName)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 combined observation field must be a JSON number: $fieldName."
+            )
+        }
+        $number = [double]$observation.$fieldName
+        if ([double]::IsNaN($number) -or [double]::IsInfinity($number) -or $number -lt 0) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 combined observation metric must be finite and non-negative: $fieldName."
+            )
+        }
+    }
+    if ([double]$observation.scatter_delivered_update_rate_hz -le 0 -or
+        [double]$observation.gmi_delivered_update_rate_hz -le 0) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation delivered update rates must be positive.'
+        )
+    }
+    if ([double]$observation.combined_iteration_ms_max -lt
+            [double]$observation.combined_iteration_ms_p95 -or
+        [double]$observation.input_latency_ms_max -lt
+            [double]$observation.input_latency_ms_p95) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 combined observation maxima must be greater than or equal to p95.'
+        )
+    }
+
+    return $parsed.Json
+}
+
+function Get-P0R1HeadroomDevelopmentObservation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$OutputLines
+    )
+
+    $requiredFields = @(
+        'schema_id', 'observation_kind', 'development_only', 'official_acceptance',
+        'may_substitute_hard_gate', 'fixture_id', 'event_count', 'width', 'height',
+        'tile_count', 'scatter_tile_count', 'gmi_tile_count', 'selected_gmi_channel',
+        'gmi_waveform_count', 'gmi_sample_count', 'warmup_iterations',
+        'measurement_iterations', 'three_tile_iteration_ms_p95',
+        'three_tile_iteration_ms_max', 'allocated_bytes_per_iteration',
+        'scatter_a_raster_sha256', 'scatter_b_raster_sha256', 'gmi_raster_sha256',
+        'machine'
+    )
+    $parsed = ConvertFrom-P0R1ExactObservationLine `
+        -OutputLines $OutputLines `
+        -Prefix 'HEADROOM_DEVELOPMENT_OBSERVATION ' `
+        -Label 'headroom development observation' `
+        -RequiredFields $requiredFields
+    $observation = $parsed.Value
+
+    foreach ($fieldName in @('development_only', 'official_acceptance', 'may_substitute_hard_gate')) {
+        if ($observation.$fieldName -isnot [bool]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 headroom observation field must be a JSON boolean: $fieldName."
+            )
+        }
+    }
+    if (-not $observation.development_only -or
+        $observation.official_acceptance -or
+        $observation.may_substitute_hard_gate) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 headroom observation must remain development-only, non-official, and non-substituting.'
+        )
+    }
+
+    $expectedStrings = [ordered]@{
+        schema_id = 'analogboard.scatter-rendering.headroom-development-observation.v1'
+        observation_kind = 'three-tile-headroom-compatible-pc'
+        fixture_id = 'AB-P0-R1-HEADROOM-v1'
+        selected_gmi_channel = 'fsGMI'
+        scatter_a_raster_sha256 = '0ffd755ea97e90ab1f8a186cc20e58f30378196be0d6ba3b1d068cb5b59afa45'
+        scatter_b_raster_sha256 = '9c1c255558b089f96eeb6336c55b0fbe254b05f47ea815c6e230ca05e8b31b17'
+        gmi_raster_sha256 = '417e8cf7f21ab09680e98a2aa6b7aabd0479a3457a52e55f15b6b3d41bd1156b'
+    }
+    foreach ($fieldName in $expectedStrings.Keys) {
+        if ($observation.$fieldName -isnot [string] -or
+            $observation.$fieldName -cne $expectedStrings[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 headroom observation identity mismatch: $fieldName."
+            )
+        }
+    }
+    if ($observation.machine -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($observation.machine)) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 headroom observation machine identity must be a non-empty JSON string.'
+        )
+    }
+
+    $integerFields = @(
+        'event_count', 'width', 'height', 'tile_count', 'scatter_tile_count',
+        'gmi_tile_count', 'gmi_waveform_count', 'gmi_sample_count',
+        'warmup_iterations', 'measurement_iterations', 'allocated_bytes_per_iteration'
+    )
+    foreach ($fieldName in $integerFields) {
+        if (-not (Test-P0R1JsonInteger -Value $observation.$fieldName)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 headroom observation field must be an integer JSON number: $fieldName."
+            )
+        }
+        if ([long]$observation.$fieldName -lt 0) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 headroom observation integer field must be non-negative: $fieldName."
+            )
+        }
+    }
+    if ([int]$observation.event_count -ne 131072 -or
+        [int]$observation.width -ne 1024 -or
+        [int]$observation.height -ne 1024 -or
+        [int]$observation.tile_count -ne 3 -or
+        [int]$observation.scatter_tile_count -ne 2 -or
+        [int]$observation.gmi_tile_count -ne 1) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 headroom observation must use 131072 events, 1024-square output, and exactly three tiles.'
+        )
+    }
+    if ([int]$observation.gmi_waveform_count -ne 100 -or
+        [int]$observation.gmi_sample_count -ne 2400 -or
+        [int]$observation.warmup_iterations -ne 1 -or
+        [int]$observation.measurement_iterations -ne 3) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 headroom observation bounded GMI or iteration identity mismatch.'
+        )
+    }
+    foreach ($fieldName in @('three_tile_iteration_ms_p95', 'three_tile_iteration_ms_max')) {
+        if (-not (Test-P0R1JsonNumber -Value $observation.$fieldName)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 headroom observation field must be a JSON number: $fieldName."
+            )
+        }
+        $number = [double]$observation.$fieldName
+        if ([double]::IsNaN($number) -or [double]::IsInfinity($number) -or $number -lt 0) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 headroom observation metric must be finite and non-negative: $fieldName."
+            )
+        }
+    }
+    if ([double]$observation.three_tile_iteration_ms_max -lt
+        [double]$observation.three_tile_iteration_ms_p95) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 headroom observation maximum must be greater than or equal to p95.'
+        )
+    }
+
+    return $parsed.Json
+}
+
+function Assert-P0R1RendererDecisionContract {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+    $relativeDecisionPath = 'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
+    $decisionPath = Join-Path $resolvedRoot $relativeDecisionPath
+    if (-not (Test-Path -LiteralPath $decisionPath -PathType Leaf)) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 renderer decision file is absent: $relativeDecisionPath."
+        )
+    }
+    $decisionJson = Get-Content -LiteralPath $decisionPath -Raw -Encoding UTF8
+    Assert-P0R1NoDuplicateJsonProperties `
+        -Json $decisionJson `
+        -Label 'renderer decision'
+    try {
+        $decision = $decisionJson | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw [InvalidOperationException]::new('P0-R1 renderer decision must be valid JSON.')
+    }
+
+    $requiredFields = @(
+        'schema_id', 'decision_id', 'status', 'scope', 'development_only',
+        'official_acceptance', 'production_throughput_guarantee',
+        'selected_candidate_id', 'dependency_contract', 'selected_path',
+        'candidates', 'evidence', 'stop_conditions', 'residual_limits'
+    )
+    $actualFields = @($decision.PSObject.Properties.Name)
+    foreach ($fieldName in $requiredFields) {
+        if ($actualFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision field is absent: $fieldName."
+            )
+        }
+    }
+    if ($actualFields.Count -ne $requiredFields.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer decision must contain only the exact versioned field set.'
+        )
+    }
+
+    $expectedStrings = [ordered]@{
+        schema_id = 'analogboard.scatter-rendering.renderer-decision.v1'
+        decision_id = 'P0-R1-RENDERER-v1'
+        status = 'selected_for_phase_checkpoint'
+        scope = 'P0-R1 bounded visualization prototype only'
+        selected_candidate_id = 'wpf-writeablebitmap-preallocated'
+    }
+    foreach ($fieldName in $expectedStrings.Keys) {
+        if ($decision.$fieldName -isnot [string] -or
+            $decision.$fieldName -cne $expectedStrings[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision identity mismatch: $fieldName."
+            )
+        }
+    }
+    foreach ($fieldName in @(
+        'development_only', 'official_acceptance', 'production_throughput_guarantee'
+    )) {
+        if ($decision.$fieldName -isnot [bool]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision field must be a JSON boolean: $fieldName."
+            )
+        }
+    }
+    if (-not $decision.development_only -or
+        $decision.official_acceptance -or
+        $decision.production_throughput_guarantee) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer decision must remain development-only, non-official, and not a production throughput guarantee.'
+        )
+    }
+
+    $dependency = $decision.dependency_contract
+    $dependencyFields = @(
+        'framework', 'external_nuget_package_count', 'manifest_path',
+        'manifest_sha256', 'license_name', 'license_sha256',
+        'third_party_notices_sha256'
+    )
+    if (@($dependency.PSObject.Properties.Name).Count -ne $dependencyFields.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer dependency decision must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $dependencyFields) {
+        if (@($dependency.PSObject.Properties.Name) -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer dependency decision field is absent: $fieldName."
+            )
+        }
+    }
+    if (-not (Test-P0R1JsonInteger -Value $dependency.external_nuget_package_count) -or
+        [int]$dependency.external_nuget_package_count -ne 0) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer decision external NuGet package count must be integer zero.'
+        )
+    }
+    $expectedDependencyStrings = [ordered]@{
+        framework = 'WPF in Microsoft.WindowsDesktop.App 10.0.10'
+        manifest_path = 'docs/dependencies/analogboard-p0-r1-dependencies.json'
+        manifest_sha256 = 'f1baebfb5cd4334563f7ab6b42ed3f6bf867e8d5f6199de62aa6effbeb6af534'
+        license_name = 'MIT'
+        license_sha256 = '7f6839a61ce892b79c6549e2dc5a81fdbd240a0b260f8881216b45b7fda8b45d'
+        third_party_notices_sha256 = 'deb4427a295e1ed474b0d81c5a0d972c1b550b9a715cda939cdfa9236b1b418f'
+    }
+    foreach ($fieldName in $expectedDependencyStrings.Keys) {
+        if ($dependency.$fieldName -isnot [string] -or
+            $dependency.$fieldName -cne $expectedDependencyStrings[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer dependency decision identity mismatch: $fieldName."
+            )
+        }
+    }
+
+    $selectedPathFields = @(
+        'framework_surface', 'pixel_contract', 'publication_api', 'rasterization',
+        'composition', 'fallback', 'maintenance_boundary', 'phase2_boundary'
+    )
+    if (@($decision.selected_path.PSObject.Properties.Name).Count -ne $selectedPathFields.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 selected renderer path must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $selectedPathFields) {
+        if (@($decision.selected_path.PSObject.Properties.Name) -cnotcontains $fieldName -or
+            $decision.selected_path.$fieldName -isnot [string] -or
+            [string]::IsNullOrWhiteSpace($decision.selected_path.$fieldName)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 selected renderer path field is absent or empty: $fieldName."
+            )
+        }
+    }
+    if ($decision.selected_path.framework_surface -cne
+            'System.Windows.Media.Imaging.WriteableBitmap' -or
+        $decision.selected_path.pixel_contract -cne 'preallocated opaque BGRA32' -or
+        $decision.selected_path.publication_api -cne 'WritePixels') {
+        throw [InvalidOperationException]::new(
+            'P0-R1 selected renderer path does not match the frozen WriteableBitmap contract.'
+        )
+    }
+
+    $candidateFields = @(
+        'candidate_id', 'disposition', 'correctness', 'performance',
+        'dependency_license', 'cpu_gpu_behavior', 'fallback', 'maintenance',
+        'phase2_portability'
+    )
+    $expectedCandidates = [ordered]@{
+        'wpf-writeablebitmap-preallocated' = 'selected_for_phase_checkpoint'
+        'wpf-writeablebitmap-direct-backbuffer' = 'rejected_for_phase0'
+        'wpf-vector-or-rendertargetbitmap-events' = 'rejected_contract_mismatch'
+    }
+    if ($decision.candidates -isnot [array] -or
+        @($decision.candidates).Count -ne $expectedCandidates.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer decision must contain exactly three candidate evaluations.'
+        )
+    }
+    for ($index = 0; $index -lt $expectedCandidates.Count; $index++) {
+        $candidate = @($decision.candidates)[$index]
+        if (@($candidate.PSObject.Properties.Name).Count -ne $candidateFields.Count) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer candidate must contain the exact field set at index $index."
+            )
+        }
+        foreach ($fieldName in $candidateFields) {
+            if (@($candidate.PSObject.Properties.Name) -cnotcontains $fieldName -or
+                $candidate.$fieldName -isnot [string] -or
+                [string]::IsNullOrWhiteSpace($candidate.$fieldName)) {
+                throw [InvalidOperationException]::new(
+                    "P0-R1 renderer candidate field is absent or empty at index $index`: $fieldName."
+                )
+            }
+        }
+        $expectedId = @($expectedCandidates.Keys)[$index]
+        if ($candidate.candidate_id -cne $expectedId -or
+            $candidate.disposition -cne $expectedCandidates[$expectedId]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer candidate identity or disposition mismatch at index $index."
+            )
+        }
+    }
+
+    $expectedEvidence = [ordered]@{
+        density_raster_contract_path = 'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json'
+        density_raster_contract_sha256 = 'c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33'
+        gmi_raster_contract_path = 'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json'
+        gmi_raster_contract_sha256 = '874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08'
+        combined_development_path = 'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json'
+        combined_development_sha256 = '71bfdbe672fef7d56cd72da9af5e313751fe08e6d592bde4ab5080ef5ef0c180'
+        headroom_development_path = 'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json'
+        headroom_development_sha256 = '991a0aaa5411ee05dc304d9b381abae30c22ad8f302a2225301fec5b57920f69'
+    }
+    if (@($decision.evidence.PSObject.Properties.Name).Count -ne $expectedEvidence.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer decision evidence must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedEvidence.Keys) {
+        if (@($decision.evidence.PSObject.Properties.Name) -cnotcontains $fieldName -or
+            $decision.evidence.$fieldName -isnot [string] -or
+            $decision.evidence.$fieldName -cne $expectedEvidence[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision evidence mismatch: $fieldName."
+            )
+        }
+    }
+
+    $hashedFiles = @(
+        @{ Path = $dependency.manifest_path; Hash = $dependency.manifest_sha256 },
+        @{ Path = $decision.evidence.density_raster_contract_path; Hash = $decision.evidence.density_raster_contract_sha256 },
+        @{ Path = $decision.evidence.gmi_raster_contract_path; Hash = $decision.evidence.gmi_raster_contract_sha256 },
+        @{ Path = $decision.evidence.combined_development_path; Hash = $decision.evidence.combined_development_sha256 },
+        @{ Path = $decision.evidence.headroom_development_path; Hash = $decision.evidence.headroom_development_sha256 }
+    )
+    foreach ($item in $hashedFiles) {
+        $path = Join-Path $resolvedRoot $item.Path
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision evidence file is absent: $($item.Path)."
+            )
+        }
+        $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -cne $item.Hash) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision evidence hash mismatch: $($item.Path)."
+            )
+        }
+    }
+
+    $measuredSourceTree = Get-P0R1MeasuredSourceTreeHash -RepositoryRoot $resolvedRoot
+    Assert-P0R1MeasuredEvidenceSourceContract `
+        -EvidencePath (Join-Path $resolvedRoot $decision.evidence.combined_development_path) `
+        -Label 'combined development evidence' `
+        -MeasuredSourceTree $measuredSourceTree
+    Assert-P0R1MeasuredEvidenceSourceContract `
+        -EvidencePath (Join-Path $resolvedRoot $decision.evidence.headroom_development_path) `
+        -Label 'headroom development evidence' `
+        -MeasuredSourceTree $measuredSourceTree
+
+    foreach ($fieldName in @('stop_conditions', 'residual_limits')) {
+        $items = @($decision.$fieldName)
+        if ($decision.$fieldName -isnot [array] -or $items.Count -ne 3) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 renderer decision $fieldName must contain exactly three entries."
+            )
+        }
+        foreach ($item in $items) {
+            if ($item -isnot [string] -or [string]::IsNullOrWhiteSpace($item)) {
+                throw [InvalidOperationException]::new(
+                    "P0-R1 renderer decision $fieldName entries must be non-empty JSON strings."
+                )
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        DecisionId = $decision.decision_id
+        SelectedCandidateId = $decision.selected_candidate_id
+        Status = $decision.status
+        Path = $relativeDecisionPath
+        Sha256 = (Get-FileHash -LiteralPath $decisionPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        MeasuredSourceTreeSha256 = $measuredSourceTree.Sha256
+    }
+}
+
+function Invoke-P0R1SanitizedDotNet {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+    )
+
+    $resolvedWorkingDirectory = (Resolve-Path -LiteralPath $WorkingDirectory -ErrorAction Stop).Path
+    if (-not (Test-Path -LiteralPath $script:ExpectedDotNetExecutablePath -PathType Leaf)) {
+        throw [IO.FileNotFoundException]::new(
+            "Required dotnet executable is absent: $($script:ExpectedDotNetExecutablePath)",
+            $script:ExpectedDotNetExecutablePath
+        )
+    }
+
+    $originalEnvironment = [Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Process)
+    $sanitizedEnvironment = Get-P0R1SanitizedDotNetEnvironment -Environment $originalEnvironment
+    try {
+        foreach ($key in @($originalEnvironment.Keys)) {
+            [Environment]::SetEnvironmentVariable(
+                [string]$key,
+                $null,
+                [EnvironmentVariableTarget]::Process
+            )
+        }
+        foreach ($entry in $sanitizedEnvironment.GetEnumerator()) {
+            [Environment]::SetEnvironmentVariable(
+                $entry.Key,
+                $entry.Value,
+                [EnvironmentVariableTarget]::Process
+            )
+        }
+
+        Push-Location -LiteralPath $resolvedWorkingDirectory
+        try {
+            $output = @(
+                & $script:ExpectedDotNetExecutablePath @Arguments 2>&1 |
+                    ForEach-Object { $_.ToString() }
+            )
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    finally {
+        $currentEnvironment = [Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Process)
+        foreach ($key in @($currentEnvironment.Keys)) {
+            [Environment]::SetEnvironmentVariable(
+                [string]$key,
+                $null,
+                [EnvironmentVariableTarget]::Process
+            )
+        }
+        foreach ($key in @($originalEnvironment.Keys)) {
+            [Environment]::SetEnvironmentVariable(
+                [string]$key,
+                [string]$originalEnvironment[$key],
+                [EnvironmentVariableTarget]::Process
+            )
+        }
+    }
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = $output
+    }
+}
+
 function Invoke-DefaultP0R1DotNet {
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [Parameter(Mandatory = $true)][string]$WorkingDirectory
     )
 
-    Push-Location -LiteralPath $WorkingDirectory
-    try {
-        $output = @(& dotnet @Arguments 2>&1 | ForEach-Object { $_.ToString() })
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        Pop-Location
-    }
-    return [pscustomobject]@{
-        ExitCode = $exitCode
-        Output = $output
-    }
+    return Invoke-P0R1SanitizedDotNet -Arguments $Arguments -WorkingDirectory $WorkingDirectory
 }
 
 function Invoke-CheckedP0R1DotNet {
@@ -924,13 +1998,16 @@ function Invoke-P0R1FocusedVerification {
         }
     }
 
+    $null = Clear-P0R1GeneratedBuildRoots -PrototypeRoot $resolvedPrototypeRoot
+
     $restoreArguments = @(
         'restore',
         $state.SolutionPath,
         '--configfile', $restoreContract.NuGetConfigPath,
         '--no-cache',
         '--force-evaluate',
-        '--disable-parallel'
+        '--disable-parallel',
+        '--disable-build-servers'
     )
     $null = Invoke-CheckedP0R1DotNet `
         -Label 'dotnet restore' `
@@ -943,7 +2020,8 @@ function Invoke-P0R1FocusedVerification {
         $state.SolutionPath,
         '--configuration', $Configuration,
         "-p:Platform=$Architecture",
-        '--no-restore'
+        '--no-restore',
+        '--disable-build-servers'
     )
     $null = Invoke-CheckedP0R1DotNet `
         -Label 'dotnet build' `
@@ -958,6 +2036,7 @@ function Invoke-P0R1FocusedVerification {
         "-p:Platform=$Architecture",
         '--no-build',
         '--no-restore',
+        '--disable-build-servers',
         '--'
     )
     $runnerOutput = Invoke-CheckedP0R1DotNet `
@@ -967,6 +2046,8 @@ function Invoke-P0R1FocusedVerification {
         -DotNetInvoker $DotNetInvoker
     $testSummary = Get-P0R1TestSummary -OutputLines $runnerOutput
     $developmentObservation = Get-P0R1DevelopmentObservation -OutputLines $runnerOutput
+    $combinedDevelopmentObservation = Get-P0R1CombinedDevelopmentObservation -OutputLines $runnerOutput
+    $headroomDevelopmentObservation = Get-P0R1HeadroomDevelopmentObservation -OutputLines $runnerOutput
 
     return [pscustomobject]@{
         Status = 'Pass'
@@ -978,17 +2059,26 @@ function Invoke-P0R1FocusedVerification {
         TestsPassed = $testSummary.Passed
         TestsFailed = $testSummary.Failed
         DevelopmentObservation = $developmentObservation
+        CombinedDevelopmentObservation = $combinedDevelopmentObservation
+        HeadroomDevelopmentObservation = $headroomDevelopmentObservation
     }
 }
 
 Export-ModuleMember -Function @(
+    'Get-P0R1SanitizedDotNetEnvironment',
+    'Invoke-P0R1SanitizedDotNet',
     'Assert-P0R1VerificationSelection',
     'Assert-P0R1ToolchainOutput',
     'Assert-P0R1RepositoryDependencyContract',
     'Assert-P0R1DependencyManifestContract',
     'Assert-P0R1RestoreIsolation',
+    'Clear-P0R1GeneratedBuildRoots',
     'Get-P0R1PrototypeState',
     'Get-P0R1TestSummary',
+    'Get-P0R1MeasuredSourceTreeHash',
     'Get-P0R1DevelopmentObservation',
+    'Get-P0R1CombinedDevelopmentObservation',
+    'Get-P0R1HeadroomDevelopmentObservation',
+    'Assert-P0R1RendererDecisionContract',
     'Invoke-P0R1FocusedVerification'
 )

@@ -31,17 +31,17 @@
 - [x] Implement preallocated `WriteableBitmap` publication without per-event WPF objects
 - [x] Implement observable producer-nonblocking latest-frame replacement with pending maximum one
 - [x] Instrument generation order, allocation, publication, frame timing, and UI latency
-- [ ] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
+- [x] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
 ## Batch 4: bounded GMI/combined harness/decision
 
 依存: Batch 3
 
-- [ ] Implement one selected channel bounded at 100 waveforms by 2400 samples
-- [ ] Prove scatter/GMI/input fairness in the minimal combined harness
-- [ ] Record candidate comparison, dependency/license, CPU/GPU/fallback, maintenance, and Phase 2 seam
-- [ ] Record development performance and separate headroom observations without claiming official acceptance
-- [ ] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
+- [x] Implement one selected channel bounded at 100 waveforms by 2400 samples
+- [x] Prove scatter/GMI/input fairness in the minimal combined harness
+- [x] Record candidate comparison, dependency/license, CPU/GPU/fallback, maintenance, and Phase 2 seam
+- [x] Record development performance and separate headroom observations without claiming official acceptance
+- [x] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
 ## Phase Checkpoint
 
@@ -57,6 +57,6 @@
 
 ## Scope guard
 
-- [ ] No production shell, acquisition/C ABI/USB/Decoder/Zarr, gate/recipe, hardware/driver/registry/firmware, or sibling write enters the diff
-- [ ] No external renderer/test/benchmark NuGet package, network restore, raw payload, secret, cache, binary, or generated trace is tracked
-- [ ] P0-C4, D17 golden, A-4b, Frozen v1, Phase 0 completion, and Phase 2 remain open
+- [x] No production shell, acquisition/C ABI/USB/Decoder/Zarr, gate/recipe, hardware/driver/registry/firmware, or sibling write enters the diff
+- [x] No external renderer/test/benchmark NuGet package, network restore, raw payload, secret, cache, binary, or generated trace is tracked
+- [x] P0-C4, D17 golden, A-4b, Frozen v1, Phase 0 completion, and Phase 2 remain open
