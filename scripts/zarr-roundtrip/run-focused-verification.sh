@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly REPOSITORY_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+readonly REPOSITORY_ROOT
 readonly BUILD_HELPER="${REPOSITORY_ROOT}/.claude/skills/msvc-build/scripts/build.sh"
 readonly PROTOTYPE_BUILD_ROOT="${REPOSITORY_ROOT}/.deps/p0-s/prototype"
 readonly GCSA_SNAPSHOT_ROOT="${REPOSITORY_ROOT}/.deps/p0-s/gcsa-20689a991697217518ec2ff15aaaa2533b169eb0"
