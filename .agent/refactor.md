@@ -1,46 +1,36 @@
-# Refactor checkpoint: P0-S dependency preparation
+# Refactor checkpoint router
 
-This checkpoint applies only to files touched by the isolated dependency and
-encrypted-Zarr preparation branch. Preserve contract bytes and fail-closed
-behavior while improving clarity, determinism, and maintainability.
+This file is deliberately scope-neutral. The active `goal.md` selects the
+versioned refactor profile; this router validates that binding and delegates the
+checkpoint without adding task-specific rules.
 
-## Scope guard
+## Required binding
 
-- Keep all implementation under the isolated prototype and verification paths.
-- Do not link the prototype to production `AcquisitionEngine`, EP2/EP4/EP6,
-  CyAPI, WPF, the existing solution acquisition path, or real measurement data.
-- Do not modify gcsa, sys_app, task_management, driver, registry, firmware, or
-  the current `goal.md`.
-- Refactor only files touched by the current batch.
+Before changing code during the refactor pass:
 
-## Refactor checks
+1. Read the explicit `Refactor checkpoint profile` path and full
+   `Refactor checkpoint blob SHA` from the active `goal.md`. Do not infer a
+   profile from the branch name, touched paths, previous goal, or newest file.
+2. Require a normalized repository-relative regular file named `refactor.md`
+   below `.agent/checkpoint-profiles/`. Reject absolute paths, `..`, symlinks,
+   untracked files, and paths outside that directory.
+3. Compute the working-tree Git blob identity with `git hash-object -- <path>`
+   and require exact equality with the full blob SHA pinned by `goal.md`.
+4. Read the entire pinned profile and apply its scope guard, refactor checks,
+   verification, and stop conditions to files touched by the current batch.
 
-1. Keep contract constants in one typed contract surface; do not duplicate
-   hand-copied wire values across writer, tests, and scripts.
-2. Preserve deterministic JSON with stable key ordering and byte-identical
-   serialization across repeated runs.
-3. Separate binary wire parsing/building, c-blosc adaptation, strict JSON,
-   AES-GCM, metadata state, and filesystem publication helpers.
-4. Keep nonce registration explicit across arrays and partitions. Test keys are
-   injected only through a test key provider; never log key bytes.
-5. Keep all publication temp-to-atomic-rename and make incomplete output
-   unobservable as committed state.
-6. Use stable typed errors with actionable messages. Do not add raw-byte,
-   plaintext, codec, version, or library fallbacks.
-7. Keep generated stores, dependency caches, source archives, compiled output,
-   secrets, nonces from real data, and raw measurement payload outside Git.
-8. Update focused tests for every behavior changed during refactoring and keep
-   Given/When/Then intent visible.
+Stop before refactoring if either binding is absent, ambiguous, outside the
+allowed directory, unreadable, or hash-mismatched. Never fall back to another
+profile, including a historically related profile.
 
-## Verification
+## Common checkpoint behavior
 
-- Run the focused tests for the touched batch in Release and Debug where the CRT
-  is relevant.
-- Run deterministic JSON and exact KAT comparisons where applicable.
-- Run `git diff --check` and inspect tracked/staged path sizes.
-- Confirm no production acquisition, sibling repository, generated store,
-  dependency binary, secret, or raw payload is in the diff.
-- Record retained complexity and residual limits in the active process log.
-
-Stop if a refactor would alter a pin, golden, persistent wire, D21 rule, or
-P0-S2 sharding decision.
+- Preserve behavior and authoritative contract bytes unless the pinned profile
+  explicitly defines the behavior change already authorized by `goal.md`.
+- Refactor only files touched by the current batch; do not broaden scope to
+  adjacent cleanup.
+- Keep tests green and add or update focused tests for behavior changed during
+  refactoring.
+- Record applied profile path, expected and actual blob identities, changes,
+  verification, retained complexity, and residual limits in the active process
+  log.
