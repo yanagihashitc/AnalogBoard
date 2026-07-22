@@ -8,11 +8,11 @@
   "reference_profile_required_for_official_acceptance": "AB-PERF-REF-v1",
   "source": {
     "branch": "perf/phase0-scatter-prototype",
-    "base_commit": "f9472c81a2f014a97a0ae186d82e5bc46bab84f9",
-    "state": "Batch 4 pre-commit worktree; publication commit is recorded by the next checkpoint",
-    "measured_source_tree_contract": "sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus global.json and three linked fixtures; six in-repository ancestor candidates use sha256(file) or <absent>)",
-    "measured_source_file_count": 54,
-    "measured_source_tree_sha256": "96dffc30a2704809aefbc3e67bc07c23fcf0d2f48baff94f2b4854a93077250a"
+    "base_commit": "5da936ed669f36dc7525eb8ec86d8c2e776e0078",
+    "state": "Batch 5 pre-commit worktree; official runner correction is not official performance evidence",
+    "measured_source_tree_contract": "sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus .editorconfig, .gitattributes, global.json, and three linked fixtures; the canonical reference profile and six in-repository ancestor candidates use sha256(file) or <absent>)",
+    "measured_source_file_count": 61,
+    "measured_source_tree_sha256": "c2f44d15e68b77997ed8cf730c8ef6d7b712ac800badb5690985f2e7f23b4fae"
   },
   "machine": {
     "computer_name": "DESKTOP-IK7JAL5",
@@ -41,8 +41,8 @@
   "verification_command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-rendering/verify.ps1 -Mode Focused -Configuration Release -Architecture x64",
   "verification": {
     "status": "Pass",
-    "tests_total": 82,
-    "tests_passed": 82,
+    "tests_total": 115,
+    "tests_passed": 115,
     "tests_failed": 0,
     "wrapper_contract": "Pass"
   },
@@ -63,16 +63,16 @@
     "gmi_raster_contract_sha256": "874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08"
   },
   "observation": {
-    "combined_iteration_ms_p95": 10.2572,
-    "combined_iteration_ms_max": 10.2572,
-    "scatter_delivered_update_rate_hz": 101.02602026177863,
-    "gmi_delivered_update_rate_hz": 101.02602026177863,
-    "gmi_max_update_interval_ms": 10.2393,
-    "input_latency_ms_p95": 0.338,
-    "input_latency_ms_max": 0.338,
+    "combined_iteration_ms_p95": 9.7854,
+    "combined_iteration_ms_max": 9.7854,
+    "scatter_delivered_update_rate_hz": 106.91710930349919,
+    "gmi_delivered_update_rate_hz": 106.91710930349919,
+    "gmi_max_update_interval_ms": 9.7948,
+    "input_latency_ms_p95": 0.4208,
+    "input_latency_ms_max": 0.4208,
     "allocated_bytes_per_iteration": 2424,
-    "scatter_publish_p99_ms": 0.0923,
-    "gmi_publish_p99_ms": 0.0066,
+    "scatter_publish_p99_ms": 0.0959,
+    "gmi_publish_p99_ms": 0.0023,
     "scatter_pending_frame_max": 1,
     "scatter_pending_callback_max": 1,
     "gmi_pending_frame_max": 1,

@@ -23,7 +23,33 @@ internal static class CombinedVisualizationHarnessContractTests
             GivenPendingFeedsAndForeignAccess_WhenDisposed_ThenCallbacksNoOpAndSecondDisposeIsIdempotent),
         new(nameof(GivenScatterReleaseFailure_WhenDispatcherPumped_ThenGmiFeedRemainsIndependent),
             GivenScatterReleaseFailure_WhenDispatcherPumped_ThenGmiFeedRemainsIndependent),
+        new(nameof(GivenRenderCompletionObserver_WhenFramePublished_ThenCompletionPrecedesLeaseRelease),
+            GivenRenderCompletionObserver_WhenFramePublished_ThenCompletionPrecedesLeaseRelease),
     ];
+
+    private static void GivenRenderCompletionObserver_WhenFramePublished_ThenCompletionPrecedesLeaseRelease()
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        var order = new List<string>();
+        using var harness = new CombinedVisualizationHarness<TestRasterFrame, TestRasterFrame>(
+            dispatcher,
+            width: 2,
+            height: 2,
+            scatterRelease: _ => order.Add("release"),
+            gmiRelease: _ => { },
+            metricCapacity: 8,
+            renderStarting: (feed, generation) =>
+                order.Add($"start-{feed}-{generation}"),
+            renderCompleted: (feed, generation) =>
+                order.Add($"complete-{feed}-{generation}"));
+        harness.SubmitScatter(new TestRasterFrame(1, 0x31));
+
+        PumpDispatcherToIdle(dispatcher);
+
+        ContractAssert.SequenceEqual(
+            new[] { "start-Scatter-1", "complete-Scatter-1", "release" },
+            order);
+    }
 
     private static void GivenScatterGmiAndInputBacklog_WhenDispatcherPumped_ThenInputAndFeedBoundsRemainIndependent()
     {

@@ -44,7 +44,8 @@ public sealed class CombinedVisualizationHarness<TScatterFrame, TGmiFrame> : IDi
             scatterRelease,
             gmiRelease,
             metricCapacity,
-            renderStarting: null)
+            renderStarting: null,
+            renderCompleted: null)
     {
     }
 
@@ -55,7 +56,8 @@ public sealed class CombinedVisualizationHarness<TScatterFrame, TGmiFrame> : IDi
         Action<TScatterFrame> scatterRelease,
         Action<TGmiFrame> gmiRelease,
         int metricCapacity,
-        Action<VisualizationFeed, long>? renderStarting)
+        Action<VisualizationFeed, long>? renderStarting,
+        Action<VisualizationFeed, long>? renderCompleted = null)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(scatterRelease);
@@ -84,6 +86,7 @@ public sealed class CombinedVisualizationHarness<TScatterFrame, TGmiFrame> : IDi
                     VisualizationFeed.Scatter,
                     _scatterCopyBuffer);
                 Volatile.Write(ref _scatterLastPublishedGeneration, generation);
+                renderCompleted?.Invoke(VisualizationFeed.Scatter, generation);
             },
             scatterRelease,
             metricCapacity);
@@ -99,6 +102,7 @@ public sealed class CombinedVisualizationHarness<TScatterFrame, TGmiFrame> : IDi
                     VisualizationFeed.Gmi,
                     _gmiCopyBuffer);
                 Volatile.Write(ref _gmiLastPublishedGeneration, generation);
+                renderCompleted?.Invoke(VisualizationFeed.Gmi, generation);
             },
             gmiRelease,
             metricCapacity);

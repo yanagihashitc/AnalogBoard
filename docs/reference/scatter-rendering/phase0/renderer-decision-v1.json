@@ -67,9 +67,9 @@
     "gmi_raster_contract_path": "docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json",
     "gmi_raster_contract_sha256": "874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08",
     "combined_development_path": "docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json",
-    "combined_development_sha256": "71bfdbe672fef7d56cd72da9af5e313751fe08e6d592bde4ab5080ef5ef0c180",
+    "combined_development_sha256": "8aa304e759f2598ad7436651dacf431c35a92ffc512be4a3fc77c091b63b575e",
     "headroom_development_path": "docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json",
-    "headroom_development_sha256": "991a0aaa5411ee05dc304d9b381abae30c22ad8f302a2225301fec5b57920f69"
+    "headroom_development_sha256": "214d0ad9aebacee0896825c4df14f1735924954424f30c1d2a8562d49d555e37"
   },
   "stop_conditions": [
     "Any external renderer or rendering/test/benchmark package requires a task_management amendment before download or implementation.",

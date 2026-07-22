@@ -23,7 +23,7 @@ $script:ExpectedProjectPaths = @(
     'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj'
 )
 $script:ExpectedAncestorTerminatorHashes = [ordered]@{
-    'prototypes\scatter-rendering\Directory.Build.targets' = '17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea'
+    'prototypes\scatter-rendering\Directory.Build.targets' = 'a92d6a617ec4f0ed84c209ad8cdaeace3108b69b4a2874e8180773c65f09be51'
     'prototypes\scatter-rendering\Directory.Packages.props' = 'af799a176bf7be0de5e660924f4bde3444170788e9633399a1f65f0b72c9602f'
     'prototypes\scatter-rendering\Directory.Solution.props' = '17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea'
     'prototypes\scatter-rendering\Directory.Solution.targets' = '17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea'
@@ -691,8 +691,12 @@ function Get-P0R1PrototypeState {
         [string]$testsProject.Project.PropertyGroup.TargetFramework -cne $script:ExpectedTargetFramework -or
         [string]$testsProject.Project.PropertyGroup.PlatformTarget -cne 'x64' -or
         [string]$testsProject.Project.PropertyGroup.UseWPF -cne 'true' -or
-        [string]$testsProject.Project.PropertyGroup.OutputType -cne 'Exe') {
-        throw [InvalidOperationException]::new('P0-R1 Tests project must set UseWPF=true and OutputType=Exe.')
+        [string]$testsProject.Project.PropertyGroup.OutputType -cne 'Exe' -or
+        [string]$testsProject.Project.PropertyGroup.RuntimeFrameworkVersion -cne $script:ExpectedDesktopRuntimeVersion -or
+        [string]$testsProject.Project.PropertyGroup.RollForward -cne 'Disable') {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Tests project must set UseWPF=true, OutputType=Exe, RuntimeFrameworkVersion=10.0.10, and RollForward=Disable.'
+        )
     }
 
     return [pscustomobject]@{
@@ -856,6 +860,8 @@ function Get-P0R1MeasuredSourceTreeHash {
     }
 
     foreach ($relativePath in @(
+        '.editorconfig',
+        '.gitattributes',
         'global.json',
         'docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
@@ -872,6 +878,17 @@ function Get-P0R1MeasuredSourceTreeHash {
             (Get-FileHash -LiteralPath $absolutePath -Algorithm SHA256).Hash.ToLowerInvariant()
         )
     }
+
+    $optionalReferenceProfile =
+        'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json'
+    $optionalReferencePath = Join-Path $resolvedRoot $optionalReferenceProfile
+    $optionalReferenceValue = if (Test-Path -LiteralPath $optionalReferencePath -PathType Leaf) {
+        (Get-FileHash -LiteralPath $optionalReferencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    else {
+        '<absent>'
+    }
+    $entries.Add($optionalReferenceProfile, $optionalReferenceValue)
 
     $ancestorBuildCandidates = @(
         'Directory.Build.props',
@@ -909,7 +926,7 @@ function Get-P0R1MeasuredSourceTreeHash {
     }
 
     return [pscustomobject]@{
-        Contract = 'sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus global.json and three linked fixtures; six in-repository ancestor candidates use sha256(file) or <absent>)'
+        Contract = 'sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus .editorconfig, .gitattributes, global.json, and three linked fixtures; the canonical reference profile and six in-repository ancestor candidates use sha256(file) or <absent>)'
         FileCount = @($entries.Values | Where-Object { $_ -cne '<absent>' }).Count
         Sha256 = $hash
     }
@@ -969,9 +986,9 @@ function Assert-P0R1MeasuredEvidenceSourceContract {
         )
     }
     if ($evidence.source.branch -cne 'perf/phase0-scatter-prototype' -or
-        $evidence.source.base_commit -cne 'f9472c81a2f014a97a0ae186d82e5bc46bab84f9' -or
+        $evidence.source.base_commit -cne '5da936ed669f36dc7525eb8ec86d8c2e776e0078' -or
         $evidence.source.state -cne
-            'Batch 4 pre-commit worktree; publication commit is recorded by the next checkpoint') {
+            'Batch 5 pre-commit worktree; official runner correction is not official performance evidence') {
         throw [InvalidOperationException]::new(
             "P0-R1 $Label source branch/base/state identity mismatch."
         )
@@ -1782,9 +1799,9 @@ function Assert-P0R1RendererDecisionContract {
         gmi_raster_contract_path = 'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json'
         gmi_raster_contract_sha256 = '874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08'
         combined_development_path = 'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json'
-        combined_development_sha256 = '71bfdbe672fef7d56cd72da9af5e313751fe08e6d592bde4ab5080ef5ef0c180'
+        combined_development_sha256 = '8aa304e759f2598ad7436651dacf431c35a92ffc512be4a3fc77c091b63b575e'
         headroom_development_path = 'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json'
-        headroom_development_sha256 = '991a0aaa5411ee05dc304d9b381abae30c22ad8f302a2225301fec5b57920f69'
+        headroom_development_sha256 = '214d0ad9aebacee0896825c4df14f1735924954424f30c1d2a8562d49d555e37'
     }
     if (@($decision.evidence.PSObject.Properties.Name).Count -ne $expectedEvidence.Count) {
         throw [InvalidOperationException]::new(
@@ -1862,7 +1879,9 @@ function Assert-P0R1RendererDecisionContract {
 function Invoke-P0R1SanitizedDotNet {
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
-        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [string]$GitExecutablePath,
+        [switch]$OfficialPreflight
     )
 
     $resolvedWorkingDirectory = (Resolve-Path -LiteralPath $WorkingDirectory -ErrorAction Stop).Path
@@ -1875,6 +1894,18 @@ function Invoke-P0R1SanitizedDotNet {
 
     $originalEnvironment = [Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Process)
     $sanitizedEnvironment = Get-P0R1SanitizedDotNetEnvironment -Environment $originalEnvironment
+    if ($OfficialPreflight) {
+        if ([string]::IsNullOrWhiteSpace($GitExecutablePath) -or
+            -not [IO.Path]::IsPathFullyQualified($GitExecutablePath) -or
+            -not (Test-Path -LiteralPath $GitExecutablePath -PathType Leaf)) {
+            throw [InvalidOperationException]::new(
+                'Official performance execution requires one absolute Git executable path.'
+            )
+        }
+        $sanitizedEnvironment['P0R1_GIT_EXECUTABLE'] =
+            (Resolve-Path -LiteralPath $GitExecutablePath -ErrorAction Stop).Path
+        $sanitizedEnvironment['P0R1_OFFICIAL_PREFLIGHT'] = 'AB-PERF-RUNNER-v1'
+    }
     try {
         foreach ($key in @($originalEnvironment.Keys)) {
             [Environment]::SetEnvironmentVariable(
@@ -1998,6 +2029,13 @@ function Invoke-P0R1FocusedVerification {
         }
     }
 
+    $gitCommand = Get-Command git.exe -CommandType Application -ErrorAction Stop
+    $gitExecutablePath = (Resolve-Path -LiteralPath $gitCommand.Source -ErrorAction Stop).Path
+    $gitExecutableSha256 =
+        (Get-FileHash -LiteralPath $gitExecutablePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $measuredSourceTree = Get-P0R1MeasuredSourceTreeHash `
+        -RepositoryRoot $resolvedRepositoryRoot
+
     $null = Clear-P0R1GeneratedBuildRoots -PrototypeRoot $resolvedPrototypeRoot
 
     $restoreArguments = @(
@@ -2020,6 +2058,9 @@ function Invoke-P0R1FocusedVerification {
         $state.SolutionPath,
         '--configuration', $Configuration,
         "-p:Platform=$Architecture",
+        "-p:P0R1MeasuredSourceTreeSha256=$($measuredSourceTree.Sha256)",
+        "-p:P0R1GitExecutablePath=$gitExecutablePath",
+        "-p:P0R1GitExecutableSha256=$gitExecutableSha256",
         '--no-restore',
         '--disable-build-servers'
     )

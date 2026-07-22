@@ -6,6 +6,7 @@ $VerificationRoot = Split-Path -Parent $ScriptDir
 $RepositoryRoot = (Resolve-Path -LiteralPath (Join-Path $VerificationRoot '..\..')).Path
 $ModulePath = Join-Path $VerificationRoot 'scatter_verification_core.psm1'
 $WrapperPath = Join-Path $VerificationRoot 'verify.ps1'
+$PerformanceWrapperPath = Join-Path $VerificationRoot 'run_performance.ps1'
 
 if (-not (Test-Path -LiteralPath $ModulePath -PathType Leaf)) {
     throw "RED: scatter verification core is not implemented: $ModulePath"
@@ -13,8 +14,77 @@ if (-not (Test-Path -LiteralPath $ModulePath -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $WrapperPath -PathType Leaf)) {
     throw "RED: scatter verification wrapper is not implemented: $WrapperPath"
 }
+if (-not (Test-Path -LiteralPath $PerformanceWrapperPath -PathType Leaf)) {
+    throw "RED: scatter performance wrapper is not implemented: $PerformanceWrapperPath"
+}
 
 Import-Module $ModulePath -Force
+
+$performanceWrapper = Get-Content -LiteralPath $PerformanceWrapperPath -Raw -Encoding UTF8
+foreach ($requiredPerformanceBoundary in @(
+    'Assert-P0R1RepositoryDependencyContract',
+    'Assert-P0R1RendererDecisionContract',
+    'Invoke-P0R1FocusedVerification',
+    'Invoke-P0R1SanitizedDotNet',
+    'performance-reference-profile-v1.json',
+    '.inprogress',
+    '--warmup-ms',
+    '--measurement-ms',
+    '--soak-ms',
+    '--reference-profile',
+    '--repository-root',
+    '--output-root',
+    '--final-observed-profile',
+    '--process-exits',
+    'profile.final.json',
+    'process-exits.json',
+    'failure.json',
+    '"$SessionDirectory.failure.json"',
+    'suite.manifest.json',
+    'Get-Command git.exe',
+    '-OfficialPreflight:($Mode -ceq ''Official'')',
+    'exit $script:PerformanceExitCode',
+    "@('hard-scatter', 'hard-combined')",
+    "-Scenario 'soak'",
+    "-Scenario 'headroom'",
+    "'finalize'"
+)) {
+    if (-not $performanceWrapper.Contains($requiredPerformanceBoundary)) {
+        throw "Performance wrapper boundary is absent: $requiredPerformanceBoundary"
+    }
+}
+foreach ($requiredOfficialEnvironmentBoundary in @(
+    'P0R1_GIT_EXECUTABLE',
+    'P0R1_OFFICIAL_PREFLIGHT',
+    'AB-PERF-RUNNER-v1',
+    'P0R1MeasuredSourceTreeSha256',
+    'P0R1GitExecutablePath',
+    'P0R1GitExecutableSha256'
+)) {
+    $moduleSource = Get-Content -LiteralPath $ModulePath -Raw -Encoding UTF8
+    if (-not $moduleSource.Contains($requiredOfficialEnvironmentBoundary)) {
+        throw "Official C# authority environment boundary is absent: $requiredOfficialEnvironmentBoundary"
+    }
+}
+$performanceDependencyIndex = $performanceWrapper.IndexOf(
+    'Assert-P0R1RepositoryDependencyContract',
+    [StringComparison]::Ordinal
+)
+$performanceRendererIndex = $performanceWrapper.IndexOf(
+    'Assert-P0R1RendererDecisionContract',
+    [StringComparison]::Ordinal
+)
+$performanceFocusedIndex = $performanceWrapper.IndexOf(
+    'Invoke-P0R1FocusedVerification',
+    [StringComparison]::Ordinal
+)
+if ($performanceDependencyIndex -lt 0 -or
+    $performanceRendererIndex -lt 0 -or
+    $performanceFocusedIndex -lt 0 -or
+    $performanceDependencyIndex -gt $performanceFocusedIndex -or
+    $performanceRendererIndex -gt $performanceFocusedIndex) {
+    throw 'Performance dependency and renderer/source contracts must run before focused build/test execution.'
+}
 
 function Assert-Equal {
     param(
@@ -221,6 +291,8 @@ function New-ContractFixture {
     <TargetFramework>net10.0-windows</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
     <UseWPF>true</UseWPF>
+    <RuntimeFrameworkVersion>10.0.10</RuntimeFrameworkVersion>
+    <RollForward>Disable</RollForward>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj" />
@@ -540,7 +612,7 @@ try {
         Set-Content -LiteralPath $testsLibraryPath -Encoding UTF8
     Assert-ThrowsExact -Action {
         Get-P0R1PrototypeState -PrototypeRoot $testsLibrary
-    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true and OutputType=Exe.'
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true, OutputType=Exe, RuntimeFrameworkVersion=10.0.10, and RollForward=Disable.'
 
     $testsWithoutWpf = New-ContractFixture -Root (Join-Path $temporaryRoot 'tests-without-wpf')
     $testsWithoutWpfPath = Join-Path $testsWithoutWpf 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
@@ -548,7 +620,22 @@ try {
         Set-Content -LiteralPath $testsWithoutWpfPath -Encoding UTF8
     Assert-ThrowsExact -Action {
         Get-P0R1PrototypeState -PrototypeRoot $testsWithoutWpf
-    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true and OutputType=Exe.'
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true, OutputType=Exe, RuntimeFrameworkVersion=10.0.10, and RollForward=Disable.'
+
+    foreach ($runtimeMutation in @(
+        @{ Name = 'runtime-version'; Old = '<RuntimeFrameworkVersion>10.0.10</RuntimeFrameworkVersion>'; New = '<RuntimeFrameworkVersion>10.0.11</RuntimeFrameworkVersion>' },
+        @{ Name = 'roll-forward'; Old = '<RollForward>Disable</RollForward>'; New = '<RollForward>LatestPatch</RollForward>' }
+    )) {
+        $runtimeFixture = New-ContractFixture -Root (Join-Path $temporaryRoot ("tests-" + $runtimeMutation.Name))
+        $runtimeProject = Join-Path $runtimeFixture 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
+        (Get-Content -LiteralPath $runtimeProject -Raw -Encoding UTF8).Replace(
+            $runtimeMutation.Old,
+            $runtimeMutation.New
+        ) | Set-Content -LiteralPath $runtimeProject -Encoding UTF8
+        Assert-ThrowsExact -Action {
+            Get-P0R1PrototypeState -PrototypeRoot $runtimeFixture
+        } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true, OutputType=Exe, RuntimeFrameworkVersion=10.0.10, and RollForward=Disable.'
+    }
 
     # Given: A Core project using an undeclared SDK or architecture override.
     # When/Then: Every project-level toolchain identity is fixed before restore.
@@ -753,6 +840,24 @@ try {
         } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage $case.Expected
     }
 
+    $completeRepository = Split-Path -Parent (Split-Path -Parent $completePrototype)
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'global.json') -Destination $completeRepository
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot '.gitattributes') -Destination $completeRepository
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot '.editorconfig') -Destination $completeRepository
+    foreach ($fixtureName in @(
+        'display-transform-contract-v1.json',
+        'density-raster-contract-v1.json',
+        'gmi-raster-contract-v1.json'
+    )) {
+        $fixtureDestination = Join-Path `
+            $completeRepository `
+            "docs\reference\scatter-rendering\phase0\$fixtureName"
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $fixtureDestination) -Force
+        Copy-Item `
+            -LiteralPath (Join-Path $RepositoryRoot "docs\reference\scatter-rendering\phase0\$fixtureName") `
+            -Destination $fixtureDestination
+    }
+
     # Given: A complete scaffold and a successful fake dotnet boundary.
     # When: Focused verification is orchestrated.
     # Then: Commands are isolated and the bounded test summary reaches the result.
@@ -786,6 +891,19 @@ try {
     Assert-Contains -Actual $calls[2].Arguments -Expected '--disable-build-servers' -Message 'Restore build-server isolation'
     Assert-Contains -Actual $calls[3].Arguments -Expected '--no-restore' -Message 'Build restore isolation'
     Assert-Contains -Actual $calls[3].Arguments -Expected '--disable-build-servers' -Message 'Build server isolation'
+    Assert-Contains `
+        -Actual $calls[3].Arguments `
+        -Expected "-p:P0R1MeasuredSourceTreeSha256=$((Get-P0R1MeasuredSourceTreeHash -RepositoryRoot $completeRepository).Sha256)" `
+        -Message 'Build measured-source identity'
+    $gitExecutablePath = (Resolve-Path -LiteralPath (Get-Command git.exe -CommandType Application).Source).Path
+    Assert-Contains `
+        -Actual $calls[3].Arguments `
+        -Expected "-p:P0R1GitExecutablePath=$gitExecutablePath" `
+        -Message 'Build Git executable identity'
+    Assert-Contains `
+        -Actual $calls[3].Arguments `
+        -Expected "-p:P0R1GitExecutableSha256=$((Get-FileHash -LiteralPath $gitExecutablePath -Algorithm SHA256).Hash.ToLowerInvariant())" `
+        -Message 'Build Git executable hash'
     Assert-Contains -Actual $calls[4].Arguments -Expected '--no-build' -Message 'Runner build isolation'
     Assert-Contains -Actual $calls[4].Arguments -Expected '--no-restore' -Message 'Runner restore isolation'
     Assert-Contains -Actual $calls[4].Arguments -Expected '--disable-build-servers' -Message 'Runner build-server isolation'
@@ -851,6 +969,105 @@ finally {
 $null = Assert-P0R1RestoreIsolation -PrototypeRoot $realPrototype
 $realState = Get-P0R1PrototypeState -PrototypeRoot $realPrototype
 Assert-Equal -Actual $realState.ProjectCount -Expected 3 -Message 'Real scaffold project count'
+$repositoryAttributesSource = Get-Content `
+    -LiteralPath (Join-Path $RepositoryRoot '.gitattributes') `
+    -Raw `
+    -Encoding UTF8
+foreach ($requiredMeasuredSourceAttribute in @(
+    '/.gitattributes text eol=lf',
+    '/.editorconfig text eol=lf',
+    '/global.json text eol=lf',
+    '/prototypes/scatter-rendering/** text eol=lf',
+    '/docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json text eol=lf',
+    '/docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json text eol=lf',
+    '/docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json text eol=lf',
+    '/docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json text eol=lf',
+    '/Directory.Build.props text eol=lf',
+    '/Directory.Build.targets text eol=lf',
+    '/Directory.Packages.props text eol=lf',
+    '/prototypes/Directory.Build.props text eol=lf',
+    '/prototypes/Directory.Build.targets text eol=lf',
+    '/prototypes/Directory.Packages.props text eol=lf'
+)) {
+    if (-not $repositoryAttributesSource.Contains($requiredMeasuredSourceAttribute)) {
+        throw "Measured source EOL authority is absent: $requiredMeasuredSourceAttribute"
+    }
+}
+$repositoryEditorConfigSource = Get-Content `
+    -LiteralPath (Join-Path $RepositoryRoot '.editorconfig') `
+    -Raw `
+    -Encoding UTF8
+foreach ($requiredMeasuredSourceEditorConfig in @(
+    '[.editorconfig]',
+    '[.gitattributes]',
+    '[global.json]',
+    '[prototypes/scatter-rendering/**]',
+    '[docs/reference/scatter-rendering/phase0/*.json]',
+    '[Directory.Build.props]',
+    '[Directory.Build.targets]',
+    '[Directory.Packages.props]',
+    '[prototypes/Directory.Build.props]',
+    '[prototypes/Directory.Build.targets]',
+    '[prototypes/Directory.Packages.props]'
+)) {
+    $sectionPattern = '(?ms)^' +
+        [regex]::Escape($requiredMeasuredSourceEditorConfig) +
+        '\r?\nend_of_line = lf(?:\r?\n|$)'
+    if ($repositoryEditorConfigSource -notmatch $sectionPattern) {
+        throw "Measured source EditorConfig LF authority is absent: $requiredMeasuredSourceEditorConfig"
+    }
+}
+$buildIdentityTargetsPath = Join-Path $realPrototype 'Directory.Build.targets'
+$buildIdentityTargetsSource = Get-Content `
+    -LiteralPath $buildIdentityTargetsPath `
+    -Raw `
+    -Encoding UTF8
+foreach ($requiredBuildIdentityBoundary in @(
+    'ValidateP0R1BuildIdentity',
+    '<AssemblyMetadata Include="P0R1MeasuredSourceTreeSha256"',
+    '<AssemblyMetadata Include="P0R1GitExecutablePath"',
+    '<AssemblyMetadata Include="P0R1GitExecutableSha256"',
+    '<AssemblyMetadata Include="P0R1Configuration"',
+    '<AssemblyMetadata Include="P0R1TargetFramework"',
+    '<AssemblyMetadata Include="P0R1Platform"',
+    '<AssemblyMetadata Include="P0R1PlatformTarget"',
+    '<AssemblyMetadata Include="P0R1SdkVersion"'
+)) {
+    if (-not $buildIdentityTargetsSource.Contains($requiredBuildIdentityBoundary)) {
+        throw "Focused build identity boundary is absent: $requiredBuildIdentityBoundary"
+    }
+}
+$missingIdentityBuildOutput = @(
+    & dotnet msbuild `
+        $realProject `
+        -nologo `
+        -target:ValidateP0R1BuildIdentity `
+        -p:Configuration=Release `
+        -p:Platform=x64 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -eq 0 -or
+    -not ($missingIdentityBuildOutput -match
+        'P0R1MeasuredSourceTreeSha256 must be a lowercase SHA-256 identity\.')) {
+    throw 'A direct build without focused source identity must fail closed.'
+}
+$debugIdentityBuildOutput = @(
+    & dotnet msbuild `
+        $realProject `
+        -nologo `
+        -target:ValidateP0R1BuildIdentity `
+        -p:Configuration=Debug `
+        -p:Platform=x64 `
+        "-p:P0R1MeasuredSourceTreeSha256=$('a' * 64)" `
+        '-p:P0R1GitExecutablePath=C:\fixture\git.exe' `
+        "-p:P0R1GitExecutableSha256=$('b' * 64)" 2>&1 |
+        ForEach-Object { $_.ToString() }
+)
+if ($LASTEXITCODE -eq 0 -or
+    -not ($debugIdentityBuildOutput -match
+        'P0-R1 build identity requires Configuration=Release\.')) {
+    throw 'A Debug build identity must fail closed.'
+}
 
 $wrapperSource = Get-Content -LiteralPath $WrapperPath -Raw -Encoding UTF8
 foreach ($requiredToken in @(
@@ -882,7 +1099,7 @@ if ($sourceEvidenceIndex -lt 0 -or $sourceEvidenceIndex -gt $dotnetIndex) {
 $rendererDecision = Assert-P0R1RendererDecisionContract -RepositoryRoot $RepositoryRoot
 Assert-Equal -Actual $rendererDecision.DecisionId -Expected 'P0-R1-RENDERER-v1' -Message 'Renderer decision identity'
 Assert-Equal -Actual $rendererDecision.SelectedCandidateId -Expected 'wpf-writeablebitmap-preallocated' -Message 'Renderer selection'
-Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '96dffc30a2704809aefbc3e67bc07c23fcf0d2f48baff94f2b4854a93077250a' -Message 'Measured source tree identity'
+Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected 'c2f44d15e68b77997ed8cf730c8ef6d7b712ac800badb5690985f2e7f23b4fae' -Message 'Measured source tree identity'
 $expectedMeasurementCommand = 'dotnet run --project tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj --configuration Release -p:Platform=x64 --no-build --no-restore --disable-build-servers --'
 foreach ($relativeEvidencePath in @(
     'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
@@ -939,6 +1156,8 @@ try {
         Copy-Item -LiteralPath (Join-Path $RepositoryRoot $relativePath) -Destination $destination
     }
     Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'global.json') -Destination $sourceDriftRoot
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot '.gitattributes') -Destination $sourceDriftRoot
+    Copy-Item -LiteralPath (Join-Path $RepositoryRoot '.editorconfig') -Destination $sourceDriftRoot
     $sourceDestination = Join-Path $sourceDriftRoot 'prototypes/scatter-rendering'
     $null = New-Item -ItemType Directory -Path $sourceDestination -Force
     foreach ($rootFile in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering') -File -Force) {

@@ -11,8 +11,65 @@ the fixed BGRA density raster, thin built-in `WriteableBitmap` publication,
 pending-one latest-frame scheduling, and bounded development instrumentation.
 Batch 4 adds bounded selected-channel GMI, combined scatter/GMI/input fairness,
 separate compatible-PC combined/headroom observations, and the renderer-path
-decision. Official reference-PC performance evidence remains pending its Phase
-Checkpoint.
+decision. Batch 5 adds the missing fixed-window runner and fail-closed evidence
+transaction. Official reference-PC performance evidence remains pending its
+Phase Checkpoint.
+
+## Batch 5 official runner boundary
+
+- `AB-PERF-RUNNER-v1` fixes hard scatter and combined runs at an independent
+  30-second warm-up plus 60-second measurement in three fresh child processes
+  per scenario. The combined workload uses separate 60 Hz scatter, 10 Hz GMI,
+  and 20 Hz input-probe cadences with no catch-up bursts.
+- The soak is a fresh combined child with a 30-second warm-up and 600-second
+  measurement. Headroom is a distinct observation-only child and never enters
+  hard-threshold aggregation.
+- Raw generation/timestamp/latency/publication/allocation/memory samples stay in
+  ignored `artifacts/phase0-scatter-rendering/`. Each child seals one raw JSON;
+  the suite manifest is written last and the `.inprogress` directory is renamed
+  only after every hash, identity, raw verdict, and distinct child PID validates.
+- The runner records the exact fixture seeds, shapes, cadences, lease-pool sizes,
+  metric schema/hash, raw tick unit, and summary method. Diagnostic timestamps
+  reproduce the sealed latency/frame cohorts, while accepted/rendered/coalesced
+  counters must conserve every publication before the suite can finalize.
+- The event-count allocation probe warms both fixtures, uses four balanced
+  one-event/hard-event pairs with the current-thread counter, and rejects an
+  invalid negative pair instead of clamping it into a passing result.
+- Every child records the runtime it actually loaded. The test executable pins
+  both `RuntimeFrameworkVersion=10.0.10` and `RollForward=Disable`; finalization
+  rejects any Core or WindowsDesktop runtime identity other than `10.0.10`.
+- Focused verification hashes every non-generated prototype/build input and the
+  exact `git.exe`, embeds those identities as assembly metadata, and rebuilds
+  from cleared generated roots. Official C# entry points rederive the source
+  tree and Git hash, require every real measured input to be Git-tracked at
+  HEAD, then check canonical Release x64/profile/HEAD state. The executing test
+  assembly and its copied Core/WPF dependencies must all reside in the canonical
+  test output and carry the same embedded source, Git, Release, x64, target
+  framework, platform-target, and SDK identity. HEAD comparison hashes the raw
+  working bytes with Git filters disabled; `.gitattributes` and measured-path
+  EditorConfig overrides pin those bytes to LF across checkout and editor save.
+  A stale ignored DLL, Debug DLL,
+  ignored injected source, filtered source, or substituted Git executable fails
+  closed.
+- The suite captures the complete live profile both before and after all eight
+  children and requires byte identity. A sealed process-exit ledger binds each
+  raw artifact to its distinct PID and typed exit code. Failure before manifest
+  seal retains bounded `failure.json` inside the ignored `.inprogress` session;
+  failure after manifest seal (for example, the final directory move) retains an
+  adjacent `<session>.inprogress.failure.json` so the sealed root stays exact.
+- `DryRun` accepts only bounded short windows. Its raw files and final manifest
+  fix `development_only=true`, `official_eligible=false`,
+  `official_acceptance=false`, and `may_substitute_official=false`.
+- Official execution accepts only the Git-tracked canonical path
+  `performance-reference-profile-v1.json`. That file is intentionally absent
+  until a fresh Gate B Dell capture is owner-pinned; the runner never creates or
+  approves a reference profile itself.
+
+The retained Gate B inventories agree on Dell Precision 3680, ANALYZER_S1,
+i9-14900, 68,390,989,824 bytes RAM, Windows 11 build 26200, WD SN820 NVMe, and
+power GUID `381b4222-f694-41f0-9685-ff5bb260df2e`. They do not record GPU and
+driver, active display/refresh/DPI, Stopwatch frequency, or the pinned .NET
+toolchain, so they are provenance anchors rather than `AB-PERF-REF-v1`.
 
 ## Batch 2 correctness evidence
 
@@ -95,6 +152,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-renderin
 The complete standalone solution is restored with the repository
 `NuGet.Config`, built with `--no-restore`, and exercised by its self-hosted test
 runner with `--no-build --no-restore`. A missing or partial scaffold fails loud.
+
+Run the complete non-official transaction on a compatible PC with bounded
+windows:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-rendering/run_performance.ps1 -Mode DryRun -DryRunWarmupMilliseconds 50 -DryRunMeasurementMilliseconds 500 -DryRunSoakMilliseconds 1000
+```
+
+This command exercises eight fresh children plus finalization but cannot produce
+official acceptance. Official mode additionally requires a clean source tree and
+the tracked, owner-pinned canonical `AB-PERF-REF-v1` profile.
 
 Dependency details are recorded in
 [`analogboard-p0-r1-dependencies.json`](../../../dependencies/analogboard-p0-r1-dependencies.json).

@@ -43,9 +43,20 @@
 - [x] Record development performance and separate headroom observations without claiming official acceptance
 - [x] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
-## Phase Checkpoint
+## Batch 5: official runner/evidence guard correction
 
 依存: Batches 1–4
+
+- [x] Freeze exact official schedule and the non-substituting dry-run boundary
+- [x] Add strict CLI, reference/live profile, provenance, raw metric, threshold, soak, suite, and atomic artifact contracts by TDD
+- [x] Separate producer, owner STA Dispatcher, GMI, and input probe with render-completion timestamps and bounded raw buffers
+- [x] Add fresh-child PowerShell orchestration and raw-to-manifest atomic suite finalization
+- [x] Run one complete compatible-PC short dry-run and prove all eight distinct children plus the manifest remain non-official
+- [x] Complete pinned refactor/review, final audit, one commit, push, and todo archive
+
+## Phase Checkpoint
+
+依存: Batches 1–5
 
 - [ ] Rebuild from a clean generated root and rerun full correctness/determinism/dependency checks
 - [ ] Run hard scatter and combined scenarios on `AB-PERF-REF-v1` with 30-second warm-up plus three independent 60-second measurements
@@ -54,6 +65,11 @@
 - [ ] Audit source revision, machine/toolchain/profile/fixture identity, clocks, raw metrics, summaries, exits, and artifact hashes
 - [ ] Verify todo/archive, branch/remote parity, clean tracked worktree, and ignored generated payloads
 - [ ] Create the single `perf/phase0-scatter-prototype` to `main` PR and stop before merge
+
+Batch 5 is a preparatory correction discovered by the clean checkpoint audit.
+The committed development observations use bounded iteration counts and cannot
+produce the required independent 30/60-second windows, 10-minute soak, or raw
+metric evidence. It does not relax or replace any Phase Checkpoint threshold.
 
 ## Scope guard
 

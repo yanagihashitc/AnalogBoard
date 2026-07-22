@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <RuntimeFrameworkVersion>10.0.10</RuntimeFrameworkVersion>
+    <RollForward>Disable</RollForward>
     <PlatformTarget>x64</PlatformTarget>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
@@ -25,4 +27,5 @@
           Link="Fixtures\gmi-raster-contract-v1.json"
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
 </Project>
