@@ -994,7 +994,6 @@ void Test_ByteLevel_OffsetValue_AllChannels()
     for (int i = 0; i < 13; i++)
     {
         UINT addr = FPGAREG_OFFSET_DAT_CH1 + (i * 2);
-        USHORT regVal = FpgaRegLogic::Reg_Read(addr, buffer);
         USHORT expected = FpgaRegLogic::CalcOffsetRegValue(offsets[i]);
 
         // バイト単位で検証
@@ -1002,9 +1001,9 @@ void Test_ByteLevel_OffsetValue_AllChannels()
         BYTE expectedHigh = (expected >> 8) & 0xFF;
 
         char msg[128];
-        sprintf(msg, "Offset CH%d addr=0x%X low byte", i + 1, addr);
+        sprintf_s(msg, sizeof(msg), "Offset CH%d addr=0x%X low byte", i + 1, addr);
         TEST_ASSERT_EQ(expectedLow, buffer[addr], msg);
-        sprintf(msg, "Offset CH%d addr=0x%X high byte", i + 1, addr);
+        sprintf_s(msg, sizeof(msg), "Offset CH%d addr=0x%X high byte", i + 1, addr);
         TEST_ASSERT_EQ(expectedHigh, buffer[addr + 1], msg);
     }
 }
@@ -1022,16 +1021,15 @@ void Test_ByteLevel_ExtCtrlVol1_AllChannels()
     for (int i = 0; i < 5; i++)
     {
         UINT addr = FPGAREG_DAC_DAT_CH9 + (i * 2);
-        USHORT regVal = FpgaRegLogic::Reg_Read(addr, buffer);
         USHORT expected = FpgaRegLogic::CalcExtCtrlVolRegValue(vols[i]);
 
         BYTE expectedLow = expected & 0xFF;
         BYTE expectedHigh = (expected >> 8) & 0xFF;
 
         char msg[128];
-        sprintf(msg, "ExtCtrlVol1 CH%d addr=0x%X low", i, addr);
+        sprintf_s(msg, sizeof(msg), "ExtCtrlVol1 CH%d addr=0x%X low", i, addr);
         TEST_ASSERT_EQ(expectedLow, buffer[addr], msg);
-        sprintf(msg, "ExtCtrlVol1 CH%d addr=0x%X high", i, addr);
+        sprintf_s(msg, sizeof(msg), "ExtCtrlVol1 CH%d addr=0x%X high", i, addr);
         TEST_ASSERT_EQ(expectedHigh, buffer[addr + 1], msg);
     }
 }
@@ -1049,16 +1047,15 @@ void Test_ByteLevel_ExtCtrlVol2_AllChannels()
     for (int i = 0; i < 6; i++)
     {
         UINT addr = FPGAREG_DAC_DAT_CH3 + (i * 2);
-        USHORT regVal = FpgaRegLogic::Reg_Read(addr, buffer);
         USHORT expected = FpgaRegLogic::CalcExtCtrlVolRegValue(vols[i]);
 
         BYTE expectedLow = expected & 0xFF;
         BYTE expectedHigh = (expected >> 8) & 0xFF;
 
         char msg[128];
-        sprintf(msg, "ExtCtrlVol2 CH%d addr=0x%X low", i, addr);
+        sprintf_s(msg, sizeof(msg), "ExtCtrlVol2 CH%d addr=0x%X low", i, addr);
         TEST_ASSERT_EQ(expectedLow, buffer[addr], msg);
-        sprintf(msg, "ExtCtrlVol2 CH%d addr=0x%X high", i, addr);
+        sprintf_s(msg, sizeof(msg), "ExtCtrlVol2 CH%d addr=0x%X high", i, addr);
         TEST_ASSERT_EQ(expectedHigh, buffer[addr + 1], msg);
     }
 }
@@ -1081,13 +1078,13 @@ void Test_ByteLevel_Gain3_AllChannels()
         USHORT actual = FpgaRegLogic::Reg_Read(addr, buffer);
 
         char msg[128];
-        sprintf(msg, "Gain3 CH%d (%.2f) expected=0x%04X", i + 1, gain3Vals[i], expected);
+        sprintf_s(msg, sizeof(msg), "Gain3 CH%d (%.2f) expected=0x%04X", i + 1, gain3Vals[i], expected);
         TEST_ASSERT_EQ(expected, actual, msg);
 
         // バイト単位
-        sprintf(msg, "Gain3 CH%d low byte", i + 1);
+        sprintf_s(msg, sizeof(msg), "Gain3 CH%d low byte", i + 1);
         TEST_ASSERT_EQ(expected & 0xFF, buffer[addr], msg);
-        sprintf(msg, "Gain3 CH%d high byte", i + 1);
+        sprintf_s(msg, sizeof(msg), "Gain3 CH%d high byte", i + 1);
         TEST_ASSERT_EQ((expected >> 8) & 0xFF, buffer[addr + 1], msg);
     }
 }
@@ -1162,7 +1159,7 @@ void Test_FullEp2Buffer_TypicalConfig()
         USHORT expected = FpgaRegLogic::CalcGain3RegValue(-0.75);
         USHORT actual = FpgaRegLogic::Reg_Read(addr, ep2Buf);
         char msg[128];
-        sprintf(msg, "Full: Gain3 CH%d", i + 1);
+        sprintf_s(msg, sizeof(msg), "Full: Gain3 CH%d", i + 1);
         TEST_ASSERT_EQ(expected, actual, msg);
     }
 
@@ -1194,7 +1191,7 @@ void Test_FullEp2Buffer_TypicalConfig()
         UINT addr = FPGAREG_OFFSET_DAT_CH1 + (i * 2);
         USHORT actual = FpgaRegLogic::Reg_Read(addr, ep2Buf);
         char msg[128];
-        sprintf(msg, "Full: Offset CH%d", i + 1);
+        sprintf_s(msg, sizeof(msg), "Full: Offset CH%d", i + 1);
         TEST_ASSERT_EQ(expectedOffset, actual, msg);
     }
 
@@ -1214,7 +1211,7 @@ void Test_FullEp2Buffer_TypicalConfig()
         UINT addr = FPGAREG_DAC_DAT_CH9 + (i * 2);
         USHORT actual = FpgaRegLogic::Reg_Read(addr, ep2Buf);
         char msg[128];
-        sprintf(msg, "Full: ExtCtrlVol1[%d]", i);
+        sprintf_s(msg, sizeof(msg), "Full: ExtCtrlVol1[%d]", i);
         TEST_ASSERT_EQ(expectedVol1[i], actual, msg);
     }
 
@@ -1229,7 +1226,7 @@ void Test_FullEp2Buffer_TypicalConfig()
         UINT addr = FPGAREG_DAC_DAT_CH3 + (i * 2);
         USHORT actual = FpgaRegLogic::Reg_Read(addr, ep2Buf);
         char msg[128];
-        sprintf(msg, "Full: ExtCtrlVol2[%d]", i);
+        sprintf_s(msg, sizeof(msg), "Full: ExtCtrlVol2[%d]", i);
         TEST_ASSERT_EQ(expectedVol2, actual, msg);
     }
 
@@ -1380,7 +1377,7 @@ void Test_FullEp2Buffer_GainSwitched()
     {
         USHORT g3 = FpgaRegLogic::Reg_Read(FPGAREG_GAIN_DAT_CH1 + (i * 2), ep2Buf);
         char msg[64];
-        sprintf(msg, "Full2: Gain3 CH%d = 0x200", i + 1);
+        sprintf_s(msg, sizeof(msg), "Full2: Gain3 CH%d = 0x200", i + 1);
         TEST_ASSERT_EQ(0x200, g3, msg);
     }
 
@@ -1389,7 +1386,7 @@ void Test_FullEp2Buffer_GainSwitched()
     {
         USHORT g3 = FpgaRegLogic::Reg_Read(FPGAREG_GAIN_DAT_CH1 + (i * 2), ep2Buf);
         char msg[64];
-        sprintf(msg, "Full2: Gain3 CH%d = 0x3FF", i + 1);
+        sprintf_s(msg, sizeof(msg), "Full2: Gain3 CH%d = 0x3FF", i + 1);
         TEST_ASSERT_EQ(0x3FF, g3, msg);
     }
 }
@@ -1417,7 +1414,7 @@ void Test_CalcOffsetRegValue_BoundaryValues()
         USHORT r1 = FpgaRegLogic::CalcOffsetRegValue(v);
         USHORT r2 = FpgaRegLogic::CalcOffsetRegValue(v);
         char msg[64];
-        sprintf(msg, "Offset idempotent %.0f", v);
+        sprintf_s(msg, sizeof(msg), "Offset idempotent %.0f", v);
         TEST_ASSERT_EQ(r1, r2, msg);
     }
 }
@@ -1444,7 +1441,7 @@ void Test_CalcTrgValueRegValue_BoundaryValues()
         USHORT r1 = FpgaRegLogic::CalcTrgValueRegValue(v);
         USHORT r2 = FpgaRegLogic::CalcTrgValueRegValue(v);
         char msg[64];
-        sprintf(msg, "TrgVal idempotent %d", v);
+        sprintf_s(msg, sizeof(msg), "TrgVal idempotent %d", v);
         TEST_ASSERT_EQ(r1, r2, msg);
     }
 }
@@ -1474,7 +1471,7 @@ void Test_CalcExtCtrlVolRegValue_BoundaryValues()
         USHORT r1 = FpgaRegLogic::CalcExtCtrlVolRegValue(v);
         USHORT r2 = FpgaRegLogic::CalcExtCtrlVolRegValue(v);
         char msg[64];
-        sprintf(msg, "ExtCtrl idempotent %d", v);
+        sprintf_s(msg, sizeof(msg), "ExtCtrl idempotent %d", v);
         TEST_ASSERT_EQ(r1, r2, msg);
     }
 }
@@ -1499,7 +1496,7 @@ void Test_CalcGain3RegValue_BoundaryValues()
         USHORT r1 = FpgaRegLogic::CalcGain3RegValue(v);
         USHORT r2 = FpgaRegLogic::CalcGain3RegValue(v);
         char msg[64];
-        sprintf(msg, "Gain3 idempotent %.2f", v);
+        sprintf_s(msg, sizeof(msg), "Gain3 idempotent %.2f", v);
         TEST_ASSERT_EQ(r1, r2, msg);
     }
 
@@ -1508,7 +1505,7 @@ void Test_CalcGain3RegValue_BoundaryValues()
     {
         USHORT r = FpgaRegLogic::CalcGain3RegValue(v);
         char msg[64];
-        sprintf(msg, "Gain3 range check %.2f (result=0x%X)", v, r);
+        sprintf_s(msg, sizeof(msg), "Gain3 range check %.2f (result=0x%X)", v, r);
         TEST_ASSERT(r >= 0x200 && r <= 0x3FF, msg);
     }
 }

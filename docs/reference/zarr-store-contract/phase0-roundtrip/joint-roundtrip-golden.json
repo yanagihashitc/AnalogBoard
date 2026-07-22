@@ -1,0 +1,91 @@
+{
+  "schema": "analogboard-p0-s-joint-golden-v1",
+  "generated_at": "2026-07-22",
+  "result": "pass",
+  "generator": {
+    "base_commit": "1333a3e64bff3557ea82c3fbaa68462381c0cb77",
+    "command": "scripts/zarr-roundtrip/run-focused-verification.sh joint",
+    "source_sha256": {
+      "prototypes/zarr-store-roundtrip/CMakeLists.txt": "54445b4f95fb0bf0b84c7a5623075245f0eb7ea04ec799a54d10e50744e76d8c",
+      "prototypes/zarr-store-roundtrip/include/p0s/aead_store.h": "1609e463843649f9e9f4e1c7fe2a7a1d489ce12191bc45dff5c10e728386eedb",
+      "prototypes/zarr-store-roundtrip/include/p0s/atomic_file.h": "5564dfab366a5230902c004183b897da87bd87b1e284d86434f6cabe7918159e",
+      "prototypes/zarr-store-roundtrip/include/p0s/blosc_adapter.h": "028fc8ea208bb8e9245218abef96876d6d400096e28193a4c33e609e26d31b2e",
+      "prototypes/zarr-store-roundtrip/include/p0s/error.h": "6e1c91668db669f43386f97ce4d482793c615de5995beb5c765a6a0567c54098",
+      "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h": "09184caee0c9d6ccd7ebb8af3d014d1ab503c632e6c1263074e42b4de0809489",
+      "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h": "012df415d283da5a681a3eec85bf73257f0dfb0401b1e4fd848d72343c862252",
+      "prototypes/zarr-store-roundtrip/include/p0s/strict_json.h": "9988a424a4418d129854427f11ab3f91ae58731214f352ea2a3e76647f98e15b",
+      "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py": "83697b40d5cf68bec653a444f301413098930b4122d52fc75c05e378d97f4d6c",
+      "prototypes/zarr-store-roundtrip/src/aead_store.cpp": "ad57f483f94efe6da1148145554cb2ff968678659f4ebc9b2662c780dd67c249",
+      "prototypes/zarr-store-roundtrip/src/atomic_file.cpp": "6b50b855eb6659f2bc0fd4fb409db544562fe3fb05e4f81f099a928461c8ede0",
+      "prototypes/zarr-store-roundtrip/src/blosc_adapter.cpp": "164ffbf86c8f893be8c88c2f2b713f97b6f392339164487be6b9445f5182b966",
+      "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "d34b9b1e6230fcc06b493b1ebc94bb42be63ce6616b6ea01ef5a10c11ae6c05f",
+      "prototypes/zarr-store-roundtrip/src/strict_json.cpp": "278c5ddaf0197505c33085895d6dfef474fbd15edbc596e2666ad6e3a7ef2b06",
+      "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py": "07f4f9bccdbc35c60dc52aef067e347a3529f77de85cb72f64d9287a366923d2",
+      "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "36008c6b0ea8d9f412be1919252eda006e8cc5be2c00f79d029e0750649bfd63",
+      "prototypes/zarr-store-roundtrip/tools/store_generator.cpp": "adb04b75093401b10ff1cb6c90a725b1e43cf5cee00dbc62e7a328f51af63575",
+      "scripts/zarr-roundtrip/run-focused-verification.sh": "036af59cdbb732b71651b415a6f911a0f4931bf62453cc95c60c141f1dd579a9"
+    }
+  },
+  "gcsa": {
+    "commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+    "contract_id": "gcsa-store-a4a-rc1",
+    "package_tree_sha256": "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14",
+    "image_id": "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e",
+    "runtime_policy": {
+      "container_lifecycle": "fresh--rm",
+      "image_pull": "never",
+      "network": "none",
+      "privileges": "no-new-privileges",
+      "repository_mount": "read-only",
+      "rootfs": "read-only",
+      "writable_tmpfs": "/tmp-64m"
+    }
+  },
+  "public_kat": {
+    "classification": "public-packaged-kat",
+    "sha256": "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
+  },
+  "joint_evidence": {
+    "content_policy": {
+      "encrypted_wire_bytes_included": false,
+      "measurement_payload_included": false,
+      "nonce_bytes_included": false,
+      "public_kat_only": true
+    },
+    "contract_id": "gcsa-store-a4a-rc1",
+    "fixture": {
+      "arrays": {
+        "fl_waveform": {
+          "dtype": "<u2",
+          "shape": [5, 8, 2400]
+        },
+        "gmi_waveform": {
+          "dtype": "<u2",
+          "shape": [5, 5, 2400]
+        },
+        "pulse_features": {
+          "dtype": "<f8",
+          "shape": [5, 24]
+        }
+      },
+      "dataset_id": "tube_1",
+      "event_count": 5,
+      "events_per_partition": [3, 2],
+      "global_events_by_partition": [[0, 2, 4], [1, 3]],
+      "n_partitions": 2,
+      "sharding": "round-robin"
+    },
+    "gcsa_snapshot_commit": "20689a991697217518ec2ff15aaaa2533b169eb0",
+    "schema": "analogboard-p0-s-joint-evidence-v1",
+    "verification": {
+      "canonical_evidence_sha256": "b90427471da1d18618d4add37273903ce0376dc7eccb1eb682d4e1c42fa6b62d",
+      "encrypted_chunk_count": 6,
+      "encrypted_wires_differ": true,
+      "gcsa_recompute_mismatch": true,
+      "negative_checks": 35,
+      "nonce_sets_disjoint": true,
+      "positive_checks": 269,
+      "raw_zarr_reads_rejected": 6
+    }
+  }
+}

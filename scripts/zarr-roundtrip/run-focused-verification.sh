@@ -1,0 +1,257 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+REPOSITORY_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+readonly REPOSITORY_ROOT
+readonly BUILD_HELPER="${REPOSITORY_ROOT}/.claude/skills/msvc-build/scripts/build.sh"
+readonly PROTOTYPE_BUILD_ROOT="${REPOSITORY_ROOT}/.deps/p0-s/prototype"
+readonly GCSA_SNAPSHOT_ROOT="${REPOSITORY_ROOT}/.deps/p0-s/gcsa-20689a991697217518ec2ff15aaaa2533b169eb0"
+readonly ACCEPTED_KAT="${GCSA_SNAPSHOT_ROOT}/src/gcsa/store/data/aead_v1_kat.json"
+readonly EXPECTED_KAT_SHA256="cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
+readonly EXPECTED_GCSA_IMAGE_ID="sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e"
+readonly GCSA_CONTAINER_REPOSITORY_ROOT="/home/jupyter/AnalogBoard"
+readonly GCSA_CONTAINER_SNAPSHOT="${GCSA_CONTAINER_REPOSITORY_ROOT}/.deps/p0-s/gcsa-20689a991697217518ec2ff15aaaa2533b169eb0"
+readonly GCSA_CONTAINER_VALIDATOR_DIR="/home/jupyter/AnalogBoard/prototypes/zarr-store-roundtrip/scripts"
+readonly EXPECTED_GCSA_CONTRACT_ID="gcsa-store-a4a-rc1"
+readonly EXPECTED_GCSA_PACKAGE_SHA256="c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14"
+readonly JOINT_GOLDEN="${REPOSITORY_ROOT}/docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json"
+readonly PHASE0_EVIDENCE_MANIFEST_RELATIVE="docs/reference/zarr-store-contract/phase0-roundtrip/phase0-roundtrip-manifest.json"
+readonly PHASE0_EVIDENCE_MANIFEST="${REPOSITORY_ROOT}/${PHASE0_EVIDENCE_MANIFEST_RELATIVE}"
+readonly SHARDING_COMPARISON_RELATIVE="docs/reference/zarr-store-contract/phase0-roundtrip/sharding-comparison.json"
+readonly JOINT_ARTIFACT_PARENT="${REPOSITORY_ROOT}/artifacts/phase0-zarr-roundtrip/focused"
+
+usage() {
+  echo "usage: $0 batch1|cpp|python|gcsa-kat|joint|sharding" >&2
+}
+
+require_identity() {
+  local actual
+  actual="$(sha256sum "${ACCEPTED_KAT}" | awk '{print $1}')"
+  if [[ "${actual}" != "${EXPECTED_KAT_SHA256}" ]]; then
+    echo "accepted gcsa KAT SHA-256 mismatch: ${actual}" >&2
+    return 1
+  fi
+}
+
+run_cpp() {
+  local configuration
+  local build_root
+  local windows_build_root
+  for configuration in \
+      release-approved debug-approved release-reproduced debug-reproduced; do
+    build_root="${PROTOTYPE_BUILD_ROOT}/${configuration}"
+    if [[ ! -f "${build_root}/CMakeCache.txt" ]]; then
+      echo "configured prototype build is absent: ${build_root}" >&2
+      return 1
+    fi
+    windows_build_root="$(wslpath -w "${build_root}")"
+    "${BUILD_HELPER}" raw -- cmake --build "${windows_build_root}" --verbose
+    "${BUILD_HELPER}" raw -- ctest --test-dir "${windows_build_root}" \
+      --no-tests=error -V
+  done
+}
+
+run_python() {
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+    -s "${REPOSITORY_ROOT}/prototypes/zarr-store-roundtrip/tests" \
+    -p 'test_*.py' -v
+}
+
+run_gcsa_python() {
+  docker run --rm --pull never --read-only --network none \
+    --security-opt no-new-privileges \
+    --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+    --volume "${REPOSITORY_ROOT}:${GCSA_CONTAINER_REPOSITORY_ROOT}:ro" \
+    --env "PYTHONPATH=${GCSA_CONTAINER_SNAPSHOT}/src:${GCSA_CONTAINER_VALIDATOR_DIR}" \
+    --env PYTHONDONTWRITEBYTECODE=1 \
+    --workdir "${GCSA_CONTAINER_SNAPSHOT}" \
+    --entrypoint python \
+    "${EXPECTED_GCSA_IMAGE_ID}" "$@"
+}
+
+run_gcsa_kat_checks() {
+  run_gcsa_python -c \
+    "from pathlib import Path; from validate_gcsa_roundtrip import gcsa_snapshot_root, require_accepted_gcsa_snapshot, require_public_kat_runtime; from gcsa.store.schema import CONTRACT_RC_ID; kat_path = Path('src/gcsa/store/data/aead_v1_kat.json'); assert __import__('hashlib').sha256(kat_path.read_bytes()).hexdigest() == '${EXPECTED_KAT_SHA256}'; actual = require_accepted_gcsa_snapshot(gcsa_snapshot_root()); assert actual == '${EXPECTED_GCSA_PACKAGE_SHA256}', actual; assert CONTRACT_RC_ID == '${EXPECTED_GCSA_CONTRACT_ID}', CONTRACT_RC_ID; require_public_kat_runtime(kat_path); print('gcsa_kat_checks=2 status=pass')"
+}
+
+run_gcsa_kat() {
+  run_gcsa_kat_checks
+}
+
+run_joint() (
+  if [[ ! -f "${JOINT_GOLDEN}" ]]; then
+    echo "tracked joint evidence golden is absent: ${JOINT_GOLDEN}" >&2
+    return 1
+  fi
+  local build_root="${PROTOTYPE_BUILD_ROOT}/release-approved"
+  local windows_build_root
+  windows_build_root="$(wslpath -w "${build_root}")"
+  "${BUILD_HELPER}" raw -- cmake --build "${windows_build_root}" \
+    --target p0s_store_generator --verbose
+
+  mkdir -p "${JOINT_ARTIFACT_PARENT}"
+  local run_root
+  run_root="$(mktemp -d "${JOINT_ARTIFACT_PARENT}/joint.XXXXXX")"
+  trap 'rm -rf -- "${run_root}"' EXIT
+
+  local finalized_a="${run_root}/finalized-a"
+  local finalized_b="${run_root}/finalized-b"
+  local open_store="${run_root}/open"
+  local generator="${build_root}/p0s_store_generator.exe"
+  local windows_generator
+  local windows_kat
+  windows_generator="$(wslpath -w "${generator}")"
+  windows_kat="$(wslpath -w "${ACCEPTED_KAT}")"
+
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${finalized_a}")" --sharding round-robin
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${finalized_b}")" --sharding round-robin
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${open_store}")" --open --sharding round-robin
+
+  local container_run_root
+  local repository_relative_run_root
+  repository_relative_run_root="${run_root#"${REPOSITORY_ROOT}/"}"
+  container_run_root="${GCSA_CONTAINER_REPOSITORY_ROOT}/${repository_relative_run_root}"
+  run_gcsa_python \
+    "${GCSA_CONTAINER_VALIDATOR_DIR}/validate_gcsa_roundtrip.py" \
+    --open-store "${container_run_root}/open" \
+    --finalized-store-a "${container_run_root}/finalized-a" \
+    --finalized-store-b "${container_run_root}/finalized-b" \
+    --expected-evidence \
+      "${GCSA_CONTAINER_REPOSITORY_ROOT}/docs/reference/zarr-store-contract/phase0-roundtrip/joint-roundtrip-golden.json"
+)
+
+run_timed_generator() {
+  local windows_generator="$1"
+  local windows_kat="$2"
+  local output_root="$3"
+  local mode="$4"
+  local start_ns
+  local end_ns
+  start_ns="$(date +%s%N)"
+  "${BUILD_HELPER}" raw -- "${windows_generator}" "${windows_kat}" \
+    "$(wslpath -w "${output_root}")" --sharding "${mode}"
+  end_ns="$(date +%s%N)"
+  LAST_GENERATOR_MS="$(((end_ns - start_ns) / 1000000))"
+}
+
+run_sharding() (
+  if [[ ! -f "${PHASE0_EVIDENCE_MANIFEST}" ]]; then
+    echo "tracked phase0 evidence manifest is absent: ${PHASE0_EVIDENCE_MANIFEST}" >&2
+    return 1
+  fi
+  local build_root="${PROTOTYPE_BUILD_ROOT}/release-approved"
+  local windows_build_root
+  windows_build_root="$(wslpath -w "${build_root}")"
+  "${BUILD_HELPER}" raw -- cmake --build "${windows_build_root}" \
+    --target p0s_store_generator --verbose
+
+  mkdir -p "${JOINT_ARTIFACT_PARENT}"
+  local run_root
+  run_root="$(mktemp -d "${JOINT_ARTIFACT_PARENT}/sharding.XXXXXX")"
+  trap 'rm -rf -- "${run_root}"' EXIT
+
+  local generator="${build_root}/p0s_store_generator.exe"
+  local windows_generator
+  local windows_kat
+  windows_generator="$(wslpath -w "${generator}")"
+  windows_kat="$(wslpath -w "${ACCEPTED_KAT}")"
+
+  local -a modes=(
+    round-robin
+    append-sequential
+    append-sequential
+    round-robin
+    round-robin
+    append-sequential
+  )
+  local -a round_robin_samples=()
+  local -a append_sequential_samples=()
+  local round_robin_index=0
+  local append_sequential_index=0
+  local mode
+  local output_root
+  for mode in "${modes[@]}"; do
+    if [[ "${mode}" == "round-robin" ]]; then
+      round_robin_index=$((round_robin_index + 1))
+      output_root="${run_root}/round-robin-${round_robin_index}"
+      run_timed_generator \
+        "${windows_generator}" "${windows_kat}" "${output_root}" "${mode}"
+      round_robin_samples+=("${LAST_GENERATOR_MS}")
+    else
+      append_sequential_index=$((append_sequential_index + 1))
+      output_root="${run_root}/append-sequential-${append_sequential_index}"
+      run_timed_generator \
+        "${windows_generator}" "${windows_kat}" "${output_root}" "${mode}"
+      append_sequential_samples+=("${LAST_GENERATOR_MS}")
+    fi
+  done
+
+  local repository_relative_run_root
+  local container_run_root
+  repository_relative_run_root="${run_root#"${REPOSITORY_ROOT}/"}"
+  container_run_root="${GCSA_CONTAINER_REPOSITORY_ROOT}/${repository_relative_run_root}"
+  local -a timing_arguments=()
+  local sample
+  for sample in "${round_robin_samples[@]}"; do
+    timing_arguments+=(--round-robin-wall-ms "${sample}")
+  done
+  for sample in "${append_sequential_samples[@]}"; do
+    timing_arguments+=(--append-sequential-wall-ms "${sample}")
+  done
+  run_gcsa_python \
+    "${GCSA_CONTAINER_VALIDATOR_DIR}/compare_sharding_modes.py" \
+    --round-robin-store "${container_run_root}/round-robin-1" \
+    --append-sequential-store "${container_run_root}/append-sequential-1" \
+    --evidence-manifest \
+      "${GCSA_CONTAINER_REPOSITORY_ROOT}/${PHASE0_EVIDENCE_MANIFEST_RELATIVE}" \
+    --expected-evidence \
+      "${GCSA_CONTAINER_REPOSITORY_ROOT}/${SHARDING_COMPARISON_RELATIVE}" \
+    "${timing_arguments[@]}"
+)
+
+main() {
+  if [[ $# -ne 1 ]]; then
+    usage
+    return 2
+  fi
+  require_identity
+  case "$1" in
+    batch1)
+      run_python
+      run_gcsa_kat
+      run_cpp
+      ;;
+    cpp)
+      run_cpp
+      ;;
+    python)
+      run_python
+      ;;
+    gcsa-kat)
+      run_gcsa_kat
+      ;;
+    joint)
+      run_python
+      run_gcsa_kat_checks
+      run_joint
+      ;;
+    sharding)
+      run_python
+      run_gcsa_kat_checks
+      run_sharding
+      ;;
+    *)
+      usage
+      return 2
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
