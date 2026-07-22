@@ -13,15 +13,15 @@
 - [x] Synchronize known ambient guidance to active P0-R1 and .NET 10
 - [x] Pin the exact offline toolchain/dependency contract and generated-root exclusions
 - [x] Build the standalone aggregate-contract/WPF/test scaffold and reusable verifier by TDD
-- [ ] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
+- [x] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
 ## Batch 2: transform/binning correctness
 
 依存: Batch 1
 
-- [ ] Port pinned linear/log/biexp display behavior and owner-pinned asinh behavior
-- [ ] Prove raw/gate immutability, typed finite failures, pre-transform pair exclusion, bin edges, count conservation, and deterministic raster
-- [ ] Publish the independent asinh fixture and bounded correctness evidence
+- [x] Port pinned linear/log/biexp display behavior and owner-pinned asinh behavior
+- [x] Prove raw/gate immutability, typed finite failures, pre-transform pair exclusion, bin edges, count conservation, and deterministic raster
+- [x] Publish the independent asinh fixture and bounded correctness evidence
 - [ ] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
 ## Batch 3: WPF scatter/latest-frame scheduling

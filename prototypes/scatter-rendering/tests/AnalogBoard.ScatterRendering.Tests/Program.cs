@@ -6,6 +6,8 @@ internal static class Program
     {
         return TestRunner.Run(
             AggregateFrameContractTests.Cases.Concat(
+                DisplayTransformContractTests.Cases).Concat(
+                DensityBinningContractTests.Cases).Concat(
                 PerformanceMetricSchemaContractTests.Cases).Concat(
                 TestRunnerContractTests.Cases));
     }

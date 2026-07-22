@@ -11,4 +11,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\..\docs\reference\scatter-rendering\phase0\display-transform-contract-v1.json"
+          Link="Fixtures\display-transform-contract-v1.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

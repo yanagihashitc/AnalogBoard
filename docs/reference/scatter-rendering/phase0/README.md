@@ -5,9 +5,26 @@ and rendering-path decision evidence for Phase 0 Step `P0-R1`.
 
 Batch 1 establishes the exact .NET/WPF dependency and verification contract,
 the standalone project boundary, bounded aggregate DTOs, deterministic
-synthetic fixture generator, and versioned metric schema. The display-transform
-fixture, rendering implementation, scheduler, GMI harness, performance
-evidence, and final decision remain pending their ordered batches.
+synthetic fixture generator, and versioned metric schema. Batch 2 adds the
+accepted display-transform and density-binning correctness seam. WPF raster
+publication, scheduling, GMI, performance evidence, and the final renderer
+decision remain pending their ordered batches.
+
+## Batch 2 correctness evidence
+
+- [`display-transform-contract-v1.json`](display-transform-contract-v1.json)
+  is the independent CPython 3.12.2 standard-library fixture for
+  `AB-DISPLAY-TRANSFORM-v1`; SHA-256
+  `5955f5b3ec649c490cd1bc752b1515fb33f5b7170212f0e221ca7552acb4adaf`.
+- linear/log/biexponential behavior is pinned to the sys_app authorities listed
+  in Draft 4.5; asinh uses cofactor `150.0` and the owner-amended formula.
+- Every transform has a typed finite boundary. Density excludes a pair before
+  transformation when either raw axis is non-finite and records that count.
+- Reusable binner scratch and caller-owned grids retain raw ADC-linear values;
+  counts use Y-major row-major order with explicit exclude/clamp accounting.
+- Correctness covers 100,001 events at 512 by 512 bins. This is deterministic
+  correctness evidence on the development PC, not official performance
+  acceptance.
 
 ## Boundaries
 

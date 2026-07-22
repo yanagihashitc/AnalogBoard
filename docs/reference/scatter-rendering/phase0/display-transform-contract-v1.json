@@ -1,0 +1,124 @@
+{
+  "contract_id": "AB-DISPLAY-TRANSFORM-v1",
+  "cofactor": 150.0,
+  "forward_formula": "asinh(raw / 150.0)",
+  "inverse_formula": "150.0 * sinh(display)",
+  "tolerances": {
+    "forward_absolute": 1e-12,
+    "inverse_formula": "max(1e-12, abs(raw) * 1e-12)"
+  },
+  "provenance": {
+    "authority_kind": "independent_standard_library",
+    "implementation": "CPython",
+    "python_version": "3.12.2",
+    "distribution": "conda-forge",
+    "compiler": "GCC 12.3.0",
+    "functions": [
+      "math.asinh",
+      "math.sinh"
+    ],
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "libc": "glibc 2.39",
+    "float_format": "IEEE-754 binary64",
+    "hex_byte_order": "big-endian",
+    "generation_method": "forward=math.asinh(raw/150.0); inverse=150.0*math.sinh(forward)"
+  },
+  "cases": [
+    {
+      "id": "large_negative",
+      "raw": -150000000.0,
+      "raw_ieee754_be_hex": "c1a1e1a300000000",
+      "forward_expected": -14.508657738524469,
+      "forward_ieee754_be_hex": "c02d046ec97fa3cc",
+      "inverse_reference": -150000000.00000003,
+      "inverse_ieee754_be_hex": "c1a1e1a300000001",
+      "inverse_error": -2.9802322387695312e-08,
+      "inverse_tolerance": 0.00014999999999999999,
+      "inverse_tolerance_ieee754_be_hex": "3f23a92a30553261"
+    },
+    {
+      "id": "negative_cofactor",
+      "raw": -150.0,
+      "raw_ieee754_be_hex": "c062c00000000000",
+      "forward_expected": -0.88137358701954305,
+      "forward_ieee754_be_hex": "bfec34366179d427",
+      "inverse_reference": -150.0,
+      "inverse_ieee754_be_hex": "c062c00000000000",
+      "inverse_error": 0.0,
+      "inverse_tolerance": 1.5e-10,
+      "inverse_tolerance_ieee754_be_hex": "3de49da7e361ce4c"
+    },
+    {
+      "id": "small_negative",
+      "raw": -1.0,
+      "raw_ieee754_be_hex": "bff0000000000000",
+      "forward_expected": -0.0066666172849382463,
+      "forward_ieee754_be_hex": "bf7b4e74736b8d98",
+      "inverse_reference": -1.0,
+      "inverse_ieee754_be_hex": "bff0000000000000",
+      "inverse_error": 0.0,
+      "inverse_tolerance": 1e-12,
+      "inverse_tolerance_ieee754_be_hex": "3d719799812dea11"
+    },
+    {
+      "id": "negative_zero",
+      "raw": -0.0,
+      "raw_ieee754_be_hex": "8000000000000000",
+      "forward_expected": -0.0,
+      "forward_ieee754_be_hex": "8000000000000000",
+      "inverse_reference": -0.0,
+      "inverse_ieee754_be_hex": "8000000000000000",
+      "inverse_error": 0.0,
+      "inverse_tolerance": 1e-12,
+      "inverse_tolerance_ieee754_be_hex": "3d719799812dea11"
+    },
+    {
+      "id": "positive_zero",
+      "raw": 0.0,
+      "raw_ieee754_be_hex": "0000000000000000",
+      "forward_expected": 0.0,
+      "forward_ieee754_be_hex": "0000000000000000",
+      "inverse_reference": 0.0,
+      "inverse_ieee754_be_hex": "0000000000000000",
+      "inverse_error": 0.0,
+      "inverse_tolerance": 1e-12,
+      "inverse_tolerance_ieee754_be_hex": "3d719799812dea11"
+    },
+    {
+      "id": "small_positive",
+      "raw": 1.0,
+      "raw_ieee754_be_hex": "3ff0000000000000",
+      "forward_expected": 0.0066666172849382463,
+      "forward_ieee754_be_hex": "3f7b4e74736b8d98",
+      "inverse_reference": 1.0,
+      "inverse_ieee754_be_hex": "3ff0000000000000",
+      "inverse_error": 0.0,
+      "inverse_tolerance": 1e-12,
+      "inverse_tolerance_ieee754_be_hex": "3d719799812dea11"
+    },
+    {
+      "id": "positive_cofactor",
+      "raw": 150.0,
+      "raw_ieee754_be_hex": "4062c00000000000",
+      "forward_expected": 0.88137358701954305,
+      "forward_ieee754_be_hex": "3fec34366179d427",
+      "inverse_reference": 150.0,
+      "inverse_ieee754_be_hex": "4062c00000000000",
+      "inverse_error": 0.0,
+      "inverse_tolerance": 1.5e-10,
+      "inverse_tolerance_ieee754_be_hex": "3de49da7e361ce4c"
+    },
+    {
+      "id": "large_positive",
+      "raw": 150000000.0,
+      "raw_ieee754_be_hex": "41a1e1a300000000",
+      "forward_expected": 14.508657738524469,
+      "forward_ieee754_be_hex": "402d046ec97fa3cc",
+      "inverse_reference": 150000000.00000003,
+      "inverse_ieee754_be_hex": "41a1e1a300000001",
+      "inverse_error": 2.9802322387695312e-08,
+      "inverse_tolerance": 0.00014999999999999999,
+      "inverse_tolerance_ieee754_be_hex": "3f23a92a30553261"
+    }
+  ]
+}
