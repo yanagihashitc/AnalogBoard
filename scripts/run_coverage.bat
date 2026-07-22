@@ -5,6 +5,8 @@ for %%I in ("%~dp0..") do set "ROOT=%%~fI"
 set "COVERAGE_DIR=%ROOT%\coverage"
 set "COVERAGE_XML=%COVERAGE_DIR%\fpga_coverage.xml"
 set "TEST_EXE=%ROOT%\AnalogBoard_UnitTest\FpgaRegisterLogic_test.exe"
+set "TEST_PDB=%ROOT%\AnalogBoard_UnitTest\FpgaRegisterLogic_test.pdb"
+set "COPIED_TEST_PDB=%ROOT%\AnalogBoard_UnitTest\x64\Debug\AnalogBoard_UnitTest.pdb"
 set "TESTAPP_SRC=%ROOT%\AnalogBoard_TestApp"
 set "UNITTEST_SRC=%ROOT%\AnalogBoard_UnitTest"
 
@@ -16,6 +18,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
+if not exist "%COPIED_TEST_PDB%" (
+    echo ERROR: Coverage symbols are missing: %COPIED_TEST_PDB%
+    exit /b 1
+)
+copy /Y "%COPIED_TEST_PDB%" "%TEST_PDB%" > nul
+if errorlevel 1 (
+    echo ERROR: Failed to restore coverage symbols.
+    exit /b 1
+)
+
 OpenCppCoverage ^
   --modules "%TEST_EXE%" ^
   --sources "%TESTAPP_SRC%" ^
@@ -24,6 +36,7 @@ OpenCppCoverage ^
   -- "%TEST_EXE%"
 if errorlevel 1 (
     echo ERROR: Coverage collection failed.
+    call :CleanupCoverageSymbols
     exit /b 1
 )
 
@@ -35,8 +48,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "if($lv -le 0 -or $rate -lt $threshold){exit 1}else{exit 0}"
 if errorlevel 1 (
     echo ERROR: Coverage is below threshold.
+    call :CleanupCoverageSymbols
     exit /b 1
 )
 
+call :CleanupCoverageSymbols
 echo SUCCESS: Coverage is above threshold.
+exit /b 0
+
+:CleanupCoverageSymbols
+del /q "%TEST_PDB%" > nul 2>&1
 exit /b 0
