@@ -1,7 +1,7 @@
 # P0-S1/P0-S2 Product Execution Checklist
 
 対象プラン: [AnalogBoard rebuild plan](../../plans/260710-analogboard-rebuild-plan.html)
-プロセスログ: [Process Log](../../process_log/2026-07-22-p0-s-roundtrip-log.md)
+プロセスログ: [Process Log](2026-07-22-p0-s-roundtrip-log.md)
 作成日: 2026-07-22
 
 ---
@@ -49,5 +49,5 @@
 
 - [x] Rebuild from clean generated roots and rerun the complete C++/Python/gcsa matrix
 - [x] Audit every Product acceptance and Completion Criteria item against current evidence
-- [ ] Confirm Active todo empty, branch/remote parity, clean tracked worktree, and ignored generated payloads
-- [ ] Create the phase PR to `main` and stop before merge
+- [x] Confirm Active todo empty, branch/remote parity, clean tracked worktree, and ignored generated payloads (`feat/phase0-store-roundtrip` head/remote `e6e9e9aae48f84e3f894dc09f5c931dc215e1223`; verified again after merge)
+- [x] Create the phase PR to `main` and stop before merge ([PR #4](https://github.com/yanagihashitc/AnalogBoard/pull/4); later merged by the human gate as `580f1d2af9cb2f93e28dfcccc3c41b76e31677ae`)
