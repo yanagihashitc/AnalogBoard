@@ -21,17 +21,28 @@ joint.EXPECTED_GCSA_SNAPSHOT_COMMIT = "20689a991697217518ec2ff15aaaa2533b169eb0"
 joint.EXPECTED_GCSA_PACKAGE_TREE_SHA256 = (
     "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14"
 )
-joint.EXPECTED_GCSA_CONTAINER_ID = (
-    "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8"
-)
 joint.EXPECTED_GCSA_IMAGE_ID = (
     "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e"
+)
+joint.EXPECTED_GCSA_RUNTIME_POLICY = {
+    "container_lifecycle": "fresh--rm",
+    "image_pull": "never",
+    "network": "none",
+    "privileges": "no-new-privileges",
+    "repository_mount": "read-only",
+    "rootfs": "read-only",
+    "writable_tmpfs": "/tmp-64m",
+}
+joint.EXPECTED_GOLDEN_RELATIVE_PATH = Path(
+    "docs/reference/zarr-store-contract/phase0-roundtrip/"
+    "joint-roundtrip-golden.json"
 )
 joint.CONTRACT_ID = "gcsa-store-a4a-rc1"
 joint.EXPECTED_PUBLIC_KAT_SHA256 = (
     "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
 )
 joint.load_strict_json_object = lambda path: json.loads(path.read_text())
+joint.require_expected_joint_provenance = lambda path: None
 
 SPEC = importlib.util.spec_from_file_location("compare_sharding_modes", SCRIPT_PATH)
 if SPEC is None or SPEC.loader is None:
@@ -124,8 +135,8 @@ class EvidenceManifestTests(unittest.TestCase):
                 "gcsa_package_tree_sha256": (
                     joint.EXPECTED_GCSA_PACKAGE_TREE_SHA256
                 ),
-                "gcsa_container_id": joint.EXPECTED_GCSA_CONTAINER_ID,
                 "gcsa_image_id": joint.EXPECTED_GCSA_IMAGE_ID,
+                "gcsa_runtime_policy": joint.EXPECTED_GCSA_RUNTIME_POLICY,
                 "contract_id": joint.CONTRACT_ID,
                 "public_kat_sha256": joint.EXPECTED_PUBLIC_KAT_SHA256,
             },
@@ -156,6 +167,39 @@ class EvidenceManifestTests(unittest.TestCase):
                 ("source.txt",),
             ):
                 comparator.verify_evidence_manifest(manifest)
+
+    def test_manifest_pins_and_executes_joint_validator_provenance(self) -> None:
+        # Given: The sharding manifest inventory and a valid tracked joint
+        # golden whose validator is imported by the comparator.
+        required = {
+            "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py",
+            "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py",
+            "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, _ = self._manifest(root)
+
+            # When: Manifest validation completes with an exact source set.
+            with mock.patch.object(
+                comparator,
+                "EXPECTED_MANIFEST_SOURCE_PATHS",
+                ("source.txt",),
+            ), mock.patch.object(
+                joint,
+                "require_expected_joint_provenance",
+                create=True,
+            ) as require_joint:
+                comparator.verify_evidence_manifest(manifest)
+
+            # Then: The real inventory includes the imported validator/test and
+            # validation delegates to the immutable joint golden provenance.
+            self.assertTrue(
+                required.issubset(comparator.EXPECTED_MANIFEST_SOURCE_PATHS)
+            )
+            require_joint.assert_called_once_with(
+                root / joint.EXPECTED_GOLDEN_RELATIVE_PATH
+            )
 
     def test_manifest_rejects_identity_source_and_structure_drift(self) -> None:
         mutations = {

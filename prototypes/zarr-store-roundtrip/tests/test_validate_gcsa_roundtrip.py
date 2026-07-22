@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 import tempfile
 import types
@@ -432,13 +433,19 @@ class TrackedEvidenceTests(unittest.TestCase):
                 "package_tree_sha256": (
                     "c63c79c4add3a8034cd1486921470818ad71d024ace1e8e356ae4f8dbf396d14"
                 ),
-                "container_id": (
-                    "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8"
-                ),
                 "image_id": (
                     "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411"
                     "649ae80fd036cc79f0febb80b4c0b06e"
                 ),
+                "runtime_policy": {
+                    "container_lifecycle": "fresh--rm",
+                    "image_pull": "never",
+                    "network": "none",
+                    "privileges": "no-new-privileges",
+                    "repository_mount": "read-only",
+                    "rootfs": "read-only",
+                    "writable_tmpfs": "/tmp-64m",
+                },
             },
             "public_kat": {
                 "classification": "public-packaged-kat",
@@ -706,6 +713,71 @@ class TrackedEvidenceTests(unittest.TestCase):
 
 class ImmutableSourceProvenanceTests(unittest.TestCase):
     COMMIT = "8fdcd747e0d6bf760fd6e674f620f8c97b356235"
+
+    def test_generator_provenance_covers_the_direct_build_closure(self) -> None:
+        # Given: The complete CMake build graph for p0s_store_generator plus
+        # the validator, wrapper, and tests that establish its evidence.
+        expected = (
+            "prototypes/zarr-store-roundtrip/CMakeLists.txt",
+            "prototypes/zarr-store-roundtrip/include/p0s/aead_store.h",
+            "prototypes/zarr-store-roundtrip/include/p0s/atomic_file.h",
+            "prototypes/zarr-store-roundtrip/include/p0s/blosc_adapter.h",
+            "prototypes/zarr-store-roundtrip/include/p0s/error.h",
+            "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h",
+            "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h",
+            "prototypes/zarr-store-roundtrip/include/p0s/strict_json.h",
+            "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py",
+            "prototypes/zarr-store-roundtrip/src/aead_store.cpp",
+            "prototypes/zarr-store-roundtrip/src/atomic_file.cpp",
+            "prototypes/zarr-store-roundtrip/src/blosc_adapter.cpp",
+            "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp",
+            "prototypes/zarr-store-roundtrip/src/strict_json.cpp",
+            "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py",
+            "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py",
+            "prototypes/zarr-store-roundtrip/tools/store_generator.cpp",
+            "scripts/zarr-roundtrip/run-focused-verification.sh",
+        )
+
+        # When: The immutable producer inventory is inspected.
+        actual = validator.EXPECTED_GOLDEN_SOURCE_PATHS
+
+        # Then: No direct source, header, build rule, or evidence guard floats.
+        self.assertEqual(actual, expected)
+        repository_root = SCRIPT_PATH.parents[3]
+        prototype_root = SCRIPT_PATH.parents[1]
+        cmake = (prototype_root / "CMakeLists.txt").read_text(encoding="utf-8")
+        cmake_sources = {
+            f"prototypes/zarr-store-roundtrip/{relative}"
+            for relative in re.findall(r"(?:src|tools)/[A-Za-z0-9_./-]+\.cpp", cmake)
+        }
+        public_headers = {
+            path.relative_to(repository_root).as_posix()
+            for path in (prototype_root / "include").rglob("*.h")
+        }
+        self.assertTrue(cmake_sources.issubset(actual))
+        self.assertTrue(public_headers.issubset(actual))
+
+    def test_runtime_identity_has_no_mutable_container_id(self) -> None:
+        # Given: The accepted reader is defined by an immutable image and a
+        # fresh-container execution policy.
+        # When: Runtime provenance constants are inspected.
+        policy = validator.EXPECTED_GCSA_RUNTIME_POLICY
+
+        # Then: Mutable container IDs are excluded and every mutation surface
+        # is closed by the recorded policy.
+        self.assertFalse(hasattr(validator, "EXPECTED_GCSA_CONTAINER_ID"))
+        self.assertEqual(
+            policy,
+            {
+                "container_lifecycle": "fresh--rm",
+                "image_pull": "never",
+                "network": "none",
+                "privileges": "no-new-privileges",
+                "repository_mount": "read-only",
+                "rootfs": "read-only",
+                "writable_tmpfs": "/tmp-64m",
+            },
+        )
 
     @staticmethod
     def _git_result(

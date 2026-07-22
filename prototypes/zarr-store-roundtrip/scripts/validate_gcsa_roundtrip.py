@@ -88,19 +88,37 @@ EXPECTED_GOLDEN_RELATIVE_PATH = Path(
     "joint-roundtrip-golden.json"
 )
 EXPECTED_GOLDEN_SOURCE_PATHS = (
+    "prototypes/zarr-store-roundtrip/CMakeLists.txt",
+    "prototypes/zarr-store-roundtrip/include/p0s/aead_store.h",
+    "prototypes/zarr-store-roundtrip/include/p0s/atomic_file.h",
+    "prototypes/zarr-store-roundtrip/include/p0s/blosc_adapter.h",
+    "prototypes/zarr-store-roundtrip/include/p0s/error.h",
     "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h",
     "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h",
+    "prototypes/zarr-store-roundtrip/include/p0s/strict_json.h",
     "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py",
+    "prototypes/zarr-store-roundtrip/src/aead_store.cpp",
+    "prototypes/zarr-store-roundtrip/src/atomic_file.cpp",
+    "prototypes/zarr-store-roundtrip/src/blosc_adapter.cpp",
     "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp",
+    "prototypes/zarr-store-roundtrip/src/strict_json.cpp",
+    "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py",
     "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py",
+    "prototypes/zarr-store-roundtrip/tools/store_generator.cpp",
     "scripts/zarr-roundtrip/run-focused-verification.sh",
-)
-EXPECTED_GCSA_CONTAINER_ID = (
-    "d141d00e5edb0bd17ee37836340a4315343019d32db4f9197322e9a3a5c9e1d8"
 )
 EXPECTED_GCSA_IMAGE_ID = (
     "sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e"
 )
+EXPECTED_GCSA_RUNTIME_POLICY = {
+    "container_lifecycle": "fresh--rm",
+    "image_pull": "never",
+    "network": "none",
+    "privileges": "no-new-privileges",
+    "repository_mount": "read-only",
+    "rootfs": "read-only",
+    "writable_tmpfs": "/tmp-64m",
+}
 EXPECTED_PUBLIC_KAT_SHA256 = (
     "cd0ee69428b483ddff4a10a84d15732ed9a7aabd2b85c99adbb97168f8fe60aa"
 )
@@ -553,11 +571,8 @@ def build_joint_evidence_summary(
     }
 
 
-def require_expected_joint_evidence(
-    path: Path,
-    actual: Mapping[str, Any],
-) -> None:
-    """Require tracked provenance, source hashes, and runtime evidence."""
+def require_expected_joint_provenance(path: Path) -> dict[str, Any]:
+    """Require the tracked producer and accepted-reader provenance."""
     document = load_strict_json_object(path)
     expected_keys = {
         "schema",
@@ -609,8 +624,8 @@ def require_expected_joint_evidence(
         "commit": EXPECTED_GCSA_SNAPSHOT_COMMIT,
         "contract_id": CONTRACT_ID,
         "package_tree_sha256": EXPECTED_GCSA_PACKAGE_TREE_SHA256,
-        "container_id": EXPECTED_GCSA_CONTAINER_ID,
         "image_id": EXPECTED_GCSA_IMAGE_ID,
+        "runtime_policy": EXPECTED_GCSA_RUNTIME_POLICY,
     }
     if document["gcsa"] != expected_gcsa:
         raise CheckFailure("expected evidence gcsa provenance drift")
@@ -620,6 +635,16 @@ def require_expected_joint_evidence(
     }
     if document["public_kat"] != expected_public_kat:
         raise CheckFailure("expected evidence public KAT provenance drift")
+
+    return document
+
+
+def require_expected_joint_evidence(
+    path: Path,
+    actual: Mapping[str, Any],
+) -> None:
+    """Require tracked provenance, source hashes, and runtime evidence."""
+    document = require_expected_joint_provenance(path)
 
     expected = document["joint_evidence"]
     if not isinstance(expected, dict):
@@ -658,6 +683,49 @@ def load_strict_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise CheckFailure("expected evidence JSON must contain an object")
     return document
+
+
+def require_public_kat_runtime(path: Path) -> None:
+    """Exercise AES-GCM and inner Blosc bytes without dev-only test packages."""
+    from numcodecs import Blosc
+
+    vector = load_strict_json_object(path)
+    try:
+        context = AeadChunkContext(
+            dataset_id=str(vector["dataset_id"]),
+            array_rel_path=str(vector["array_rel_path"]),
+            chunk_key=str(vector["chunk_key"]),
+            expected_chunk_rank=int(vector["chunk_rank"]),
+        )
+        plaintext = bytes.fromhex(str(vector["plaintext_hex"]))
+        wire = encrypt_chunk(
+            plaintext,
+            context,
+            nonce=bytes.fromhex(str(vector["nonce_hex"])),
+        )
+        restored = decrypt_chunk(wire, context)
+        inner = vector["inner"]
+        compressor = inner["compressor"]
+        codec = Blosc(
+            cname=str(compressor["cname"]),
+            clevel=int(compressor["clevel"]),
+            shuffle=int(compressor["shuffle"]),
+            blocksize=int(compressor["blocksize"]),
+        )
+        decoded = np.frombuffer(
+            codec.decode(plaintext),
+            dtype=str(inner["dtype"]),
+        ).reshape(tuple(inner["shape"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CheckFailure("public KAT runtime structure drift") from exc
+    if (
+        context.aad().hex() != vector["aad_hex"]
+        or wire.hex() != vector["wire_hex"]
+        or restored != plaintext
+    ):
+        raise CheckFailure("public KAT AES-GCM runtime drift")
+    if decoded.ravel().tolist() != inner["decoded_values"]:
+        raise CheckFailure("public KAT Blosc runtime drift")
 
 
 def store_config() -> ZarrStoreConfig:

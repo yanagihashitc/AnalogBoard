@@ -43,9 +43,12 @@ EXPECTED_MANIFEST_SOURCE_PATHS = (
     "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h",
     "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h",
     "prototypes/zarr-store-roundtrip/scripts/compare_sharding_modes.py",
+    "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py",
     "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp",
     "prototypes/zarr-store-roundtrip/tests/store_writer_tests.cpp",
     "prototypes/zarr-store-roundtrip/tests/test_compare_sharding_modes.py",
+    "prototypes/zarr-store-roundtrip/tests/test_focused_verification_script.py",
+    "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py",
     "prototypes/zarr-store-roundtrip/tools/store_generator.cpp",
     "scripts/zarr-roundtrip/run-focused-verification.sh",
 )
@@ -154,8 +157,8 @@ def verify_evidence_manifest(path: Path) -> Path:
         "analogboard_baseline_commit": ANALOGBOARD_BASELINE_COMMIT,
         "gcsa_commit": joint.EXPECTED_GCSA_SNAPSHOT_COMMIT,
         "gcsa_package_tree_sha256": joint.EXPECTED_GCSA_PACKAGE_TREE_SHA256,
-        "gcsa_container_id": joint.EXPECTED_GCSA_CONTAINER_ID,
         "gcsa_image_id": joint.EXPECTED_GCSA_IMAGE_ID,
+        "gcsa_runtime_policy": joint.EXPECTED_GCSA_RUNTIME_POLICY,
         "contract_id": joint.CONTRACT_ID,
         "public_kat_sha256": joint.EXPECTED_PUBLIC_KAT_SHA256,
     }
@@ -190,6 +193,9 @@ def verify_evidence_manifest(path: Path) -> Path:
             raise joint.CheckFailure(
                 f"roundtrip evidence source SHA-256 drift: {relative}"
             )
+    joint.require_expected_joint_provenance(
+        repository_root / joint.EXPECTED_GOLDEN_RELATIVE_PATH
+    )
     return repository_root
 
 
@@ -566,6 +572,8 @@ def build_summary(
             "analogboard_baseline_commit": ANALOGBOARD_BASELINE_COMMIT,
             "gcsa_commit": joint.EXPECTED_GCSA_SNAPSHOT_COMMIT,
             "gcsa_package_tree_sha256": joint.EXPECTED_GCSA_PACKAGE_TREE_SHA256,
+            "gcsa_image_id": joint.EXPECTED_GCSA_IMAGE_ID,
+            "gcsa_runtime_policy": joint.EXPECTED_GCSA_RUNTIME_POLICY,
             "contract_id": joint.CONTRACT_ID,
             "public_kat_sha256": joint.EXPECTED_PUBLIC_KAT_SHA256,
         },
