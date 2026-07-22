@@ -1,10 +1,11 @@
 # P0-S Zarr dependency prototype
 
 This directory is an isolated Phase 0 harness. It provides the joint evidence
-for P0-S1 and the round-robin decision for P0-S2; both remain `gate_ready` until
-the phase PR is merged and centrally synchronized. It is not linked to the
-production `AcquisitionEngine`, EP2/EP4/EP6, the existing solution, the C ABI,
-or WPF, and it does not declare A-4b, Frozen v1, or Phase 0 complete.
+for P0-S1 and the round-robin decision for P0-S2; both are `completed` after
+phase PR #4 and closeout PR #5 were merged and independently reverified by
+task_management on 2026-07-22. It is not linked to the production
+`AcquisitionEngine`, EP2/EP4/EP6, the existing solution, the C ABI, or WPF, and
+it does not declare A-4b, P0-R1, Frozen v1, or Phase 0 complete.
 
 ## Offline dependency boundary
 
