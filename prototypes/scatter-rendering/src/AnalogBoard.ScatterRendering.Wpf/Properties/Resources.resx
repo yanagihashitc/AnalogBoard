@@ -18,4 +18,25 @@
   <data name="StatusReady" xml:space="preserve">
     <value>Ready</value>
   </data>
+  <data name="SurfaceBufferLengthMismatch" xml:space="preserve">
+    <value>BGRA publication length must equal {0} bytes; actual: {1}.</value>
+  </data>
+  <data name="SurfaceDisposed" xml:space="preserve">
+    <value>Raster surface has been disposed.</value>
+  </data>
+  <data name="SurfaceGenerationNotIncreasing" xml:space="preserve">
+    <value>Publication generation must increase monotonically; previous: {0}; actual: {1}.</value>
+  </data>
+  <data name="SurfaceHeightOutOfRange" xml:space="preserve">
+    <value>Raster surface height must be between 1 and {0} inclusive; actual: {1}.</value>
+  </data>
+  <data name="SurfaceOwnerMustBeSta" xml:space="preserve">
+    <value>Raster surface must be created on an STA UI thread.</value>
+  </data>
+  <data name="SurfaceWidthOutOfRange" xml:space="preserve">
+    <value>Raster surface width must be between 1 and {0} inclusive; actual: {1}.</value>
+  </data>
+  <data name="SurfaceWrongThread" xml:space="preserve">
+    <value>Raster surface publication must run on its owner UI thread.</value>
+  </data>
 </root>

@@ -6,9 +6,11 @@ and rendering-path decision evidence for Phase 0 Step `P0-R1`.
 Batch 1 establishes the exact .NET/WPF dependency and verification contract,
 the standalone project boundary, bounded aggregate DTOs, deterministic
 synthetic fixture generator, and versioned metric schema. Batch 2 adds the
-accepted display-transform and density-binning correctness seam. WPF raster
-publication, scheduling, GMI, performance evidence, and the final renderer
-decision remain pending their ordered batches.
+accepted display-transform and density-binning correctness seam. Batch 3 adds
+the fixed BGRA density raster, thin built-in `WriteableBitmap` publication,
+pending-one latest-frame scheduling, and bounded development instrumentation.
+GMI, combined fairness, official performance evidence, and the final renderer
+decision remain pending their ordered checkpoints.
 
 ## Batch 2 correctness evidence
 
@@ -25,6 +27,25 @@ decision remain pending their ordered batches.
 - Correctness covers 100,001 events at 512 by 512 bins. This is deterministic
   correctness evidence on the development PC, not official performance
   acceptance.
+
+## Batch 3 raster and scheduling evidence
+
+- [`density-raster-contract-v1.json`](density-raster-contract-v1.json) fixes
+  opaque BGRA32 output, a colorblind-safe five-anchor viridis-family palette,
+  integer interpolation, and the one required Y-axis inversion. The contract
+  file SHA-256 is
+  `c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33`.
+- The WPF surface retains one owner-STA `WriteableBitmap` and copies from a
+  caller-owned reusable BGRA buffer. It creates no per-event WPF objects.
+- The Core scheduler uses one latest-frame slot, one queued/in-flight callback,
+  explicit coalesce/release accounting, strict generation order, and bounded
+  raw-tick/allocation rings. Producer calls do not await or lock the UI.
+- [`batch3-development-observation.json`](batch3-development-observation.json)
+  records the single 100,001-event, 512-square compatible-PC smoke emitted by
+  the exact wrapper. Its scheduler submit p99 is explicitly identified as a
+  single-slot test-double measurement; real Dispatcher timing remains open. It
+  is non-official and does not substitute for the `AB-PERF-REF-v1` Phase
+  Checkpoint.
 
 ## Boundaries
 

@@ -22,15 +22,15 @@
 - [x] Port pinned linear/log/biexp display behavior and owner-pinned asinh behavior
 - [x] Prove raw/gate immutability, typed finite failures, pre-transform pair exclusion, bin edges, count conservation, and deterministic raster
 - [x] Publish the independent asinh fixture and bounded correctness evidence
-- [ ] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
+- [x] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
 ## Batch 3: WPF scatter/latest-frame scheduling
 
 依存: Batch 2
 
-- [ ] Implement preallocated `WriteableBitmap` publication without per-event WPF objects
-- [ ] Implement observable producer-nonblocking latest-frame replacement with pending maximum one
-- [ ] Instrument generation order, allocation, publication, frame timing, and UI latency
+- [x] Implement preallocated `WriteableBitmap` publication without per-event WPF objects
+- [x] Implement observable producer-nonblocking latest-frame replacement with pending maximum one
+- [x] Instrument generation order, allocation, publication, frame timing, and UI latency
 - [ ] Complete focused verification, pinned refactor/review, final audit, one commit, push, and todo archive
 
 ## Batch 4: bounded GMI/combined harness/decision

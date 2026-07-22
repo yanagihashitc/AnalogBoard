@@ -45,6 +45,7 @@ try {
     }
     else {
         Write-Host "tests_total=$($result.TestsTotal) tests_passed=$($result.TestsPassed) tests_failed=$($result.TestsFailed)"
+        Write-Host "development_observation=$($result.DevelopmentObservation)"
     }
     exit 0
 }

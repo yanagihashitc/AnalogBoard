@@ -287,7 +287,8 @@ function Assert-P0R1RestoreIsolation {
     )
     $allowedProjectEdges = @(
         'src/AnalogBoard.ScatterRendering.Wpf/AnalogBoard.ScatterRendering.Wpf.csproj|src/AnalogBoard.ScatterRendering.Core/AnalogBoard.ScatterRendering.Core.csproj',
-        'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj|src/AnalogBoard.ScatterRendering.Core/AnalogBoard.ScatterRendering.Core.csproj'
+        'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj|src/AnalogBoard.ScatterRendering.Core/AnalogBoard.ScatterRendering.Core.csproj',
+        'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj|src/AnalogBoard.ScatterRendering.Wpf/AnalogBoard.ScatterRendering.Wpf.csproj'
     )
     $observedProjectEdges = [System.Collections.Generic.List[string]]::new()
 
@@ -338,7 +339,7 @@ function Assert-P0R1RestoreIsolation {
         $expectedEdges = @($allowedProjectEdges | Sort-Object -CaseSensitive)
         if (($actualEdges -join "`n") -cne ($expectedEdges -join "`n")) {
             throw [InvalidOperationException]::new(
-                'P0-R1 ProjectReference graph must contain exactly WPF-to-Core and Tests-to-Core.'
+                'P0-R1 ProjectReference graph must contain exactly WPF-to-Core, Tests-to-Core, and Tests-to-WPF.'
             )
         }
     }
@@ -513,16 +514,52 @@ function Get-P0R1PrototypeState {
         )
     }
     $resourceRelativePath = 'src/AnalogBoard.ScatterRendering.Wpf/Properties/Resources.resx'
-    if (-not (Test-Path -LiteralPath (Join-Path $resolvedRoot $resourceRelativePath.Replace('/', '\')) -PathType Leaf)) {
+    $resourcePath = Join-Path $resolvedRoot $resourceRelativePath.Replace('/', '\')
+    if (-not (Test-Path -LiteralPath $resourcePath -PathType Leaf)) {
         throw [InvalidOperationException]::new("P0-R1 WPF resource is absent: $resourceRelativePath.")
+    }
+    [xml]$resources = Get-Content -LiteralPath $resourcePath -Raw -Encoding UTF8
+    $requiredResourceKeys = @(
+        'SurfaceBufferLengthMismatch',
+        'SurfaceDisposed',
+        'SurfaceGenerationNotIncreasing',
+        'SurfaceHeightOutOfRange',
+        'SurfaceOwnerMustBeSta',
+        'SurfaceWidthOutOfRange',
+        'SurfaceWrongThread'
+    )
+    $actualResourceKeys = @(
+        $resources.SelectNodes('/root/data') |
+            ForEach-Object { [string]$_.name }
+    )
+    foreach ($resourceKey in $requiredResourceKeys) {
+        if ($actualResourceKeys -cnotcontains $resourceKey) {
+            throw [InvalidOperationException]::new("P0-R1 WPF resource key is absent: $resourceKey.")
+        }
+    }
+
+    $wpfSourceRoot = Join-Path $resolvedRoot 'src\AnalogBoard.ScatterRendering.Wpf'
+    $wpfSources = @(
+        Get-ChildItem -LiteralPath $wpfSourceRoot -Filter '*.cs' -File -Recurse |
+            Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    )
+    foreach ($wpfSource in $wpfSources) {
+        $wpfSourceText = Get-Content -LiteralPath $wpfSource.FullName -Raw -Encoding UTF8
+        if ($wpfSourceText -match '\bMessageBox\b') {
+            $wpfSourceRelative = Get-P0R1NormalizedRelativePath -Root $resolvedRoot -FullPath $wpfSource.FullName
+            throw [InvalidOperationException]::new(
+                "MessageBox is forbidden in P0-R1 WPF source: $wpfSourceRelative."
+            )
+        }
     }
 
     [xml]$testsProject = Get-Content -LiteralPath $testProjectPath -Raw -Encoding UTF8
     if ([string]$testsProject.Project.Sdk -cne 'Microsoft.NET.Sdk' -or
         [string]$testsProject.Project.PropertyGroup.TargetFramework -cne $script:ExpectedTargetFramework -or
         [string]$testsProject.Project.PropertyGroup.PlatformTarget -cne 'x64' -or
+        [string]$testsProject.Project.PropertyGroup.UseWPF -cne 'true' -or
         [string]$testsProject.Project.PropertyGroup.OutputType -cne 'Exe') {
-        throw [InvalidOperationException]::new('P0-R1 Tests project must set OutputType=Exe.')
+        throw [InvalidOperationException]::new('P0-R1 Tests project must set UseWPF=true and OutputType=Exe.')
     }
 
     return [pscustomobject]@{
@@ -587,6 +624,221 @@ function Get-P0R1TestSummary {
         Passed = $passed
         Failed = $failed
     }
+}
+
+function Get-P0R1DevelopmentObservation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$OutputLines
+    )
+
+    $prefix = 'OBSERVATION '
+    $observationLines = @(
+        $OutputLines |
+            Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) }
+    )
+    if ($observationLines.Count -ne 1) {
+        throw [InvalidOperationException]::new(
+            "Test runner output must contain exactly one OBSERVATION line; found $($observationLines.Count)."
+        )
+    }
+
+    $json = $observationLines[0].Substring($prefix.Length)
+    try {
+        $observation = $json | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw [InvalidOperationException]::new('P0-R1 development observation must be valid JSON.')
+    }
+
+    $requiredFields = @(
+        'schema_id',
+        'development_only',
+        'official_acceptance',
+        'fixture_id',
+        'event_count',
+        'width',
+        'height',
+        'iterations',
+        'frame_ms_p95',
+        'frame_ms_max',
+        'allocated_bytes_per_frame',
+        'core_scheduler_test_double_submit_p99_ms',
+        'poster_identity',
+        'pending_work_max',
+        'logical_pending_work_max',
+        'poster_accepted_callbacks',
+        'poster_completed_callbacks',
+        'poster_aborted_callbacks',
+        'coalesced_frames',
+        'raster_sha256',
+        'machine'
+    )
+    $actualFields = @($observation.PSObject.Properties.Name)
+    foreach ($fieldName in $requiredFields) {
+        if ($actualFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 development observation field is absent: $fieldName."
+            )
+        }
+    }
+
+    if ([string]$observation.schema_id -cne 'analogboard.scatter-rendering.development-observation.v1') {
+        throw [InvalidOperationException]::new('P0-R1 development observation schema mismatch.')
+    }
+    foreach ($fieldName in @('development_only', 'official_acceptance')) {
+        if ($observation.$fieldName -isnot [bool]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 development observation field must be a JSON boolean: $fieldName."
+            )
+        }
+    }
+    if ($observation.development_only -ne $true -or $observation.official_acceptance -ne $false) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation must be development-only and must not claim official acceptance.'
+        )
+    }
+    if ([string]$observation.fixture_id -cne 'AB-P0-R1-HARD-SCATTER-v1') {
+        throw [InvalidOperationException]::new('P0-R1 observation fixture identity mismatch.')
+    }
+
+    $integerFields = @(
+        'event_count',
+        'width',
+        'height',
+        'iterations',
+        'allocated_bytes_per_frame',
+        'pending_work_max',
+        'logical_pending_work_max',
+        'poster_accepted_callbacks',
+        'poster_completed_callbacks',
+        'poster_aborted_callbacks',
+        'coalesced_frames'
+    )
+    foreach ($fieldName in $integerFields) {
+        $value = $observation.$fieldName
+        $isInteger = $value -is [sbyte] -or
+            $value -is [byte] -or
+            $value -is [int16] -or
+            $value -is [uint16] -or
+            $value -is [int32] -or
+            $value -is [uint32] -or
+            $value -is [int64] -or
+            $value -is [uint64]
+        if (-not $isInteger) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 development observation field must be an integer JSON number: $fieldName."
+            )
+        }
+    }
+    if ([int]$observation.event_count -ne 100001 -or
+        [int]$observation.width -ne 512 -or
+        [int]$observation.height -ne 512) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation must use the 100001-event 512x512 hard scatter fixture.'
+        )
+    }
+    if ([int]$observation.iterations -ne 10) {
+        throw [InvalidOperationException]::new('P0-R1 observation iterations must equal the fixed development window of 10.')
+    }
+    if ([int]$observation.pending_work_max -lt 0 -or [int]$observation.pending_work_max -gt 1) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation pending_work_max must be between 0 and 1.'
+        )
+    }
+    if ([int]$observation.logical_pending_work_max -lt 0 -or [int]$observation.logical_pending_work_max -gt 1) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation logical_pending_work_max must be between 0 and 1.'
+        )
+    }
+    foreach ($fieldName in @(
+        'allocated_bytes_per_frame',
+        'poster_accepted_callbacks',
+        'poster_completed_callbacks',
+        'poster_aborted_callbacks',
+        'coalesced_frames'
+    )) {
+        if ([long]$observation.$fieldName -lt 0) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 observation count must be non-negative: $fieldName."
+            )
+        }
+    }
+
+    foreach ($fieldName in @(
+        'frame_ms_p95',
+        'frame_ms_max',
+        'core_scheduler_test_double_submit_p99_ms'
+    )) {
+        $value = $observation.$fieldName
+        $isNumber = $value -is [sbyte] -or
+            $value -is [byte] -or
+            $value -is [int16] -or
+            $value -is [uint16] -or
+            $value -is [int32] -or
+            $value -is [uint32] -or
+            $value -is [int64] -or
+            $value -is [uint64] -or
+            $value -is [single] -or
+            $value -is [double] -or
+            $value -is [decimal]
+        if (-not $isNumber) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 development observation field must be a JSON number: $fieldName."
+            )
+        }
+
+        $value = [double]$value
+        if ([double]::IsNaN($value) -or [double]::IsInfinity($value) -or $value -lt 0) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 observation metric must be finite and non-negative: $fieldName."
+            )
+        }
+    }
+    if ([double]$observation.frame_ms_max -lt [double]$observation.frame_ms_p95) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation frame_ms_max must be greater than or equal to frame_ms_p95.'
+        )
+    }
+    if ([string]$observation.poster_identity -cne 'single_slot_test_double') {
+        throw [InvalidOperationException]::new('P0-R1 observation poster identity mismatch.')
+    }
+    if ([long]$observation.poster_accepted_callbacks -ne
+        ([long]$observation.poster_completed_callbacks + [long]$observation.poster_aborted_callbacks)) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation poster accepted callbacks must equal completed plus aborted callbacks.'
+        )
+    }
+    if ([int]$observation.pending_work_max -ne 1 -or
+        [int]$observation.logical_pending_work_max -ne 1) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation physical and logical pending maxima must both equal one.'
+        )
+    }
+    if ([long]$observation.poster_accepted_callbacks -ne 1000 -or
+        [long]$observation.poster_completed_callbacks -ne 1000 -or
+        [long]$observation.poster_aborted_callbacks -ne 0 -or
+        [long]$observation.coalesced_frames -ne 0) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation fixed scheduler smoke counts mismatch.'
+        )
+    }
+    if ([string]$observation.raster_sha256 -cne '255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780') {
+        throw [InvalidOperationException]::new(
+            'P0-R1 observation raster_sha256 does not match the hard fixture.'
+        )
+    }
+    if ($observation.machine -isnot [string]) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 development observation field must be a JSON string: machine.'
+        )
+    }
+    if ([string]::IsNullOrWhiteSpace($observation.machine)) {
+        throw [InvalidOperationException]::new('P0-R1 observation machine identity must not be empty.')
+    }
+
+    return $json
 }
 
 function Invoke-DefaultP0R1DotNet {
@@ -714,6 +966,7 @@ function Invoke-P0R1FocusedVerification {
         -WorkingDirectory $resolvedPrototypeRoot `
         -DotNetInvoker $DotNetInvoker
     $testSummary = Get-P0R1TestSummary -OutputLines $runnerOutput
+    $developmentObservation = Get-P0R1DevelopmentObservation -OutputLines $runnerOutput
 
     return [pscustomobject]@{
         Status = 'Pass'
@@ -724,6 +977,7 @@ function Invoke-P0R1FocusedVerification {
         TestsTotal = $testSummary.Total
         TestsPassed = $testSummary.Passed
         TestsFailed = $testSummary.Failed
+        DevelopmentObservation = $developmentObservation
     }
 }
 
@@ -735,5 +989,6 @@ Export-ModuleMember -Function @(
     'Assert-P0R1RestoreIsolation',
     'Get-P0R1PrototypeState',
     'Get-P0R1TestSummary',
+    'Get-P0R1DevelopmentObservation',
     'Invoke-P0R1FocusedVerification'
 )

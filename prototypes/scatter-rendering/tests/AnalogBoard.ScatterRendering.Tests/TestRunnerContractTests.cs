@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace AnalogBoard.ScatterRendering.Tests;
 
 internal static class TestRunnerContractTests

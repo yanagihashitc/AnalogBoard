@@ -200,16 +200,28 @@ function New-ContractFixture {
   </ItemGroup>
 </Project>
 '@ | Set-Content -LiteralPath (Join-Path $wpfRoot 'AnalogBoard.ScatterRendering.Wpf.csproj') -Encoding UTF8
-    '<root />' | Set-Content -LiteralPath (Join-Path $resourceRoot 'Resources.resx') -Encoding UTF8
+    @'
+<root>
+  <data name="SurfaceBufferLengthMismatch"><value>buffer</value></data>
+  <data name="SurfaceDisposed"><value>disposed</value></data>
+  <data name="SurfaceGenerationNotIncreasing"><value>generation</value></data>
+  <data name="SurfaceHeightOutOfRange"><value>height</value></data>
+  <data name="SurfaceOwnerMustBeSta"><value>sta</value></data>
+  <data name="SurfaceWidthOutOfRange"><value>width</value></data>
+  <data name="SurfaceWrongThread"><value>thread</value></data>
+</root>
+'@ | Set-Content -LiteralPath (Join-Path $resourceRoot 'Resources.resx') -Encoding UTF8
     @'
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj" />
+    <ProjectReference Include="..\..\src\AnalogBoard.ScatterRendering.Wpf\AnalogBoard.ScatterRendering.Wpf.csproj" />
   </ItemGroup>
 </Project>
 '@ | Set-Content -LiteralPath (Join-Path $testsRoot 'AnalogBoard.ScatterRendering.Tests.csproj') -Encoding UTF8
@@ -465,15 +477,41 @@ try {
         Get-P0R1PrototypeState -PrototypeRoot $missingResource
     } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage "P0-R1 WPF resource is absent: src/AnalogBoard.ScatterRendering.Wpf/Properties/Resources.resx."
 
-    # Given: A test project that is not the required self-hosted executable.
-    # When/Then: OutputType must be exactly Exe.
+    $missingResourceKey = New-ContractFixture -Root (Join-Path $temporaryRoot 'missing-resource-key')
+    $missingResourceKeyPath = Join-Path $missingResourceKey 'src\AnalogBoard.ScatterRendering.Wpf\Properties\Resources.resx'
+    [xml]$missingResourceKeyXml = Get-Content -LiteralPath $missingResourceKeyPath -Raw -Encoding UTF8
+    $missingResourceKeyNode = $missingResourceKeyXml.SelectSingleNode("/root/data[@name='SurfaceWrongThread']")
+    $null = $missingResourceKeyNode.ParentNode.RemoveChild($missingResourceKeyNode)
+    $missingResourceKeyXml.Save($missingResourceKeyPath)
+    Assert-ThrowsExact -Action {
+        Get-P0R1PrototypeState -PrototypeRoot $missingResourceKey
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 WPF resource key is absent: SurfaceWrongThread.'
+
+    $messageBoxSource = New-ContractFixture -Root (Join-Path $temporaryRoot 'message-box-source')
+    $messageBoxSourcePath = Join-Path $messageBoxSource 'src\AnalogBoard.ScatterRendering.Wpf\Forbidden.cs'
+    'internal static class Forbidden { internal static void Show() => System.Windows.MessageBox.Show("blocked"); }' |
+        Set-Content -LiteralPath $messageBoxSourcePath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Get-P0R1PrototypeState -PrototypeRoot $messageBoxSource
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'MessageBox is forbidden in P0-R1 WPF source: src/AnalogBoard.ScatterRendering.Wpf/Forbidden.cs.'
+
+    # Given: A test project without WPF support or not the required self-hosted executable.
+    # When/Then: UseWPF and OutputType must be exact for direct surface tests.
     $testsLibrary = New-ContractFixture -Root (Join-Path $temporaryRoot 'tests-library')
     $testsLibraryPath = Join-Path $testsLibrary 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
     (Get-Content -LiteralPath $testsLibraryPath -Raw -Encoding UTF8).Replace('<OutputType>Exe</OutputType>', '<OutputType>Library</OutputType>') |
         Set-Content -LiteralPath $testsLibraryPath -Encoding UTF8
     Assert-ThrowsExact -Action {
         Get-P0R1PrototypeState -PrototypeRoot $testsLibrary
-    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set OutputType=Exe.'
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true and OutputType=Exe.'
+
+    $testsWithoutWpf = New-ContractFixture -Root (Join-Path $temporaryRoot 'tests-without-wpf')
+    $testsWithoutWpfPath = Join-Path $testsWithoutWpf 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
+    (Get-Content -LiteralPath $testsWithoutWpfPath -Raw -Encoding UTF8).Replace('<UseWPF>true</UseWPF>', '<UseWPF>false</UseWPF>') |
+        Set-Content -LiteralPath $testsWithoutWpfPath -Encoding UTF8
+    Assert-ThrowsExact -Action {
+        Get-P0R1PrototypeState -PrototypeRoot $testsWithoutWpf
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 Tests project must set UseWPF=true and OutputType=Exe.'
 
     # Given: A Core project using an undeclared SDK or architecture override.
     # When/Then: Every project-level toolchain identity is fixed before restore.
@@ -549,17 +587,14 @@ try {
         Assert-P0R1RestoreIsolation -PrototypeRoot $outsideReference
     } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage "ProjectReference from 'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj' with Include '..\..\..\outside.csproj' resolves outside the prototype root."
 
-    # Given: A within-root ProjectReference not present in the two-edge allowlist.
+    # Given: A within-root ProjectReference not present in the three-edge allowlist.
     # When/Then: The unexpected edge is rejected exactly.
     $wrongReference = New-ContractFixture -Root (Join-Path $temporaryRoot 'wrong-reference')
-    $wrongTests = Join-Path $wrongReference 'tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj'
-    (Get-Content -LiteralPath $wrongTests -Raw -Encoding UTF8).Replace(
-        '..\..\src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj',
-        '..\..\src\AnalogBoard.ScatterRendering.Wpf\AnalogBoard.ScatterRendering.Wpf.csproj'
-    ) | Set-Content -LiteralPath $wrongTests -Encoding UTF8
+    $wrongCore = Join-Path $wrongReference 'src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj'
+    Add-FixtureXml -ProjectPath $wrongCore -Fragment '<ItemGroup><ProjectReference Include="..\..\tests\AnalogBoard.ScatterRendering.Tests\AnalogBoard.ScatterRendering.Tests.csproj" /></ItemGroup>'
     Assert-ThrowsExact -Action {
         Assert-P0R1RestoreIsolation -PrototypeRoot $wrongReference
-    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage "ProjectReference from 'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj' to 'src/AnalogBoard.ScatterRendering.Wpf/AnalogBoard.ScatterRendering.Wpf.csproj' is not allowed."
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage "ProjectReference from 'src/AnalogBoard.ScatterRendering.Core/AnalogBoard.ScatterRendering.Core.csproj' to 'tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj' is not allowed."
 
     # Given: One valid bounded final test summary.
     # When: It is parsed.
@@ -585,6 +620,46 @@ try {
         } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage $case.Expected
     }
 
+    # Given: One bounded development-only observation emitted before the final summary.
+    # When: Its JSON contract is parsed.
+    # Then: Scope, hard fixture, pending-one, hash, and non-official status are retained.
+    $observationJson = '{"schema_id":"analogboard.scatter-rendering.development-observation.v1","development_only":true,"official_acceptance":false,"fixture_id":"AB-P0-R1-HARD-SCATTER-v1","event_count":100001,"width":512,"height":512,"iterations":10,"frame_ms_p95":12.5,"frame_ms_max":14.0,"allocated_bytes_per_frame":128,"core_scheduler_test_double_submit_p99_ms":0.02,"poster_identity":"single_slot_test_double","pending_work_max":1,"logical_pending_work_max":1,"poster_accepted_callbacks":1000,"poster_completed_callbacks":1000,"poster_aborted_callbacks":0,"coalesced_frames":0,"raster_sha256":"255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780","machine":"fixture"}'
+    $observation = Get-P0R1DevelopmentObservation -OutputLines @(
+        "OBSERVATION $observationJson",
+        'SUMMARY total=1 passed=1 failed=0'
+    )
+    Assert-Equal -Actual $observation -Expected $observationJson -Message 'Development observation JSON'
+
+    foreach ($invalidObservation in @(
+        @{ Json = $observationJson.Replace('"development_only":true', '"development_only":false'); Expected = 'P0-R1 observation must be development-only and must not claim official acceptance.' },
+        @{ Json = $observationJson.Replace('"development_only":true', '"development_only":"true"'); Expected = 'P0-R1 development observation field must be a JSON boolean: development_only.' },
+        @{ Json = $observationJson.Replace('"official_acceptance":false', '"official_acceptance":"false"'); Expected = 'P0-R1 development observation field must be a JSON boolean: official_acceptance.' },
+        @{ Json = $observationJson.Replace('"event_count":100001', '"event_count":100000'); Expected = 'P0-R1 observation must use the 100001-event 512x512 hard scatter fixture.' },
+        @{ Json = $observationJson.Replace('"pending_work_max":1', '"pending_work_max":2'); Expected = 'P0-R1 observation pending_work_max must be between 0 and 1.' },
+        @{ Json = $observationJson.Replace('"logical_pending_work_max":1', '"logical_pending_work_max":0'); Expected = 'P0-R1 observation physical and logical pending maxima must both equal one.' },
+        @{ Json = $observationJson.Replace('"event_count":100001', '"event_count":100000.6'); Expected = 'P0-R1 development observation field must be an integer JSON number: event_count.' },
+        @{ Json = $observationJson.Replace('"frame_ms_p95":12.5', '"frame_ms_p95":15.0'); Expected = 'P0-R1 observation frame_ms_max must be greater than or equal to frame_ms_p95.' },
+        @{ Json = $observationJson.Replace('"frame_ms_p95":12.5', '"frame_ms_p95":"12.5"'); Expected = 'P0-R1 development observation field must be a JSON number: frame_ms_p95.' },
+        @{ Json = $observationJson.Replace('"frame_ms_max":14.0', '"frame_ms_max":"14.0"'); Expected = 'P0-R1 development observation field must be a JSON number: frame_ms_max.' },
+        @{ Json = $observationJson.Replace('"core_scheduler_test_double_submit_p99_ms":0.02', '"core_scheduler_test_double_submit_p99_ms":"0.02"'); Expected = 'P0-R1 development observation field must be a JSON number: core_scheduler_test_double_submit_p99_ms.' },
+        @{ Json = $observationJson.Replace('"coalesced_frames":0', '"coalesced_frames":0.5'); Expected = 'P0-R1 development observation field must be an integer JSON number: coalesced_frames.' },
+        @{ Json = $observationJson.Replace('"poster_completed_callbacks":1000', '"poster_completed_callbacks":999'); Expected = 'P0-R1 observation poster accepted callbacks must equal completed plus aborted callbacks.' },
+        @{ Json = $observationJson.Replace('"coalesced_frames":0', '"coalesced_frames":1'); Expected = 'P0-R1 observation fixed scheduler smoke counts mismatch.' },
+        @{ Json = $observationJson.Replace('"fixture_id":"AB-P0-R1-HARD-SCATTER-v1"', '"fixture_id":"drift"'); Expected = 'P0-R1 observation fixture identity mismatch.' },
+        @{ Json = $observationJson.Replace('"raster_sha256":"255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780"', '"raster_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'); Expected = 'P0-R1 observation raster_sha256 does not match the hard fixture.' },
+        @{ Json = $observationJson.Replace('"machine":"fixture"', '"machine":123'); Expected = 'P0-R1 development observation field must be a JSON string: machine.' },
+        @{ Json = $observationJson.Replace('"machine":"fixture"', '"machine":" "'); Expected = 'P0-R1 observation machine identity must not be empty.' }
+    )) {
+        Assert-ThrowsExact -Action {
+            Get-P0R1DevelopmentObservation -OutputLines @("OBSERVATION $($invalidObservation.Json)")
+        } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage $invalidObservation.Expected
+    }
+    Assert-ThrowsExact -Action {
+        Get-P0R1DevelopmentObservation -OutputLines @(
+            "OBSERVATION $($observationJson.Replace(',"coalesced_frames":0', ''))"
+        )
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 development observation field is absent: coalesced_frames.'
+
     # Given: A complete scaffold and a successful fake dotnet boundary.
     # When: Focused verification is orchestrated.
     # Then: Commands are isolated and the bounded test summary reaches the result.
@@ -595,7 +670,7 @@ try {
         $output = switch ($Arguments[0]) {
             '--version' { @('10.0.302') }
             '--list-runtimes' { @('Microsoft.WindowsDesktop.App 10.0.10 [C:\dotnet]') }
-            'run' { @('PASS fixture', 'SUMMARY total=2 passed=2 failed=0') }
+            'run' { @("OBSERVATION $observationJson", 'PASS fixture', 'SUMMARY total=2 passed=2 failed=0') }
             default { @('fixture command passed') }
         }
         return [pscustomobject]@{ ExitCode = 0; Output = $output }
@@ -610,6 +685,7 @@ try {
     Assert-Equal -Actual $result.TestsTotal -Expected 2 -Message 'Focused tests total'
     Assert-Equal -Actual $result.TestsPassed -Expected 2 -Message 'Focused tests passed'
     Assert-Equal -Actual $result.TestsFailed -Expected 0 -Message 'Focused tests failed'
+    Assert-Equal -Actual $result.DevelopmentObservation -Expected $observationJson -Message 'Focused development observation'
     Assert-Equal -Actual $calls.Count -Expected 5 -Message 'dotnet command count'
     Assert-Contains -Actual $calls[2].Arguments -Expected '--configfile' -Message 'Restore config isolation'
     Assert-Contains -Actual $calls[3].Arguments -Expected '--no-restore' -Message 'Build restore isolation'
@@ -657,7 +733,8 @@ foreach ($requiredToken in @(
     "`$env:DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE = '1'",
     'tests_total=',
     'tests_passed=',
-    'tests_failed='
+    'tests_failed=',
+    'development_observation='
 )) {
     if ($wrapperSource -notmatch [regex]::Escape($requiredToken)) {
         throw "verify.ps1 is missing required contract token: $requiredToken"
