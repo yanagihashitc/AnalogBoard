@@ -3,14 +3,14 @@
   "generated_at": "2026-07-22",
   "result": "pass",
   "generator": {
-    "base_commit": "01103017c55aed109b450bc81b0af171726a6c91",
+    "base_commit": "a3aa73383ca092ee682b46d966ff2b20c0360b81",
     "command": "scripts/zarr-roundtrip/run-focused-verification.sh joint",
     "source_sha256": {
-      "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h": "39c23fd9023b6aa82afd7ee8331b3ddcb88f09a069b9f8f2fc2dd9da4830d692",
+      "prototypes/zarr-store-roundtrip/include/p0s/minimal_zarr_writer.h": "09184caee0c9d6ccd7ebb8af3d014d1ab503c632e6c1263074e42b4de0809489",
       "prototypes/zarr-store-roundtrip/include/p0s/store_contract.h": "012df415d283da5a681a3eec85bf73257f0dfb0401b1e4fd848d72343c862252",
-      "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py": "221d9f0a4ee7a7b64c64d7b527cdea5050dca9d49c8a2f41717fde1a5b26a1cf",
-      "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "a045f18625a2e5995f3dce9ea5d0f9dc476860047365d7d7678ca9783d403369",
-      "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "2601b8ace177e3cebfc7ee25ea456b0aa7f2ef9d7cfbc3463783f77e0c5eb8e0",
+      "prototypes/zarr-store-roundtrip/scripts/validate_gcsa_roundtrip.py": "5292db56b54025c2eccf9df732dd74dd137062e2ff64e19310af3865db76258a",
+      "prototypes/zarr-store-roundtrip/src/minimal_zarr_writer.cpp": "d34b9b1e6230fcc06b493b1ebc94bb42be63ce6616b6ea01ef5a10c11ae6c05f",
+      "prototypes/zarr-store-roundtrip/tests/test_validate_gcsa_roundtrip.py": "4ba90e2ce1220dadf048f76b1f90283172069d7ee47cdcac59d3ebf8974cbb49",
       "scripts/zarr-roundtrip/run-focused-verification.sh": "820ca68fb22a83759ed953007053b325567208eecd70e4db67c92ea7021f5b72"
     }
   },

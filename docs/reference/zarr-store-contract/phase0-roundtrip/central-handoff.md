@@ -13,8 +13,15 @@ Remote branch: `origin/feat/phase0-store-roundtrip`
 - Batch 1: `5833aab886cfe312a17f238773df441b09642281`
 - Batch 2: `01103017c55aed109b450bc81b0af171726a6c91`
 - Batch 3: `da818ba245be252a3717bf9bf3d55c57fa20594e`
-- Batch 4: the commit containing this handoff; record its immutable SHA and the
-  draft phase PR URL in the central receipt after publication
+- Batch 4: `8fdcd747e0d6bf760fd6e674f620f8c97b356235`
+- PR #4 review source/provenance repair:
+  `a3aa73383ca092ee682b46d966ff2b20c0360b81`
+- Phase PR: [#4](https://github.com/yanagihashitc/AnalogBoard/pull/4)
+- Terminal publication: local `HEAD`, the same-name remote-tracking ref, and
+  `git ls-remote --heads origin feat/phase0-store-roundtrip` all resolved to
+  the Batch 4 SHA; the tracked worktree was clean at verification. The active
+  todo was empty and the completed Batch 4 was present in the ignored local
+  todo archive.
 - Base: `origin/main` at
   `807b44106dce35fe1f6b8f91b37e130ea69b3cb9`
 
@@ -48,13 +55,13 @@ after the phase PR is merged and task_management accepts the evidence.
   `b90427471da1d18618d4add37273903ce0376dc7eccb1eb682d4e1c42fa6b62d`
 - P0-S2 comparison: 37 positive / 9 expected rejection checks
 - Joint golden SHA-256:
-  `7bc30c81c1939735eda8e648f009c0a8e1025ae0a4f1d5970f77564a35f52457`
+  `adddf4a035b343ff5db372fd1699a6f8f20802c59f109a6d6894657b630d5e37`
 - Sharding comparison SHA-256:
   `a22eca0fca592654834bbe22919e26f1e75bc0257e4babfb870efb956a032381`
 - Sharding decision SHA-256:
-  `f29284a6f9bf7b9e9250df7ba74ed714b348c3a7c0a1b9ea9f460974ebc4aa14`
+  `ced20553b54b27d57028c6d8474b9949c522bd51e64c7e43329e6d61f080ebc9`
 - Evidence/source manifest SHA-256:
-  `38eb487b5b792599b74ddc3e6c14a9de422349b3aa73a3cc7ffc313c0c2b598d`
+  `8c572b318efa8d45255fc56a646838e7fef9ba4b2126cfd49a2b05a61ebd37b8`
 
 Tracked evidence contains only bounded synthetic metadata, hashes, counts, and
 decisions. Generated stores remain under ignored roots. No real measurement,

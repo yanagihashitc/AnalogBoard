@@ -41,7 +41,7 @@
 - [x] Compare round-robin and append-sequential on one five-event/two-cycle fixture and identical observations
 - [x] Adopt exactly one mode only if the accepted gcsa validator/reader passes without modification
 - [x] Publish the decision record, comparison evidence, central handoff, and bounded parent-plan status/evidence update
-- [x] Complete focused verification, refactor, review, final diff, commit, push, and todo archive
+- [x] Complete focused verification, refactor, review, final diff, commit, push, and todo archive (`8fdcd747e0d6bf760fd6e674f620f8c97b356235`; terminal publication and archive evidence recorded in the process log)
 
 ## Phase checkpoint
 
