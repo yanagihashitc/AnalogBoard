@@ -429,7 +429,7 @@ try {
         throw [InvalidOperationException]::new('Unable to resolve an exact Git source revision.')
     }
     $gitStatusOutput = @(
-        & git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>&1 |
+        & git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>$null |
             ForEach-Object { $_.ToString() }
     )
     $gitStatusExitCode = $LASTEXITCODE

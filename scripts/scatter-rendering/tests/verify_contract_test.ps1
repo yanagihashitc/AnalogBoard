@@ -43,7 +43,7 @@ if ($modeNormalizationIndex -lt 0 -or
 
 $gitStatusCapture = @'
 $gitStatusOutput = @(
-        & git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>&1 |
+        & git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>$null |
             ForEach-Object { $_.ToString() }
     )
 '@
@@ -63,15 +63,15 @@ $gitStatusDirtyIndex = $performanceWrapper.IndexOf(
     '$sourceDirty = $gitStatusOutput.Count -ne 0',
     [StringComparison]::Ordinal
 )
-# Given: Git status can fail before returning a trustworthy porcelain result.
+# Given: Git status can fail or emit benign stderr before returning porcelain stdout.
 # When: The performance wrapper derives its source-dirty provenance.
-# Then: It captures output, checks the native exit code, and only then derives dirty state.
+# Then: It isolates stderr, checks the native exit code, and only then derives dirty state.
 if ($gitStatusCaptureIndex -lt 0 -or
     $gitStatusExitGuardIndex -lt $gitStatusCaptureIndex -or
     $gitStatusFailureIndex -lt $gitStatusExitGuardIndex -or
     $gitStatusDirtyIndex -lt $gitStatusFailureIndex) {
     $reviewBoundaryFailures.Add(
-        'Performance wrapper must fail closed when Git worktree status cannot be determined.'
+        'Performance wrapper must isolate Git stderr and fail closed when worktree status cannot be determined.'
     )
 }
 
