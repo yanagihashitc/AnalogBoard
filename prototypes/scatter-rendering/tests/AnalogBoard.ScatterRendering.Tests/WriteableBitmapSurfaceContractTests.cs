@@ -1,3 +1,4 @@
+using System.Resources;
 using System.Windows.Media;
 using System.Windows.Threading;
 using AnalogBoard.ScatterRendering.Wpf;
@@ -16,6 +17,8 @@ internal static class WriteableBitmapSurfaceContractTests
             GivenInvalidBufferOrGeneration_WhenPublished_ThenTypedResourceFailureLeavesBitmapUnchanged),
         new(nameof(GivenNonOwnerThreadOrDisposedSurface_WhenPublished_ThenTypedResourceFailure),
             GivenNonOwnerThreadOrDisposedSurface_WhenPublished_ThenTypedResourceFailure),
+        new(nameof(GivenKnownAndMissingResourceKeys_WhenRead_ThenResourceBackedMessagesAreExact),
+            GivenKnownAndMissingResourceKeys_WhenRead_ThenResourceBackedMessagesAreExact),
         new(nameof(GivenOwnerDispatcher_WhenWorkPosted_ThenCallbackIsQueuedAndThreadAccessIsObservable),
             GivenOwnerDispatcher_WhenWorkPosted_ThenCallbackIsQueuedAndThreadAccessIsObservable),
     ];
@@ -130,6 +133,21 @@ internal static class WriteableBitmapSurfaceContractTests
         ContractAssert.Throws<DensitySurfaceValidationException>(
             () => surface.Publish(1, new byte[4]),
             "Raster surface has been disposed.");
+    }
+
+    private static void GivenKnownAndMissingResourceKeys_WhenRead_ThenResourceBackedMessagesAreExact()
+    {
+        // Given: The resource-backed missing-key format and one absent prototype key.
+        const string missingKey = "MissingPrototypeResourceFixture";
+
+        // When: Reading the known format and the absent key.
+        var format = PrototypeStrings.Get("RequiredPrototypeResourceAbsent");
+
+        // Then: Both the format and typed failure remain exact and resource-backed.
+        ContractAssert.Equal("Required prototype resource is absent: {0}.", format);
+        ContractAssert.Throws<MissingManifestResourceException>(
+            () => PrototypeStrings.Get(missingKey),
+            "Required prototype resource is absent: MissingPrototypeResourceFixture.");
     }
 
     private static void GivenOwnerDispatcher_WhenWorkPosted_ThenCallbackIsQueuedAndThreadAccessIsObservable()

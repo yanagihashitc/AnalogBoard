@@ -21,6 +21,45 @@ if (-not (Test-Path -LiteralPath $PerformanceWrapperPath -PathType Leaf)) {
 Import-Module $ModulePath -Force
 
 $performanceWrapper = Get-Content -LiteralPath $PerformanceWrapperPath -Raw -Encoding UTF8
+$reviewBoundaryFailures = [System.Collections.Generic.List[string]]::new()
+$modeNormalization =
+    '$Mode = if ($Mode -ieq ''Official'') { ''Official'' } else { ''DryRun'' }'
+$modeNormalizationIndex = $performanceWrapper.IndexOf(
+    $modeNormalization,
+    [StringComparison]::Ordinal
+)
+$firstCaseSensitiveModeCheckIndex = $performanceWrapper.IndexOf(
+    '$Mode -ceq ''Official''',
+    [StringComparison]::Ordinal
+)
+if ($modeNormalizationIndex -lt 0 -or
+    $firstCaseSensitiveModeCheckIndex -lt 0 -or
+    $modeNormalizationIndex -gt $firstCaseSensitiveModeCheckIndex) {
+    $reviewBoundaryFailures.Add(
+        'Performance wrapper must canonicalize ValidateSet mode casing before case-sensitive routing.'
+    )
+}
+
+$prototypeStringsPath = Join-Path `
+    $RepositoryRoot `
+    'prototypes\scatter-rendering\src\AnalogBoard.ScatterRendering.Wpf\PrototypeStrings.cs'
+$prototypeResourcesPath = Join-Path `
+    $RepositoryRoot `
+    'prototypes\scatter-rendering\src\AnalogBoard.ScatterRendering.Wpf\Properties\Resources.resx'
+$prototypeStringsSource = Get-Content -LiteralPath $prototypeStringsPath -Raw -Encoding UTF8
+[xml]$prototypeResources = Get-Content -LiteralPath $prototypeResourcesPath -Raw -Encoding UTF8
+if ($null -eq $prototypeResources.SelectSingleNode(
+        "/root/data[@name='RequiredPrototypeResourceAbsent']"
+    ) -or
+    $prototypeStringsSource.Contains('Required prototype resource is absent:')) {
+    $reviewBoundaryFailures.Add(
+        'Missing-resource exception text must be supplied only by Resources.resx.'
+    )
+}
+if ($reviewBoundaryFailures.Count -ne 0) {
+    throw "RED: $($reviewBoundaryFailures -join ' | ')"
+}
+
 foreach ($requiredPerformanceBoundary in @(
     'Assert-P0R1RepositoryDependencyContract',
     'Assert-P0R1RendererDecisionContract',
@@ -624,6 +663,7 @@ function New-ContractFixture {
   <data name="HarnessCopyBufferLengthMismatch"><value>copy</value></data>
   <data name="HarnessFrameShapeMismatch"><value>shape</value></data>
   <data name="HarnessOwnerDispatcherRequired"><value>dispatcher</value></data>
+  <data name="RequiredPrototypeResourceAbsent"><value>missing {0}</value></data>
   <data name="SurfaceBufferLengthMismatch"><value>buffer</value></data>
   <data name="SurfaceDisposed"><value>disposed</value></data>
   <data name="SurfaceGenerationNotIncreasing"><value>generation</value></data>
@@ -1505,13 +1545,13 @@ Assert-Equal -Actual $rendererDecision.DecisionId -Expected 'P0-R1-RENDERER-v1' 
 Assert-Equal -Actual $rendererDecision.SelectedCandidateId -Expected 'wpf-writeablebitmap-preallocated' -Message 'Renderer selection'
 Assert-Equal -Actual $rendererDecision.Status -Expected 'accepted_at_phase_checkpoint' -Message 'Renderer decision status'
 Assert-Equal -Actual $rendererDecision.OfficialAcceptance -Expected $true -Message 'Renderer Official acceptance'
-Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '506291b58292b5a73fd8d49fb1cb1b9e4bb01a665368eb19a61d71411aa6476f' -Message 'Measured source tree identity'
+Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '4535f6d0275bc414b2ebaebb9d46ed1c8902a576e72582e3e2f70bca9c2f48a7' -Message 'Measured source tree identity'
 $historicalDevelopmentSource = Get-P0R1MeasuredSourceTreeHash `
     -RepositoryRoot $RepositoryRoot `
     -ReferenceProfileState 'Absent'
 Assert-Equal `
     -Actual $historicalDevelopmentSource.Sha256 `
-    -Expected 'c2f44d15e68b77997ed8cf730c8ef6d7b712ac800badb5690985f2e7f23b4fae' `
+    -Expected '2c7040db82c900772067c241a1087b57709b77a8f1310018a94dbdb17ceab966' `
     -Message 'Historical profile-absent development source identity'
 Assert-Equal `
     -Actual $historicalDevelopmentSource.FileCount `

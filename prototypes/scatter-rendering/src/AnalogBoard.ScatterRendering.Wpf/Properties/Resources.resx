@@ -24,6 +24,9 @@
   <data name="HarnessFrameShapeMismatch" xml:space="preserve">
     <value>{0} raster frame must match surface size {1}x{2}; actual: {3}x{4}.</value>
   </data>
+  <data name="RequiredPrototypeResourceAbsent" xml:space="preserve">
+    <value>Required prototype resource is absent: {0}.</value>
+  </data>
   <data name="StatusReady" xml:space="preserve">
     <value>Ready</value>
   </data>

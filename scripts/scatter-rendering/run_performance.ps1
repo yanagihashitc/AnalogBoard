@@ -20,6 +20,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$Mode = if ($Mode -ieq 'Official') { 'Official' } else { 'DryRun' }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepositoryRoot = (Resolve-Path -LiteralPath (Join-Path $ScriptDir '..\..') -ErrorAction Stop).Path

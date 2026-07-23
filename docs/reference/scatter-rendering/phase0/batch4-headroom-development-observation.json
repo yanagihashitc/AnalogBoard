@@ -1,6 +1,6 @@
 {
   "schema_id": "analogboard.scatter-rendering.development-evidence.v1",
-  "run_id": "20260723_batch4_headroom_dev_01",
+  "run_id": "20260723_coderabbit_headroom_dev_01",
   "scope": "P0-R1 Batch 4 three-tile compatible-PC headroom observation",
   "development_only": true,
   "official_acceptance": false,
@@ -8,11 +8,11 @@
   "reference_profile_required_for_official_acceptance": "AB-PERF-REF-v1",
   "source": {
     "branch": "perf/phase0-scatter-prototype",
-    "base_commit": "5da936ed669f36dc7525eb8ec86d8c2e776e0078",
-    "state": "Batch 5 pre-commit worktree; official runner correction is not official performance evidence",
+    "base_commit": "aa02feda95d39e5308f678ff76c8fc073d3e9171",
+    "state": "Post-PR review worktree; compatible-PC smoke is not official performance evidence",
     "measured_source_tree_contract": "sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus .editorconfig, .gitattributes, global.json, and three linked fixtures; the canonical reference profile and six in-repository ancestor candidates use sha256(file) or <absent>)",
     "measured_source_file_count": 61,
-    "measured_source_tree_sha256": "c2f44d15e68b77997ed8cf730c8ef6d7b712ac800badb5690985f2e7f23b4fae"
+    "measured_source_tree_sha256": "2c7040db82c900772067c241a1087b57709b77a8f1310018a94dbdb17ceab966"
   },
   "machine": {
     "computer_name": "DESKTOP-IK7JAL5",
@@ -41,8 +41,8 @@
   "verification_command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-rendering/verify.ps1 -Mode Focused -Configuration Release -Architecture x64",
   "verification": {
     "status": "Pass",
-    "tests_total": 115,
-    "tests_passed": 115,
+    "tests_total": 116,
+    "tests_passed": 116,
     "tests_failed": 0,
     "wrapper_contract": "Pass"
   },
@@ -64,8 +64,8 @@
     "gmi_raster_contract_sha256": "874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08"
   },
   "observation": {
-    "three_tile_iteration_ms_p95": 28.4887,
-    "three_tile_iteration_ms_max": 28.4887,
+    "three_tile_iteration_ms_p95": 28.5363,
+    "three_tile_iteration_ms_max": 28.5363,
     "allocated_bytes_per_iteration": 192,
     "scatter_a_raster_sha256": "0ffd755ea97e90ab1f8a186cc20e58f30378196be0d6ba3b1d068cb5b59afa45",
     "scatter_b_raster_sha256": "9c1c255558b089f96eeb6336c55b0fbe254b05f47ea815c6e230ca05e8b31b17",
