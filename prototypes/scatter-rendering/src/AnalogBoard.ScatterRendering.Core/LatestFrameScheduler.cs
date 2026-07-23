@@ -426,7 +426,7 @@ public sealed class LatestFrameScheduler<TFrame> : IDisposable
 
     private void CompleteDrainAndRearmIfNeeded()
     {
-        Volatile.Write(ref _drainArmed, 0);
+        Interlocked.Exchange(ref _drainArmed, 0);
         if (Volatile.Read(ref _disposed) != 0 || Volatile.Read(ref _faulted) != 0)
         {
             ReleasePending();

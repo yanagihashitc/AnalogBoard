@@ -79,13 +79,14 @@ internal static class DevelopmentPerformanceObservationTests
         var schedulerMetrics = scheduler.GetMetricsSnapshot();
 
         // Then: Emit bounded compatible-PC numbers without applying or claiming official gates.
+        var frameMaxTicks = frameTicks.Max();
         Array.Sort(frameTicks);
-        var p95Index = Math.Max(0, (int)Math.Ceiling(0.95 * frameTicks.Length) - 1);
-        var frameP95Milliseconds = ToMilliseconds(frameTicks[p95Index]);
-        var frameMaxMilliseconds = ToMilliseconds(frameTicks[^1]);
+        var frameP95Milliseconds = ToMilliseconds(SelectNearestRank(frameTicks, 0.95));
+        var frameMaxMilliseconds = ToMilliseconds(frameMaxTicks);
         var allocatedBytesPerFrame = allocatedBytes / MeasurementIterations;
         var rasterSha256 = Convert.ToHexString(SHA256.HashData(pixels)).ToLowerInvariant();
 
+        AssertNearestRankSelectionContract();
         ContractAssert.Equal(1, schedulerMetrics.PendingFrameMaximum);
         ContractAssert.Equal(1, schedulerMetrics.PendingCallbackMaximum);
         ContractAssert.Equal(1, poster.MaximumPendingCount);
@@ -127,6 +128,30 @@ internal static class DevelopmentPerformanceObservationTests
 
     private static double ToMilliseconds(long ticks) =>
         ticks * 1_000.0 / Stopwatch.Frequency;
+
+    private static long SelectNearestRank(ReadOnlySpan<long> sortedValues, double percentile)
+    {
+        var percentileIndex = Math.Max(0, (int)Math.Ceiling(percentile * sortedValues.Length) - 1);
+        return sortedValues[percentileIndex];
+    }
+
+    private static void AssertNearestRankSelectionContract()
+    {
+        // Given: Twenty ordered samples whose nearest-rank p95 is distinct from the maximum.
+        long[] sortedTicks =
+        [
+            1, 2, 3, 4, 5,
+            6, 7, 8, 9, 10,
+            11, 12, 13, 14, 15,
+            16, 17, 18, 19, 20,
+        ];
+
+        // When: Selecting the p95 sample through the observation percentile path.
+        var p95Ticks = SelectNearestRank(sortedTicks, 0.95);
+
+        // Then: An off-by-one selection of the maximum cannot satisfy the contract.
+        ContractAssert.Equal(19L, p95Ticks);
+    }
 
     private sealed class ReusableObservationFrame : ILatestFrameLease
     {

@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Reflection;
+using System.Reflection.Emit;
 using AnalogBoard.ScatterRendering.Core;
 
 namespace AnalogBoard.ScatterRendering.Tests;
@@ -13,6 +15,8 @@ internal static class LatestFrameSchedulerContractTests
             GivenEqualReversedAndMaximumGenerations_WhenSubmitted_ThenOrderIsExplicit),
         new(nameof(GivenFramesPublishedDuringRender_WhenDrained_ThenHandshakePreventsLostWakeupAndMonopoly),
             GivenFramesPublishedDuringRender_WhenDrained_ThenHandshakePreventsLostWakeupAndMonopoly),
+        new(nameof(GivenDrainCompletion_WhenDisarmed_ThenAtomicExchangeProvidesFullFence),
+            GivenDrainCompletion_WhenDisarmed_ThenAtomicExchangeProvidesFullFence),
         new(nameof(GivenPostOrRenderFailure_WhenScheduled_ThenFramesReturnAndSchedulerFaults),
             GivenPostOrRenderFailure_WhenScheduled_ThenFramesReturnAndSchedulerFaults),
         new(nameof(GivenReleaseCallbackFailureDuringDrain_WhenScheduled_ThenGateCleansUpAndPendingFramesReturnOnce),
@@ -128,8 +132,40 @@ internal static class LatestFrameSchedulerContractTests
             poster.DrainNext();
             ContractAssert.SequenceEqual(new long[] { 1, 3 }, rendered);
             ContractAssert.SequenceEqual(new long[] { 2, 1, 3 }, released);
-            ContractAssert.Equal(1L, scheduler.GetMetricsSnapshot().CoalescedCount);
+            var snapshot = scheduler.GetMetricsSnapshot();
+            ContractAssert.Equal(1L, snapshot.CoalescedCount);
+            ContractAssert.Equal(3L, snapshot.LastRenderedGeneration);
+            ContractAssert.Equal(0, snapshot.PendingFrameCount);
+            ContractAssert.Equal(0, snapshot.PendingCallbackCount);
+            ContractAssert.Equal(0, poster.PendingCount);
         }
+    }
+
+    private static void GivenDrainCompletion_WhenDisarmed_ThenAtomicExchangeProvidesFullFence()
+    {
+        // Given: The private drain-completion handshake compiled for a concrete frame lease.
+        var method = typeof(LatestFrameScheduler<TestFrame>).GetMethod(
+            "CompleteDrainAndRearmIfNeeded",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Drain-completion handshake method was not found.");
+
+        // When: Its compiled method calls are inspected without relying on source-file paths.
+        var calledMethods = GetCalledMethods(method);
+
+        // Then: Disarming uses Interlocked.Exchange(ref int, int), which provides the required full fence.
+        ContractAssert.Equal(
+            true,
+            calledMethods.Any(
+                calledMethod =>
+                    calledMethod.DeclaringType == typeof(Interlocked) &&
+                    StringComparer.Ordinal.Equals(calledMethod.Name, nameof(Interlocked.Exchange)) &&
+                    calledMethod.GetParameters() is
+                    [
+                        { ParameterType: var firstParameterType },
+                        { ParameterType: var secondParameterType },
+                    ] &&
+                    firstParameterType == typeof(int).MakeByRefType() &&
+                    secondParameterType == typeof(int)));
     }
 
     private static void GivenPostOrRenderFailure_WhenScheduled_ThenFramesReturnAndSchedulerFaults()
@@ -573,6 +609,71 @@ internal static class LatestFrameSchedulerContractTests
             frame => rendered.Add(frame.Generation),
             frame => released.Add(frame.Generation),
             metricCapacity: 8);
+
+    private static IReadOnlyList<MethodBase> GetCalledMethods(MethodInfo method)
+    {
+        var methodBody = method.GetMethodBody()
+            ?? throw new InvalidOperationException($"Method '{method.Name}' has no IL body.");
+        var il = methodBody.GetILAsByteArray()
+            ?? throw new InvalidOperationException($"Method '{method.Name}' has no IL bytes.");
+        var module = method.Module;
+        var declaringTypeArguments = method.DeclaringType?.GetGenericArguments();
+        var methodArguments = method.GetGenericArguments();
+        var calledMethods = new List<MethodBase>();
+
+        for (var offset = 0; offset < il.Length;)
+        {
+            var opcodeValue = (ushort)il[offset++];
+            if (opcodeValue == 0xfe)
+            {
+                opcodeValue = (ushort)(0xfe00 | il[offset++]);
+            }
+
+            var opcode = OpCodesByValue[opcodeValue];
+            if (opcode.OperandType == OperandType.InlineMethod)
+            {
+                var token = BitConverter.ToInt32(il, offset);
+                calledMethods.Add(
+                    module.ResolveMethod(token, declaringTypeArguments, methodArguments)
+                    ?? throw new InvalidOperationException(
+                        $"Method token '{token}' in '{method.Name}' could not be resolved."));
+            }
+
+            offset += GetOperandSize(opcode.OperandType, il, offset);
+        }
+
+        return calledMethods;
+    }
+
+    private static int GetOperandSize(OperandType operandType, byte[] il, int operandOffset) =>
+        operandType switch
+        {
+            OperandType.InlineNone => 0,
+            OperandType.ShortInlineBrTarget or
+            OperandType.ShortInlineI or
+            OperandType.ShortInlineVar => 1,
+            OperandType.InlineVar => 2,
+            OperandType.InlineBrTarget or
+            OperandType.InlineField or
+            OperandType.InlineI or
+            OperandType.InlineMethod or
+            OperandType.InlineSig or
+            OperandType.InlineString or
+            OperandType.InlineTok or
+            OperandType.InlineType or
+            OperandType.ShortInlineR => 4,
+            OperandType.InlineI8 or
+            OperandType.InlineR => 8,
+            OperandType.InlineSwitch => 4 + (BitConverter.ToInt32(il, operandOffset) * 4),
+            _ => throw new InvalidOperationException($"Unsupported IL operand type '{operandType}'."),
+        };
+
+    private static readonly IReadOnlyDictionary<ushort, OpCode> OpCodesByValue =
+        typeof(OpCodes)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Select(field => (OpCode)(field.GetValue(null)
+                ?? throw new InvalidOperationException($"Opcode field '{field.Name}' has no value.")))
+            .ToDictionary(opcode => unchecked((ushort)opcode.Value));
 
     private sealed class TestFrame : ILatestFrameLease
     {

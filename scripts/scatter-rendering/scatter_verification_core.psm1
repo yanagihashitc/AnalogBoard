@@ -1637,7 +1637,7 @@ function Assert-P0R1MeasuredEvidenceSourceContract {
         )
     }
     if ($evidence.source.branch -cne 'perf/phase0-scatter-prototype' -or
-        $evidence.source.base_commit -cne 'aa02feda95d39e5308f678ff76c8fc073d3e9171' -or
+        $evidence.source.base_commit -cne '17f42c3c10ed9356e00e9c3439a9bafacd570af5' -or
         $evidence.source.state -cne
             'Post-PR review worktree; compatible-PC smoke is not official performance evidence') {
         throw [InvalidOperationException]::new(
@@ -2451,9 +2451,9 @@ function Assert-P0R1RendererDecisionContract {
         gmi_raster_contract_path = 'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json'
         gmi_raster_contract_sha256 = '874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08'
         combined_development_path = 'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json'
-        combined_development_sha256 = '5afd7ce3f6880d92f363bfd0665d8206b30400c2c2d85b0e254b10e8e7cea4c2'
+        combined_development_sha256 = 'dd4d87c0fa7312787d91392c7143e0cda1aa43dd774556be2b9ef5f5ed83e48b'
         headroom_development_path = 'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json'
-        headroom_development_sha256 = 'ee6656598c36ba66b5197110f93c88898569df008f32e92a60bd147bff9f70cb'
+        headroom_development_sha256 = '3d0b54ad113c716a4a32b41dd0e3a60c41fecb6318379b5665d9c19c1ccd1b2b'
         official_performance_path = 'docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json'
         official_performance_sha256 = 'cf50842df072edf53617e5ef98b4d194cbb30490ffac5c9431fb890d9841e328'
     }

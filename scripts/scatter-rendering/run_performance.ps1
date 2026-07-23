@@ -428,7 +428,15 @@ try {
     if ($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch $ExpectedSourceRevisionPattern) {
         throw [InvalidOperationException]::new('Unable to resolve an exact Git source revision.')
     }
-    $sourceDirty = @(& git -C $RepositoryRoot status --porcelain --untracked-files=normal).Count -ne 0
+    $gitStatusOutput = @(
+        & git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>&1 |
+            ForEach-Object { $_.ToString() }
+    )
+    $gitStatusExitCode = $LASTEXITCODE
+    if ($gitStatusExitCode -ne 0) {
+        throw [InvalidOperationException]::new('Unable to determine Git worktree status.')
+    }
+    $sourceDirty = $gitStatusOutput.Count -ne 0
     if ($Mode -ceq 'Official' -and $sourceDirty) {
         throw [InvalidOperationException]::new('Official performance execution requires a clean tracked worktree.')
     }

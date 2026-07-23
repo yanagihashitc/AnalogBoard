@@ -21,6 +21,7 @@ if (-not (Test-Path -LiteralPath $PerformanceWrapperPath -PathType Leaf)) {
 Import-Module $ModulePath -Force
 
 $performanceWrapper = Get-Content -LiteralPath $PerformanceWrapperPath -Raw -Encoding UTF8
+$verificationWrapper = Get-Content -LiteralPath $WrapperPath -Raw -Encoding UTF8
 $reviewBoundaryFailures = [System.Collections.Generic.List[string]]::new()
 $modeNormalization =
     '$Mode = if ($Mode -ieq ''Official'') { ''Official'' } else { ''DryRun'' }'
@@ -37,6 +38,72 @@ if ($modeNormalizationIndex -lt 0 -or
     $modeNormalizationIndex -gt $firstCaseSensitiveModeCheckIndex) {
     $reviewBoundaryFailures.Add(
         'Performance wrapper must canonicalize ValidateSet mode casing before case-sensitive routing.'
+    )
+}
+
+$gitStatusCapture = @'
+$gitStatusOutput = @(
+        & git -C $RepositoryRoot status --porcelain --untracked-files=normal 2>&1 |
+            ForEach-Object { $_.ToString() }
+    )
+'@
+$gitStatusCaptureIndex = $performanceWrapper.IndexOf(
+    $gitStatusCapture,
+    [StringComparison]::Ordinal
+)
+$gitStatusExitGuardIndex = $performanceWrapper.IndexOf(
+    '$gitStatusExitCode = $LASTEXITCODE',
+    [StringComparison]::Ordinal
+)
+$gitStatusFailureIndex = $performanceWrapper.IndexOf(
+    "throw [InvalidOperationException]::new('Unable to determine Git worktree status.')",
+    [StringComparison]::Ordinal
+)
+$gitStatusDirtyIndex = $performanceWrapper.IndexOf(
+    '$sourceDirty = $gitStatusOutput.Count -ne 0',
+    [StringComparison]::Ordinal
+)
+# Given: Git status can fail before returning a trustworthy porcelain result.
+# When: The performance wrapper derives its source-dirty provenance.
+# Then: It captures output, checks the native exit code, and only then derives dirty state.
+if ($gitStatusCaptureIndex -lt 0 -or
+    $gitStatusExitGuardIndex -lt $gitStatusCaptureIndex -or
+    $gitStatusFailureIndex -lt $gitStatusExitGuardIndex -or
+    $gitStatusDirtyIndex -lt $gitStatusFailureIndex) {
+    $reviewBoundaryFailures.Add(
+        'Performance wrapper must fail closed when Git worktree status cannot be determined.'
+    )
+}
+
+$focusedVerificationIndex = $verificationWrapper.IndexOf(
+    'Invoke-P0R1FocusedVerification',
+    [StringComparison]::Ordinal
+)
+$productTestsGuardIndex = $verificationWrapper.IndexOf(
+    'if (-not $result.ProductTestsExecuted)',
+    [StringComparison]::Ordinal
+)
+$productTestsFailureIndex = $verificationWrapper.IndexOf(
+    "'Focused verification requires the complete P0-R1 prototype; product tests were not executed.'",
+    [StringComparison]::Ordinal
+)
+$verificationSuccessIndex = $verificationWrapper.IndexOf(
+    'Write-Host "P0-R1 verification status=',
+    [StringComparison]::Ordinal
+)
+# Given: The prototype state helper can report the legacy zero-project ContractOnly state.
+# When: The standalone mandatory verification wrapper receives that result.
+# Then: It fails before publishing a successful verification status.
+if ($focusedVerificationIndex -lt 0 -or
+    $productTestsGuardIndex -lt $focusedVerificationIndex -or
+    $productTestsFailureIndex -lt $productTestsGuardIndex -or
+    $verificationSuccessIndex -lt $productTestsFailureIndex -or
+    $verificationWrapper.Substring(
+        $productTestsGuardIndex,
+        $verificationSuccessIndex - $productTestsGuardIndex
+    ) -notmatch 'throw\s+\[InvalidOperationException\]::new') {
+    $reviewBoundaryFailures.Add(
+        'Standalone focused verification must fail closed when product tests are not executed.'
     )
 }
 
@@ -187,6 +254,163 @@ function Assert-ThrowsDynamicOutput {
     }
 
     throw "Expected $ExpectedType matching dynamic output '$ExpectedMessagePattern'."
+}
+
+$wrapperFailureFixtureRoot = Join-Path `
+    ([IO.Path]::GetTempPath()) `
+    ("p0r1-wrapper-failure-" + [guid]::NewGuid().ToString('N'))
+$originalFixtureProductTests = [Environment]::GetEnvironmentVariable(
+    'P0R1_FIXTURE_PRODUCT_TESTS',
+    [EnvironmentVariableTarget]::Process
+)
+try {
+    $fixtureScriptRoot = Join-Path $wrapperFailureFixtureRoot 'scripts\scatter-rendering'
+    $fixturePrototypeRoot = Join-Path $wrapperFailureFixtureRoot 'prototypes\scatter-rendering'
+    $fixtureTestOutputRoot = Join-Path `
+        $fixturePrototypeRoot `
+        'tests\AnalogBoard.ScatterRendering.Tests\bin\x64\Release\net10.0-windows'
+    $null = New-Item -ItemType Directory -Path $fixtureScriptRoot -Force
+    $null = New-Item -ItemType Directory -Path $fixtureTestOutputRoot -Force
+    Copy-Item -LiteralPath $WrapperPath -Destination $fixtureScriptRoot
+    Copy-Item -LiteralPath $PerformanceWrapperPath -Destination $fixtureScriptRoot
+    Set-Content `
+        -LiteralPath (Join-Path $fixtureTestOutputRoot 'AnalogBoard.ScatterRendering.Tests.dll') `
+        -Value 'fixture' `
+        -Encoding UTF8
+    @'
+function Assert-P0R1VerificationSelection {
+    param($Mode, $Configuration, $Architecture)
+}
+function Assert-P0R1RepositoryDependencyContract {
+    param($RepositoryRoot)
+    return [pscustomobject]@{
+        SdkVersion = '10.0.302'
+        DesktopRuntimeVersion = '10.0.10'
+        TargetFramework = 'net10.0-windows'
+        ExternalNuGetPackageCount = 0
+    }
+}
+function Assert-P0R1RendererDecisionContract {
+    param($RepositoryRoot)
+    return [pscustomobject]@{
+        DecisionId = 'P0-R1-RENDERER-v1'
+        SelectedCandidateId = 'fixture'
+    }
+}
+function Invoke-P0R1FocusedVerification {
+    param($RepositoryRoot, $PrototypeRoot, $Configuration, $Architecture)
+    $productTestsExecuted = $env:P0R1_FIXTURE_PRODUCT_TESTS -eq '1'
+    return [pscustomobject]@{
+        Status = $(if ($productTestsExecuted) { 'Pass' } else { 'ContractOnly' })
+        ProductTestsExecuted = $productTestsExecuted
+    }
+}
+function Invoke-P0R1SanitizedDotNet {
+    param($Arguments, $WorkingDirectory, $GitExecutablePath, [switch]$OfficialPreflight)
+    if ($Arguments -contains '--version') {
+        return [pscustomobject]@{ ExitCode = 0; Output = @('10.0.302') }
+    }
+    return [pscustomobject]@{
+        ExitCode = 0
+        Output = @(
+            'Microsoft.NETCore.App 10.0.10 [C:\dotnet]',
+            'Microsoft.WindowsDesktop.App 10.0.10 [C:\dotnet]'
+        )
+    }
+}
+function Assert-P0R1ToolchainOutput {
+    param($SdkVersionLines, $RuntimeLines)
+    return [pscustomobject]@{
+        SdkVersion = '10.0.302'
+        DesktopRuntimeVersion = '10.0.10'
+    }
+}
+function git {
+    if ($args -contains 'rev-parse') {
+        $global:LASTEXITCODE = 0
+        return ('a' * 40)
+    }
+    if ($args -contains 'status') {
+        $global:LASTEXITCODE = 128
+        return 'fixture git status failure'
+    }
+    $global:LASTEXITCODE = 0
+}
+Export-ModuleMember -Function *
+'@ | Set-Content `
+        -LiteralPath (Join-Path $fixtureScriptRoot 'scatter_verification_core.psm1') `
+        -Encoding UTF8
+
+    # Given: Focused verification reports the legacy ContractOnly state with no product tests.
+    # When: The standalone mandatory verification wrapper is executed.
+    $originalErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $contractOnlyOutput = @(
+            & powershell.exe `
+                -NoLogo `
+                -NoProfile `
+                -ExecutionPolicy Bypass `
+                -File (Join-Path $fixtureScriptRoot 'verify.ps1') `
+                -Mode Focused `
+                -Configuration Release `
+                -Architecture x64 2>&1 |
+                ForEach-Object { $_.ToString() }
+        )
+        $contractOnlyExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $originalErrorActionPreference
+    }
+    # Then: The wrapper fails with the exact gate-honesty message and exit code.
+    Assert-Equal -Actual $contractOnlyExitCode -Expected 2 -Message 'ContractOnly wrapper exit code'
+    Assert-Contains `
+        -Actual $contractOnlyOutput `
+        -Expected 'P0-R1 verification failed: Focused verification requires the complete P0-R1 prototype; product tests were not executed.' `
+        -Message 'ContractOnly wrapper failure'
+
+    # Given: Revision lookup succeeds but Git status exits nonzero.
+    # When: The dry-run performance wrapper derives source provenance.
+    [Environment]::SetEnvironmentVariable(
+        'P0R1_FIXTURE_PRODUCT_TESTS',
+        '1',
+        [EnvironmentVariableTarget]::Process
+    )
+    try {
+        $ErrorActionPreference = 'Continue'
+        $gitStatusFailureOutput = @(
+            & powershell.exe `
+                -NoLogo `
+                -NoProfile `
+                -ExecutionPolicy Bypass `
+                -File (Join-Path $fixtureScriptRoot 'run_performance.ps1') `
+                -Mode DryRun `
+                -OutputRoot (Join-Path $wrapperFailureFixtureRoot 'output') 2>&1 |
+                ForEach-Object { $_.ToString() }
+        )
+        $gitStatusFailureExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $originalErrorActionPreference
+    }
+    # Then: It fails closed instead of recording a clean worktree.
+    Assert-Equal -Actual $gitStatusFailureExitCode -Expected 2 -Message 'Git status failure exit code'
+    Assert-Contains `
+        -Actual $gitStatusFailureOutput `
+        -Expected 'P0-R1 performance execution failed: Unable to determine Git worktree status.' `
+        -Message 'Git status failure'
+}
+finally {
+    [Environment]::SetEnvironmentVariable(
+        'P0R1_FIXTURE_PRODUCT_TESTS',
+        $originalFixtureProductTests,
+        [EnvironmentVariableTarget]::Process
+    )
+    Remove-Item `
+        -LiteralPath $wrapperFailureFixtureRoot `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue
 }
 
 function Copy-P0R1FixtureSourceTree {
@@ -1545,13 +1769,13 @@ Assert-Equal -Actual $rendererDecision.DecisionId -Expected 'P0-R1-RENDERER-v1' 
 Assert-Equal -Actual $rendererDecision.SelectedCandidateId -Expected 'wpf-writeablebitmap-preallocated' -Message 'Renderer selection'
 Assert-Equal -Actual $rendererDecision.Status -Expected 'accepted_at_phase_checkpoint' -Message 'Renderer decision status'
 Assert-Equal -Actual $rendererDecision.OfficialAcceptance -Expected $true -Message 'Renderer Official acceptance'
-Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '4535f6d0275bc414b2ebaebb9d46ed1c8902a576e72582e3e2f70bca9c2f48a7' -Message 'Measured source tree identity'
+Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '72ee0dc09fabe18c413e1d950b1ae11b47ddb48f0ed3545cbf97fb449a7c0a83' -Message 'Measured source tree identity'
 $historicalDevelopmentSource = Get-P0R1MeasuredSourceTreeHash `
     -RepositoryRoot $RepositoryRoot `
     -ReferenceProfileState 'Absent'
 Assert-Equal `
     -Actual $historicalDevelopmentSource.Sha256 `
-    -Expected '2c7040db82c900772067c241a1087b57709b77a8f1310018a94dbdb17ceab966' `
+    -Expected 'bf58f329785d69e1780c46d7d709af8679169c264d580de3b536551b2fb20964' `
     -Message 'Historical profile-absent development source identity'
 Assert-Equal `
     -Actual $historicalDevelopmentSource.FileCount `

@@ -39,18 +39,18 @@ try {
         -Configuration $Configuration `
         -Architecture $Architecture
 
+    if (-not $result.ProductTestsExecuted) {
+        throw [InvalidOperationException]::new(
+            'Focused verification requires the complete P0-R1 prototype; product tests were not executed.'
+        )
+    }
     Write-Host "P0-R1 verification status=$($result.Status) mode=$Mode configuration=$Configuration architecture=$Architecture"
     Write-Host "sdk=$($dependency.SdkVersion) desktop_runtime=$($dependency.DesktopRuntimeVersion) target=$($dependency.TargetFramework) external_nuget=$($dependency.ExternalNuGetPackageCount)"
-    if (-not $result.ProductTestsExecuted) {
-        Write-Host 'prototype_projects=0 product_tests=not-run reason=Batch1-contract-only'
-    }
-    else {
-        Write-Host "tests_total=$($result.TestsTotal) tests_passed=$($result.TestsPassed) tests_failed=$($result.TestsFailed)"
-        Write-Host "development_observation=$($result.DevelopmentObservation)"
-        Write-Host "combined_development_observation=$($result.CombinedDevelopmentObservation)"
-        Write-Host "headroom_development_observation=$($result.HeadroomDevelopmentObservation)"
-        Write-Host "renderer_decision=$($rendererDecision.DecisionId):$($rendererDecision.SelectedCandidateId)"
-    }
+    Write-Host "tests_total=$($result.TestsTotal) tests_passed=$($result.TestsPassed) tests_failed=$($result.TestsFailed)"
+    Write-Host "development_observation=$($result.DevelopmentObservation)"
+    Write-Host "combined_development_observation=$($result.CombinedDevelopmentObservation)"
+    Write-Host "headroom_development_observation=$($result.HeadroomDevelopmentObservation)"
+    Write-Host "renderer_decision=$($rendererDecision.DecisionId):$($rendererDecision.SelectedCandidateId)"
     exit 0
 }
 catch {
