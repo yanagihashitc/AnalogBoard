@@ -1,0 +1,87 @@
+{
+  "clock_policy": {
+    "additional_containment_tolerance_seconds": 0,
+    "calibrated_cross_clock_skew_seconds": null,
+    "capture": {
+      "basis": "Capinfos packet timestamps",
+      "timezone": "undeclared"
+    },
+    "containment": "capture_fully_contains_run_minute_bucket",
+    "filesystem_mtime_used": false,
+    "run_label": {
+      "basis": "GetLocalTime YYMMDD_HHMM filename label",
+      "bucket": "half-open",
+      "quantization_seconds": 60
+    },
+    "telemetry_filename": {
+      "basis": "GetLocalTime YYMMDD_HHMMSS filename label at EP6 thread start",
+      "quantization_seconds": 1
+    },
+    "telemetry_rows": {
+      "basis": "GetTickCount64 session-local monotonic milliseconds"
+    }
+  },
+  "failure_trace": {
+    "required_value": false,
+    "source": "usb_manifest.constraints.failure_trace_present"
+  },
+  "schema": "analogboard.phase0.initial-recording-corpus-relationship-contract",
+  "schema_version": 1,
+  "source_references": {
+    "plan": {
+      "path": "docs/plans/260710-analogboard-rebuild-plan.html",
+      "revision": "Draft 4.7",
+      "sha256": "d0c927375efdb491159e4980e8b57f62210de7b4bc8b15db43a63c7acee36b66"
+    },
+    "primary_contract": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/contract.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-contract",
+      "schema_version": 1,
+      "sha256": "825503ad2cb84a6262a2b2a6c88e661973a0fba4a37f77be6d04dc451b7c51e6"
+    },
+    "primary_manifest": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/manifest.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-manifest",
+      "schema_version": 1,
+      "sha256": "f51fc2759598dba71bfc51ede5d9128e63ab90a5dd70dd31e3c02bb015e56002"
+    },
+    "usb_manifest": {
+      "path": "docs/reference/usb-recording-corpus/2026-07-17/manifest.json",
+      "schema": "analogboard.phase0.usbpcap-corpus-index",
+      "schema_version": 1,
+      "sha256": "009d7d7732172fd01cb79ac6fc66741366004c2acbf12376b46a4ac98a3b2b8b"
+    }
+  },
+  "telemetry": {
+    "header": [
+      "cycle_id",
+      "trigger_source",
+      "trigger_detected_monotonic_ms",
+      "ddr_rd_end_confirmed_monotonic_ms",
+      "host_drain_complete_monotonic_ms",
+      "publish_cleanup_complete_monotonic_ms",
+      "host_ready_monotonic_ms",
+      "next_external_trigger_detected_monotonic_ms",
+      "rearm_ms",
+      "external_trigger_wait_ms"
+    ],
+    "sessions": [
+      {
+        "ordered_runs": [
+          "260717_1529",
+          "260717_1532"
+        ],
+        "path": "260717_152854_rearm_telemetry.csv"
+      },
+      {
+        "ordered_runs": [
+          "260717_1535",
+          "260717_1539",
+          "260717_1542",
+          "260717_1545"
+        ],
+        "path": "260717_153430_rearm_telemetry.csv"
+      }
+    ]
+  }
+}

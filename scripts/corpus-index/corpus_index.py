@@ -875,6 +875,15 @@ def _validate_manifest_entries(
     return by_path
 
 
+def validate_manifest_metadata(
+    contract: CorpusContract,
+    manifest: object,
+) -> dict[str, dict[str, Any]]:
+    """Validate frozen manifest metadata without reading corpus assets."""
+    entries = _validate_manifest_header(manifest, contract)
+    return _validate_manifest_entries(entries, contract)
+
+
 def verify_manifest(
     repo_root: Path,
     contract: CorpusContract,
@@ -882,8 +891,7 @@ def verify_manifest(
     *,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> None:
-    entries = _validate_manifest_header(manifest, contract)
-    manifest_by_path = _validate_manifest_entries(entries, contract)
+    manifest_by_path = validate_manifest_metadata(contract, manifest)
     discovered = discover_files(repo_root, contract)
     discovered_by_path = {item.path: item for item in discovered}
 

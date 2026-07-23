@@ -1,0 +1,143 @@
+{
+  "clock_policy": {
+    "additional_containment_tolerance_seconds": 0,
+    "calibrated_cross_clock_skew_seconds": null,
+    "capture": {
+      "basis": "Capinfos packet timestamps",
+      "timezone": "undeclared"
+    },
+    "containment": "capture_fully_contains_run_minute_bucket",
+    "filesystem_mtime_used": false,
+    "run_label": {
+      "basis": "GetLocalTime YYMMDD_HHMM filename label",
+      "bucket": "half-open",
+      "quantization_seconds": 60
+    },
+    "telemetry_filename": {
+      "basis": "GetLocalTime YYMMDD_HHMMSS filename label at EP6 thread start",
+      "quantization_seconds": 1
+    },
+    "telemetry_rows": {
+      "basis": "GetTickCount64 session-local monotonic milliseconds"
+    }
+  },
+  "global": {
+    "capture_count": 6,
+    "cfg_count": 6,
+    "failure_trace_present": false,
+    "pair_count": 1760,
+    "run_count": 6,
+    "telemetry_row_count": 6,
+    "telemetry_session_count": 2
+  },
+  "runs": [
+    {
+      "capture": "low_mid.pcapng",
+      "capture_contains_run_bucket": true,
+      "cfg": "260717_1529_cfg.txt",
+      "density": "low",
+      "pair_count": 56,
+      "pair_identity_sha256": "b3c0adeb3207fb51723971e1844f707d4a558be01f6725e71280f111b9af941c",
+      "run_id": "260717_1529",
+      "sequence_first": 1,
+      "sequence_last": 56,
+      "sequences_continuous": true,
+      "telemetry_row_ordinal": 1,
+      "telemetry_session": "260717_152854_rearm_telemetry.csv"
+    },
+    {
+      "capture": "low_mid.pcapng",
+      "capture_contains_run_bucket": true,
+      "cfg": "260717_1532_cfg.txt",
+      "density": "mid",
+      "pair_count": 128,
+      "pair_identity_sha256": "003ca0d5134bf6fa317a57bf3402f70d792de64676eccf3b923410fd49a1f973",
+      "run_id": "260717_1532",
+      "sequence_first": 1,
+      "sequence_last": 128,
+      "sequences_continuous": true,
+      "telemetry_row_ordinal": 2,
+      "telemetry_session": "260717_152854_rearm_telemetry.csv"
+    },
+    {
+      "capture": "mid.pcapng",
+      "capture_contains_run_bucket": true,
+      "cfg": "260717_1535_cfg.txt",
+      "density": "mid",
+      "pair_count": 142,
+      "pair_identity_sha256": "dd8f8281d5b03f401a2f1676ba513408e0ce94f2c8b6a05559afc6a9c165886b",
+      "run_id": "260717_1535",
+      "sequence_first": 1,
+      "sequence_last": 142,
+      "sequences_continuous": true,
+      "telemetry_row_ordinal": 1,
+      "telemetry_session": "260717_153430_rearm_telemetry.csv"
+    },
+    {
+      "capture": "low.pcapng",
+      "capture_contains_run_bucket": true,
+      "cfg": "260717_1539_cfg.txt",
+      "density": "low",
+      "pair_count": 56,
+      "pair_identity_sha256": "ddd4e6584a27cd784de5cd90fedad2ffb2dd738ec52a29038349e8f079836647",
+      "run_id": "260717_1539",
+      "sequence_first": 1,
+      "sequence_last": 56,
+      "sequences_continuous": true,
+      "telemetry_row_ordinal": 2,
+      "telemetry_session": "260717_153430_rearm_telemetry.csv"
+    },
+    {
+      "capture": "high1.pcapng",
+      "capture_contains_run_bucket": true,
+      "cfg": "260717_1542_cfg.txt",
+      "density": "high",
+      "pair_count": 689,
+      "pair_identity_sha256": "9b29cd5ee6294fefcf92f23427e9c93d90cff34943deed975e91aab4f8760855",
+      "run_id": "260717_1542",
+      "sequence_first": 1,
+      "sequence_last": 689,
+      "sequences_continuous": true,
+      "telemetry_row_ordinal": 3,
+      "telemetry_session": "260717_153430_rearm_telemetry.csv"
+    },
+    {
+      "capture": "high2.pcapng",
+      "capture_contains_run_bucket": true,
+      "cfg": "260717_1545_cfg.txt",
+      "density": "high",
+      "pair_count": 689,
+      "pair_identity_sha256": "7c60855d6f9aee414cd08bb88ec5a5d8e3b53f82fd891599df8be15ac1a93d39",
+      "run_id": "260717_1545",
+      "sequence_first": 1,
+      "sequence_last": 689,
+      "sequences_continuous": true,
+      "telemetry_row_ordinal": 4,
+      "telemetry_session": "260717_153430_rearm_telemetry.csv"
+    }
+  ],
+  "schema": "analogboard.phase0.initial-recording-corpus-relationships",
+  "schema_version": 1,
+  "telemetry_sessions": [
+    {
+      "cycle_id_first": 1,
+      "cycle_id_last": 2,
+      "cycle_ids_continuous": true,
+      "header_sha256": "7c2fe768199f21a1177ba3242f37a5a572acaefa4e16d649de18b5682aff02c7",
+      "monotonic_boundaries_valid": true,
+      "path": "260717_152854_rearm_telemetry.csv",
+      "row_count": 2,
+      "run_count": 2
+    },
+    {
+      "cycle_id_first": 1,
+      "cycle_id_last": 4,
+      "cycle_ids_continuous": true,
+      "header_sha256": "7c2fe768199f21a1177ba3242f37a5a572acaefa4e16d649de18b5682aff02c7",
+      "monotonic_boundaries_valid": true,
+      "path": "260717_153430_rearm_telemetry.csv",
+      "row_count": 4,
+      "run_count": 4
+    }
+  ]
+}

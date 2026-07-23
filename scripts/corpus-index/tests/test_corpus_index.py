@@ -31,6 +31,7 @@ from corpus_index import (  # noqa: E402
     load_contract,
     load_contract_data,
     serialize_manifest,
+    validate_manifest_metadata,
     verify_manifest,
 )
 
@@ -124,6 +125,22 @@ class CorpusIndexContractTests(unittest.TestCase):
             self.assertEqual(MANIFEST_SCHEMA, parsed["schema"])
             self.assertNotIn(str(repo_root.resolve()), first.decode("utf-8"))
             verify_manifest(repo_root, contract, parsed)
+
+    def test_manifest_metadata_validation_does_not_read_assets(self) -> None:
+        # Given: A valid synthetic manifest and no request for source verification.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            write_small_corpus(repo_root)
+            contract = load_contract_data(small_contract())
+            manifest = build_manifest(repo_root, contract)
+
+            # When: The public metadata-only validator is called after assets disappear.
+            for source in (repo_root / "fixtures/corpus").iterdir():
+                source.unlink()
+            entries = validate_manifest_metadata(contract, manifest)
+
+            # Then: Frozen schema/count/path metadata validates without opening assets.
+            self.assertEqual(set(item["path"] for item in manifest["entries"]), set(entries))
 
     def test_null_contract_is_rejected(self) -> None:
         # Given: A JSON null contract.
