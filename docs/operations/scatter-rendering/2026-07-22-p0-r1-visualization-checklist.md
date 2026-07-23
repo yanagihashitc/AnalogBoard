@@ -84,8 +84,8 @@
 - [x] Run the independent 10-minute soak and verify all memory/scheduling metrics
 - [x] Run the 131,072-event/1024-square/three-tile headroom observation separately
 - [x] Audit source revision, machine/toolchain/profile/fixture identity, clocks, raw metrics, summaries, exits, and artifact hashes
-- [ ] Verify todo/archive, branch/remote parity, clean tracked worktree, and ignored generated payloads
-- [ ] Create the single `perf/phase0-scatter-prototype` to `main` PR and stop before merge
+- [x] Verify todo/archive, branch/remote parity, clean tracked worktree, and ignored generated payloads
+- [x] Create the single `perf/phase0-scatter-prototype` to `main` PR and stop before merge
 
 Batches 5–7 are preparatory corrections discovered by checkpoint audits.
 Batch 5 supplies the mandatory timed evidence transaction. Batch 6 makes its
