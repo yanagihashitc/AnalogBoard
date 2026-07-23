@@ -62,7 +62,17 @@
 - [x] Copy source-drift fixtures without traversing generated directories
 - [x] Prove normal copy plus missing-source and nested-destination failures
 - [x] Complete focused verification and pinned refactor/review checks
-- [ ] Complete final audit, one commit, push, and todo archive
+- [x] Complete final audit, one commit, push, and todo archive
+
+## Batch 7: Windows PowerShell 5.1 absolute-path compatibility
+
+依存: Batches 1–6
+
+- [x] Reproduce the Official sanitized-child preflight failure
+- [x] Preserve absolute existing-Git validation without a .NET Core-only API
+- [x] Cover omitted, empty, relative, drive-relative, and missing path failures
+- [x] Complete focused verification, pinned refactor/review, final audit,
+      one commit, push, and todo archive
 
 ## Phase Checkpoint
 
@@ -77,10 +87,11 @@
 - [ ] Verify todo/archive, branch/remote parity, clean tracked worktree, and ignored generated payloads
 - [ ] Create the single `perf/phase0-scatter-prototype` to `main` PR and stop before merge
 
-Batches 5 and 6 are preparatory corrections discovered by checkpoint audits.
+Batches 5–7 are preparatory corrections discovered by checkpoint audits.
 Batch 5 supplies the mandatory timed evidence transaction. Batch 6 makes its
-contract preflight independent of ignored generated trees. Neither relaxes or
-replaces any Phase Checkpoint threshold.
+contract preflight independent of ignored generated trees. Batch 7 keeps that
+preflight compatible with Windows PowerShell 5.1. None relaxes or replaces any
+Phase Checkpoint threshold.
 
 ## Scope guard
 

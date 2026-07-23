@@ -1970,6 +1970,33 @@ function Assert-P0R1RendererDecisionContract {
     }
 }
 
+function Test-P0R1FullyQualifiedFileSystemPath {
+    param(
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    try {
+        if (-not [IO.Path]::IsPathRooted($Path)) {
+            return $false
+        }
+        $pathRoot = [IO.Path]::GetPathRoot($Path)
+    }
+    catch {
+        return $false
+    }
+
+    if ([string]::IsNullOrWhiteSpace($pathRoot)) {
+        return $false
+    }
+    return $pathRoot.Length -ge 3
+}
+
 function Invoke-P0R1SanitizedDotNet {
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
@@ -1990,7 +2017,7 @@ function Invoke-P0R1SanitizedDotNet {
     $sanitizedEnvironment = Get-P0R1SanitizedDotNetEnvironment -Environment $originalEnvironment
     if ($OfficialPreflight) {
         if ([string]::IsNullOrWhiteSpace($GitExecutablePath) -or
-            -not [IO.Path]::IsPathFullyQualified($GitExecutablePath) -or
+            -not (Test-P0R1FullyQualifiedFileSystemPath -Path $GitExecutablePath) -or
             -not (Test-Path -LiteralPath $GitExecutablePath -PathType Leaf)) {
             throw [InvalidOperationException]::new(
                 'Official performance execution requires one absolute Git executable path.'

@@ -1199,6 +1199,61 @@ try {
     Assert-Equal -Actual $sharedCompilationProbe.ExitCode -Expected 0 -Message 'Shared compilation probe exit code'
     $sharedCompilationLines = @($sharedCompilationProbe.Output | Where-Object { $_.Trim() -ne '' })
     Assert-Equal -Actual $sharedCompilationLines[$sharedCompilationLines.Count - 1].Trim() -Expected 'false' -Message 'Shared compiler server disabled'
+
+    $officialGitExecutablePath = (
+        Resolve-Path `
+            -LiteralPath (Get-Command git.exe -CommandType Application).Source `
+            -ErrorAction Stop
+    ).Path
+    # Given: The existing fully qualified Git executable used by Official mode.
+    # When: A real sanitized Official-preflight child is launched.
+    $officialSanitizedProbe = Invoke-P0R1SanitizedDotNet `
+        -Arguments @('--version') `
+        -WorkingDirectory $realPrototype `
+        -GitExecutablePath $officialGitExecutablePath `
+        -OfficialPreflight
+    # Then: Windows PowerShell 5.1 accepts the path and the child succeeds.
+    Assert-Equal `
+        -Actual $officialSanitizedProbe.ExitCode `
+        -Expected 0 `
+        -Message 'Official sanitized child process exit code'
+    Assert-Contains `
+        -Actual $officialSanitizedProbe.Output `
+        -Expected '10.0.302' `
+        -Message 'Official sanitized child output'
+
+    $officialPathError =
+        'Official performance execution requires one absolute Git executable path.'
+    # Given: Official preflight omits the Git executable path.
+    # When/Then: The missing path fails with the exact typed contract.
+    Assert-ThrowsExact -Action {
+        Invoke-P0R1SanitizedDotNet `
+            -Arguments @('--version') `
+            -WorkingDirectory $realPrototype `
+            -OfficialPreflight
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage $officialPathError
+
+    $missingGitExecutablePath = Join-Path `
+        ([IO.Path]::GetTempPath()) `
+        ("p0r1-missing-git-" + [guid]::NewGuid().ToString('N') + '.exe')
+    foreach ($invalidGitExecutablePath in @(
+        '',
+        'git.exe',
+        'C:git.exe',
+        $missingGitExecutablePath
+    )) {
+        # Given: An empty, relative, drive-relative, or missing Git path.
+        # When/Then: Official preflight rejects it with the same exact contract.
+        Assert-ThrowsExact -Action {
+            Invoke-P0R1SanitizedDotNet `
+                -Arguments @('--version') `
+                -WorkingDirectory $realPrototype `
+                -GitExecutablePath $invalidGitExecutablePath `
+                -OfficialPreflight
+        } -ExpectedType 'System.InvalidOperationException' `
+            -ExpectedMessage $officialPathError
+    }
 }
 finally {
     foreach ($variableName in $ambientProbeNames) {
