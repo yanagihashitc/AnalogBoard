@@ -54,6 +54,16 @@
 - [x] Run one complete compatible-PC short dry-run and prove all eight distinct children plus the manifest remain non-official
 - [x] Complete pinned refactor/review, final audit, one commit, push, and todo archive
 
+## Batch 6: generated-tree-independent contract fixture copy
+
+依存: Batches 1–5
+
+- [x] Reproduce the Dell preflight failure with generated `bin/obj` content
+- [x] Copy source-drift fixtures without traversing generated directories
+- [x] Prove normal copy plus missing-source and nested-destination failures
+- [x] Complete focused verification and pinned refactor/review checks
+- [ ] Complete final audit, one commit, push, and todo archive
+
 ## Phase Checkpoint
 
 依存: Batches 1–5
@@ -67,10 +77,10 @@
 - [ ] Verify todo/archive, branch/remote parity, clean tracked worktree, and ignored generated payloads
 - [ ] Create the single `perf/phase0-scatter-prototype` to `main` PR and stop before merge
 
-Batch 5 is a preparatory correction discovered by the clean checkpoint audit.
-The committed development observations use bounded iteration counts and cannot
-produce the required independent 30/60-second windows, 10-minute soak, or raw
-metric evidence. It does not relax or replace any Phase Checkpoint threshold.
+Batches 5 and 6 are preparatory corrections discovered by checkpoint audits.
+Batch 5 supplies the mandatory timed evidence transaction. Batch 6 makes its
+contract preflight independent of ignored generated trees. Neither relaxes or
+replaces any Phase Checkpoint threshold.
 
 ## Scope guard
 

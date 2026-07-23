@@ -150,6 +150,146 @@ function Assert-ThrowsDynamicOutput {
     throw "Expected $ExpectedType matching dynamic output '$ExpectedMessagePattern'."
 }
 
+function Copy-P0R1FixtureSourceTree {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot
+    )
+
+    if (-not (Test-Path -LiteralPath $SourceRoot -PathType Container)) {
+        throw [IO.DirectoryNotFoundException]::new(
+            "P0-R1 fixture source tree is absent: $SourceRoot"
+        )
+    }
+
+    $trimCharacters = [char[]]@(
+        [IO.Path]::DirectorySeparatorChar,
+        [IO.Path]::AltDirectorySeparatorChar
+    )
+    $resolvedSource = (
+        Resolve-Path -LiteralPath $SourceRoot -ErrorAction Stop
+    ).Path.TrimEnd($trimCharacters)
+    $resolvedDestination = [IO.Path]::GetFullPath(
+        $DestinationRoot
+    ).TrimEnd($trimCharacters)
+    $pathComparison = [StringComparison]::OrdinalIgnoreCase
+    $sourcePrefix = $resolvedSource + [IO.Path]::DirectorySeparatorChar
+    if ($resolvedDestination.Equals($resolvedSource, $pathComparison) -or
+        $resolvedDestination.StartsWith($sourcePrefix, $pathComparison)) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 fixture destination must be outside the source tree.'
+        )
+    }
+
+    $null = New-Item `
+        -ItemType Directory `
+        -Path $resolvedDestination `
+        -Force
+    $pendingDirectories = [Collections.Generic.Queue[string]]::new()
+    $pendingDirectories.Enqueue($resolvedSource)
+    while ($pendingDirectories.Count -gt 0) {
+        $currentDirectory = $pendingDirectories.Dequeue()
+        foreach ($entry in @(
+            Get-ChildItem -LiteralPath $currentDirectory -Force |
+                Sort-Object -Property FullName
+        )) {
+            if ($entry.PSIsContainer) {
+                if ($entry.Name -ieq 'bin' -or $entry.Name -ieq 'obj') {
+                    continue
+                }
+                $pendingDirectories.Enqueue($entry.FullName)
+                continue
+            }
+
+            $relativePath = $entry.FullName.Substring(
+                $resolvedSource.Length + 1
+            )
+            $destinationPath = Join-Path $resolvedDestination $relativePath
+            $null = New-Item `
+                -ItemType Directory `
+                -Path (Split-Path -Parent $destinationPath) `
+                -Force
+            Copy-Item `
+                -LiteralPath $entry.FullName `
+                -Destination $destinationPath `
+                -Force
+        }
+    }
+}
+
+$fixtureCopyTestRoot = Join-Path `
+    ([IO.Path]::GetTempPath()) `
+    ("p0r1-fixture-copy-" + [guid]::NewGuid().ToString('N'))
+$fixtureCopySource = Join-Path $fixtureCopyTestRoot 'source'
+$fixtureCopyDestination = Join-Path $fixtureCopyTestRoot 'destination'
+try {
+    $trackedDirectory = Join-Path $fixtureCopySource 'tracked'
+    $generatedObjDirectory = Join-Path $fixtureCopySource 'tracked\obj\x64'
+    $generatedBinDirectory = Join-Path $fixtureCopySource 'tracked\bin\x64'
+    $null = New-Item -ItemType Directory -Path $trackedDirectory -Force
+    $null = New-Item -ItemType Directory -Path $generatedObjDirectory -Force
+    $null = New-Item -ItemType Directory -Path $generatedBinDirectory -Force
+    Set-Content `
+        -LiteralPath (Join-Path $trackedDirectory 'Keep.cs') `
+        -Value '// tracked source' `
+        -Encoding UTF8
+    Set-Content `
+        -LiteralPath (Join-Path $generatedObjDirectory 'Generated.cs') `
+        -Value '// generated obj source' `
+        -Encoding UTF8
+    Set-Content `
+        -LiteralPath (Join-Path $generatedBinDirectory 'Generated.dll') `
+        -Value 'generated binary placeholder' `
+        -Encoding UTF8
+
+    # Given: A source fixture containing a normal file and generated bin/obj trees.
+    # When: The source fixture tree is copied.
+    Copy-P0R1FixtureSourceTree `
+        -SourceRoot $fixtureCopySource `
+        -DestinationRoot $fixtureCopyDestination
+
+    # Then: The normal file is copied and both generated trees are excluded.
+    Assert-Equal `
+        -Actual (Test-Path -LiteralPath (Join-Path $fixtureCopyDestination 'tracked\Keep.cs') -PathType Leaf) `
+        -Expected $true `
+        -Message 'Fixture copy tracked source'
+    Assert-Equal `
+        -Actual (Test-Path -LiteralPath (Join-Path $fixtureCopyDestination 'tracked\obj') -PathType Container) `
+        -Expected $false `
+        -Message 'Fixture copy obj exclusion'
+    Assert-Equal `
+        -Actual (Test-Path -LiteralPath (Join-Path $fixtureCopyDestination 'tracked\bin') -PathType Container) `
+        -Expected $false `
+        -Message 'Fixture copy bin exclusion'
+
+    $missingFixtureSource = Join-Path $fixtureCopyTestRoot 'missing'
+    # Given: A missing source fixture root.
+    # When: The source fixture tree copy is requested.
+    # Then: The helper fails with the exact directory error.
+    Assert-ThrowsExact -Action {
+        Copy-P0R1FixtureSourceTree `
+            -SourceRoot $missingFixtureSource `
+            -DestinationRoot (Join-Path $fixtureCopyTestRoot 'missing-destination')
+    } -ExpectedType 'System.IO.DirectoryNotFoundException' -ExpectedMessage "P0-R1 fixture source tree is absent: $missingFixtureSource"
+
+    $nestedDestination = Join-Path $fixtureCopySource 'nested-destination'
+    # Given: A destination nested inside the source fixture root.
+    # When: The source fixture tree copy is requested.
+    # Then: The helper rejects recursive self-copy before creating the destination.
+    Assert-ThrowsExact -Action {
+        Copy-P0R1FixtureSourceTree `
+            -SourceRoot $fixtureCopySource `
+            -DestinationRoot $nestedDestination
+    } -ExpectedType 'System.InvalidOperationException' -ExpectedMessage 'P0-R1 fixture destination must be outside the source tree.'
+}
+finally {
+    Remove-Item `
+        -LiteralPath $fixtureCopyTestRoot `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue
+}
+
 $canonicalProfileRelativePath =
     'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json'
 $canonicalProfilePath = Join-Path $RepositoryRoot $canonicalProfileRelativePath
@@ -1275,8 +1415,12 @@ try {
     foreach ($rootFile in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering') -File -Force) {
         Copy-Item -LiteralPath $rootFile.FullName -Destination $sourceDestination
     }
-    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/src') -Destination $sourceDestination -Recurse
-    Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/tests') -Destination $sourceDestination -Recurse
+    Copy-P0R1FixtureSourceTree `
+        -SourceRoot (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/src') `
+        -DestinationRoot (Join-Path $sourceDestination 'src')
+    Copy-P0R1FixtureSourceTree `
+        -SourceRoot (Join-Path $RepositoryRoot 'prototypes/scatter-rendering/tests') `
+        -DestinationRoot (Join-Path $sourceDestination 'tests')
 
     $null = Assert-P0R1RepositoryDependencyContract -RepositoryRoot $sourceDriftRoot
     $sourcePropsPath = Join-Path $sourceDestination 'Directory.Build.props'
