@@ -1,0 +1,98 @@
+{
+  "schema_id": "analogboard.scatter-rendering.development-evidence.v1",
+  "run_id": "20260723_claude_combined_dev_01",
+  "scope": "P0-R1 Batch 4 hard-combined compatible-PC development smoke",
+  "development_only": true,
+  "official_acceptance": false,
+  "may_substitute_official": false,
+  "reference_profile_required_for_official_acceptance": "AB-PERF-REF-v1",
+  "source": {
+    "branch": "perf/phase0-scatter-prototype",
+    "base_commit": "17f42c3c10ed9356e00e9c3439a9bafacd570af5",
+    "state": "Post-PR review worktree; compatible-PC smoke is not official performance evidence",
+    "measured_source_tree_contract": "sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus .editorconfig, .gitattributes, global.json, and three linked fixtures; the canonical reference profile and six in-repository ancestor candidates use sha256(file) or <absent>)",
+    "measured_source_file_count": 61,
+    "measured_source_tree_sha256": "bf58f329785d69e1780c46d7d709af8679169c264d580de3b536551b2fb20964"
+  },
+  "machine": {
+    "computer_name": "DESKTOP-IK7JAL5",
+    "manufacturer": "Micro-Star International Co., Ltd.",
+    "model": "MS-7D91",
+    "processor": "Intel(R) Core(TM) i7-14700KF",
+    "memory_bytes": 68553388032,
+    "operating_system": "Microsoft Windows 11 Pro",
+    "operating_system_version": "10.0.26200"
+  },
+  "graphics": {
+    "adapter": "NVIDIA GeForce RTX 4070 Ti SUPER",
+    "driver_version": "32.0.15.9579",
+    "display_mode": "1920 x 1080",
+    "refresh_rate_hz": 100
+  },
+  "toolchain": {
+    "sdk": "10.0.302",
+    "desktop_runtime": "10.0.10",
+    "target": "net10.0-windows",
+    "configuration": "Release",
+    "architecture": "x64",
+    "external_nuget_packages": 0
+  },
+  "measurement_command": "dotnet run --project tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj --configuration Release -p:Platform=x64 --no-build --no-restore --disable-build-servers --",
+  "verification_command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-rendering/verify.ps1 -Mode Focused -Configuration Release -Architecture x64",
+  "verification": {
+    "status": "Pass",
+    "tests_total": 117,
+    "tests_passed": 117,
+    "tests_failed": 0,
+    "wrapper_contract": "Pass"
+  },
+  "fixture": {
+    "fixture_id": "AB-P0-R1-HARD-COMBINED-v1",
+    "aggregate_seed": 23063,
+    "gmi_seed_base": 27432,
+    "gmi_seed_rule": "base + payload_generation",
+    "event_count": 100001,
+    "scatter_size": [512, 512],
+    "gmi_size": [512, 512],
+    "selected_gmi_channel": "fsGMI",
+    "gmi_waveform_count": 100,
+    "gmi_samples_per_waveform": 2400,
+    "warmup_iterations": 3,
+    "measurement_iterations": 10,
+    "density_raster_contract_sha256": "c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33",
+    "gmi_raster_contract_sha256": "874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08"
+  },
+  "observation": {
+    "combined_iteration_ms_p95": 10.7408,
+    "combined_iteration_ms_max": 10.7408,
+    "scatter_delivered_update_rate_hz": 100.5432350992412,
+    "gmi_delivered_update_rate_hz": 100.5432350992412,
+    "gmi_max_update_interval_ms": 10.74,
+    "input_latency_ms_p95": 0.3333,
+    "input_latency_ms_max": 0.3333,
+    "allocated_bytes_per_iteration": 2424,
+    "scatter_publish_p99_ms": 0.0511,
+    "gmi_publish_p99_ms": 0.01,
+    "scatter_pending_frame_max": 1,
+    "scatter_pending_callback_max": 1,
+    "gmi_pending_frame_max": 1,
+    "gmi_pending_callback_max": 1,
+    "scatter_rendered_count": 13,
+    "gmi_rendered_count": 13,
+    "scatter_coalesced_count": 0,
+    "gmi_coalesced_count": 0,
+    "input_sentinel_count": 10,
+    "dispatcher_priority_contract": "Input_above_Background",
+    "scatter_raster_sha256": "255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780",
+    "gmi_raster_sha256": "d02e42158d6b89d39b342a307557dcc3013f908f49e6e7f3d4f43edbb4393c88",
+    "clock": "System.Diagnostics.Stopwatch",
+    "allocation_counter": "GC.GetAllocatedBytesForCurrentThread"
+  },
+  "limits": [
+    "This bounded smoke is development evidence on a compatible PC, not an official hard-gate run.",
+    "It does not replace the required AB-PERF-REF-v1 30-second warm-up and three independent 60-second measurements.",
+    "The ten-iteration window includes changed 100-by-2400 GMI production, extrema-preserving rasterization, bounded lease sealing, and WPF publication but is not an acceptance timing window.",
+    "Input probes are queued from a foreign thread after a scatter callback starts and before its WritePixels copy; they do not measure producer-side raster time as UI work.",
+    "The tracked file contains bounded synthetic summaries only; no raw waveform, event frame, or timing trace is committed."
+  ]
+}

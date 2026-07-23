@@ -1,0 +1,82 @@
+{
+  "schema_id": "analogboard.scatter-rendering.development-evidence.v1",
+  "run_id": "20260723_batch3_dev_smoke_01",
+  "scope": "P0-R1 Batch 3 compatible-PC development smoke",
+  "development_only": true,
+  "official_acceptance": false,
+  "reference_profile_required_for_official_acceptance": "AB-PERF-REF-v1",
+  "source": {
+    "branch": "perf/phase0-scatter-prototype",
+    "base_commit": "c7c9fc12c5a12b299a718026766835ca73f89d63",
+    "state": "Batch 3 pre-commit worktree; publication commit is recorded by the next checkpoint"
+  },
+  "machine": {
+    "computer_name": "DESKTOP-IK7JAL5",
+    "manufacturer": "Micro-Star International Co., Ltd.",
+    "model": "MS-7D91",
+    "processor": "Intel(R) Core(TM) i7-14700KF",
+    "memory_bytes": 68553388032,
+    "operating_system": "Microsoft Windows 11 Pro",
+    "operating_system_version": "10.0.26200"
+  },
+  "toolchain": {
+    "sdk": "10.0.302",
+    "desktop_runtime": "10.0.10",
+    "target": "net10.0-windows",
+    "configuration": "Release",
+    "architecture": "x64",
+    "external_nuget_packages": 0
+  },
+  "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-rendering/verify.ps1 -Mode Focused -Configuration Release -Architecture x64",
+  "verification": {
+    "status": "Pass",
+    "tests_total": 62,
+    "tests_passed": 62,
+    "tests_failed": 0,
+    "wrapper_contract": "Pass"
+  },
+  "fixture": {
+    "fixture_id": "AB-P0-R1-HARD-SCATTER-v1",
+    "seed": 23063,
+    "event_count": 100001,
+    "width": 512,
+    "height": 512,
+    "x_axis": {
+      "feature_index": 0,
+      "display_transform": "linear",
+      "raw_range": [-100000.0, 300000.0]
+    },
+    "y_axis": {
+      "feature_index": 1,
+      "display_transform": "asinh",
+      "raw_range": [-100000.0, 300000.0]
+    },
+    "warmup_iterations": 3,
+    "measurement_iterations": 10,
+    "scheduler_publication_iterations": 1000,
+    "raster_contract_sha256": "c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33"
+  },
+  "observation": {
+    "frame_ms_p95": 8.2056,
+    "frame_ms_max": 8.2056,
+    "allocated_bytes_per_frame": 64,
+    "core_scheduler_test_double_submit_p99_ms": 0.0001,
+    "poster_identity": "single_slot_test_double",
+    "pending_work_max": 1,
+    "logical_pending_work_max": 1,
+    "poster_accepted_callbacks": 1000,
+    "poster_completed_callbacks": 1000,
+    "poster_aborted_callbacks": 0,
+    "coalesced_frames": 0,
+    "raster_sha256": "255bf3f549baa92d87a65111c37bed815f0b74c3452a387c6a1cc6d168b61780",
+    "clock": "System.Diagnostics.Stopwatch",
+    "allocation_counter": "GC.GetAllocatedBytesForCurrentThread"
+  },
+  "limits": [
+    "This smoke is a correctness and development observation only.",
+    "It is not an official hard-gate run and does not replace AB-PERF-REF-v1.",
+    "The scheduler submit p99 uses the named single-slot test double and is not a Dispatcher publication measurement.",
+    "It does not include the independent 30-second warm-up, three 60-second runs, combined GMI/UI fairness, or 10-minute soak.",
+    "The tracked file contains bounded summaries only; no raw frame or verbose timing trace is committed."
+  ]
+}

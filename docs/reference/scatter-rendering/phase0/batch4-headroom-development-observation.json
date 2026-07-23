@@ -1,0 +1,82 @@
+{
+  "schema_id": "analogboard.scatter-rendering.development-evidence.v1",
+  "run_id": "20260723_claude_headroom_dev_01",
+  "scope": "P0-R1 Batch 4 three-tile compatible-PC headroom observation",
+  "development_only": true,
+  "official_acceptance": false,
+  "may_substitute_hard_gate": false,
+  "reference_profile_required_for_official_acceptance": "AB-PERF-REF-v1",
+  "source": {
+    "branch": "perf/phase0-scatter-prototype",
+    "base_commit": "17f42c3c10ed9356e00e9c3439a9bafacd570af5",
+    "state": "Post-PR review worktree; compatible-PC smoke is not official performance evidence",
+    "measured_source_tree_contract": "sha256(ordinal relative-path=sha256(file) LF; every non-bin/obj prototype file including five tracked ancestor-search terminators, plus .editorconfig, .gitattributes, global.json, and three linked fixtures; the canonical reference profile and six in-repository ancestor candidates use sha256(file) or <absent>)",
+    "measured_source_file_count": 61,
+    "measured_source_tree_sha256": "bf58f329785d69e1780c46d7d709af8679169c264d580de3b536551b2fb20964"
+  },
+  "machine": {
+    "computer_name": "DESKTOP-IK7JAL5",
+    "manufacturer": "Micro-Star International Co., Ltd.",
+    "model": "MS-7D91",
+    "processor": "Intel(R) Core(TM) i7-14700KF",
+    "memory_bytes": 68553388032,
+    "operating_system": "Microsoft Windows 11 Pro",
+    "operating_system_version": "10.0.26200"
+  },
+  "graphics": {
+    "adapter": "NVIDIA GeForce RTX 4070 Ti SUPER",
+    "driver_version": "32.0.15.9579",
+    "display_mode": "1920 x 1080",
+    "refresh_rate_hz": 100
+  },
+  "toolchain": {
+    "sdk": "10.0.302",
+    "desktop_runtime": "10.0.10",
+    "target": "net10.0-windows",
+    "configuration": "Release",
+    "architecture": "x64",
+    "external_nuget_packages": 0
+  },
+  "measurement_command": "dotnet run --project tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj --configuration Release -p:Platform=x64 --no-build --no-restore --disable-build-servers --",
+  "verification_command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/scatter-rendering/verify.ps1 -Mode Focused -Configuration Release -Architecture x64",
+  "verification": {
+    "status": "Pass",
+    "tests_total": 117,
+    "tests_passed": 117,
+    "tests_failed": 0,
+    "wrapper_contract": "Pass"
+  },
+  "fixture": {
+    "fixture_id": "AB-P0-R1-HEADROOM-v1",
+    "aggregate_seed": 31801,
+    "gmi_seed": 36170,
+    "event_count": 131072,
+    "tile_size": [1024, 1024],
+    "tile_count": 3,
+    "scatter_tile_count": 2,
+    "gmi_tile_count": 1,
+    "selected_gmi_channel": "fsGMI",
+    "gmi_waveform_count": 100,
+    "gmi_samples_per_waveform": 2400,
+    "warmup_iterations": 1,
+    "measurement_iterations": 3,
+    "density_raster_contract_sha256": "c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33",
+    "gmi_raster_contract_sha256": "874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08"
+  },
+  "observation": {
+    "three_tile_iteration_ms_p95": 33.6901,
+    "three_tile_iteration_ms_max": 33.6901,
+    "allocated_bytes_per_iteration": 192,
+    "scatter_a_raster_sha256": "0ffd755ea97e90ab1f8a186cc20e58f30378196be0d6ba3b1d068cb5b59afa45",
+    "scatter_b_raster_sha256": "9c1c255558b089f96eeb6336c55b0fbe254b05f47ea815c6e230ca05e8b31b17",
+    "gmi_raster_sha256": "417e8cf7f21ab09680e98a2aa6b7aabd0479a3457a52e55f15b6b3d41bd1156b",
+    "clock": "System.Diagnostics.Stopwatch",
+    "allocation_counter": "GC.GetAllocatedBytesForCurrentThread"
+  },
+  "limits": [
+    "This is the plan-defined 131072-event, 1024-square, three-tile headroom observation only.",
+    "It cannot replace, waive, or redefine either hard scenario or the AB-PERF-REF-v1 requirement.",
+    "The three-iteration development window is deliberately separate from official timing windows and the ten-minute soak.",
+    "The tracked file contains bounded synthetic summaries only; no raw waveform, event frame, or timing trace is committed."
+  ]
+}

@@ -1,4 +1,18 @@
 .gitignore text eol=lf
+/.gitattributes text eol=lf
+/.editorconfig text eol=lf
+/global.json text eol=lf
+/prototypes/scatter-rendering/** text eol=lf
+/docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json text eol=lf
+/docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json text eol=lf
+/docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json text eol=lf
+/docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json text eol=lf
+/Directory.Build.props text eol=lf
+/Directory.Build.targets text eol=lf
+/Directory.Packages.props text eol=lf
+/prototypes/Directory.Build.props text eol=lf
+/prototypes/Directory.Build.targets text eol=lf
+/prototypes/Directory.Packages.props text eol=lf
 
 # Preserve accepted third-party notices byte-for-byte, including upstream
 # whitespace, so their pinned SHA-256 identities survive checkout.

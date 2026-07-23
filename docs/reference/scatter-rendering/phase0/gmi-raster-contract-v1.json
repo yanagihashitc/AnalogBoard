@@ -1,0 +1,33 @@
+{
+  "contract_id": "AB-GMI-RASTER-v1",
+  "scope": "P0-R1 prototype display only; not a storage or downstream contract",
+  "layout": "waveform-major [waveform,sample]",
+  "selected_channel_order": ["fsGMI", "ssGMI", "flGMI", "dGMI", "bfGMI"],
+  "x_orientation": "sample index increases left to right",
+  "y_orientation": "higher display value maps upward through one density-raster Y flip",
+  "horizontal_sampling": "each output column preserves the minimum and maximum over its proportional source-sample interval; duplicate extrema count once; upsampling uses the nearest source sample",
+  "coverage": "one or two extrema points per waveform per output column",
+  "density_raster_contract_sha256": "c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33",
+  "oracle": {
+    "waveform_count": 2,
+    "samples_per_waveform": 8,
+    "values": [0, 3, 1, 1, 2, 2, 0, 3, 0, 0, 1, 2, 2, 3, 3, 3],
+    "display_minimum": 0,
+    "display_maximum": 3,
+    "width": 4,
+    "height": 4,
+    "expected_source_coverage": [2, 0, 0, 1, 0, 2, 0, 0, 0, 1, 2, 0, 1, 0, 1, 2],
+    "expected_bgra_hex": "8c9121ff17110dff8c9121ff25e7fdff17110dff8c9121ff25e7fdff17110dff17110dff25e7fdff17110dff17110dff25e7fdff17110dff17110dff8c9121ff",
+    "expected_bgra_sha256": "4a422d631aef5ae275ea821e7fb6c2224452b53e5743b36bc7e917868958f419"
+  },
+  "upsample_oracle": {
+    "waveform_count": 1,
+    "samples_per_waveform": 2,
+    "values": [0, 3],
+    "display_minimum": 0,
+    "display_maximum": 3,
+    "width": 4,
+    "height": 4,
+    "expected_source_coverage": [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "schema_id": "analogboard.scatter-rendering.renderer-decision.v1",
+  "decision_id": "P0-R1-RENDERER-v1",
+  "status": "accepted_at_phase_checkpoint",
+  "scope": "P0-R1 bounded visualization prototype only",
+  "development_only": false,
+  "official_acceptance": true,
+  "production_throughput_guarantee": false,
+  "selected_candidate_id": "wpf-writeablebitmap-preallocated",
+  "dependency_contract": {
+    "framework": "WPF in Microsoft.WindowsDesktop.App 10.0.10",
+    "external_nuget_package_count": 0,
+    "manifest_path": "docs/dependencies/analogboard-p0-r1-dependencies.json",
+    "manifest_sha256": "f1baebfb5cd4334563f7ab6b42ed3f6bf867e8d5f6199de62aa6effbeb6af534",
+    "license_name": "MIT",
+    "license_sha256": "7f6839a61ce892b79c6549e2dc5a81fdbd240a0b260f8881216b45b7fda8b45d",
+    "third_party_notices_sha256": "deb4427a295e1ed474b0d81c5a0d972c1b550b9a715cda939cdfa9236b1b418f"
+  },
+  "selected_path": {
+    "framework_surface": "System.Windows.Media.Imaging.WriteableBitmap",
+    "pixel_contract": "preallocated opaque BGRA32",
+    "publication_api": "WritePixels",
+    "rasterization": "managed CPU density and GMI rasterization outside per-event WPF objects",
+    "composition": "WPF compositor; functional correctness does not depend on GPU availability",
+    "fallback": "retain the same BGRA32 and WritePixels seam when WPF selects software composition",
+    "maintenance_boundary": "Core owns deterministic raster buffers; the WPF adapter owns only dispatcher scheduling and bitmap copy",
+    "phase2_boundary": "port the Core contracts and thin WPF adapter; do not port prototype observations or promote them to throughput guarantees"
+  },
+  "candidates": [
+    {
+      "candidate_id": "wpf-writeablebitmap-preallocated",
+      "disposition": "accepted_at_phase_checkpoint",
+      "correctness": "deterministic density and GMI raster hashes plus owner-thread bitmap copy pass",
+      "performance": "official AB-PERF-REF-v1 hard scatter and combined runs pass independently 3/3 each; the ten-minute soak passes; headroom remains a separate observation",
+      "dependency_license": "built-in WPF; zero external NuGet; installed .NET MIT and third-party notice hashes pinned",
+      "cpu_gpu_behavior": "CPU binning/rasterization and CPU-to-bitmap copy; WPF controls final composition",
+      "fallback": "same bounded BGRA32 WritePixels seam under framework-selected software composition",
+      "maintenance": "small managed adapter with no unsafe pointer lifetime or third-party renderer lifecycle",
+      "phase2_portability": "directly portable as the Core raster contract plus a thin WPF adapter; prototype observations remain excluded"
+    },
+    {
+      "candidate_id": "wpf-writeablebitmap-direct-backbuffer",
+      "disposition": "rejected_for_phase0",
+      "correctness": "would require explicit Lock/Unlock, dirty-rectangle, stride, and pointer-lifetime proofs not needed by the accepted copy seam",
+      "performance": "no measured need to accept unsafe lifetime complexity before the reference-PC checkpoint",
+      "dependency_license": "built-in WPF; zero external NuGet",
+      "cpu_gpu_behavior": "CPU writes through a mutable back buffer; WPF controls final composition",
+      "fallback": "selected WritePixels candidate",
+      "maintenance": "higher unsafe and exception-cleanup burden",
+      "phase2_portability": "would require new unsafe lifetime and recovery contracts before Phase 2 adoption"
+    },
+    {
+      "candidate_id": "wpf-vector-or-rendertargetbitmap-events",
+      "disposition": "rejected_contract_mismatch",
+      "correctness": "per-event WPF objects conflict with the density-raster and bounded-history contract",
+      "performance": "not admitted to performance comparison because it violates the frozen seam",
+      "dependency_license": "built-in WPF; zero external NuGet",
+      "cpu_gpu_behavior": "framework-retained visual objects and composition obscure the fixed raster workload",
+      "fallback": "selected preallocated raster candidate",
+      "maintenance": "object-lifecycle and retained-visual complexity scale with displayed events",
+      "phase2_portability": "not portable to Phase 2 because it violates the bounded raster and no-per-event-object seam"
+    }
+  ],
+  "evidence": {
+    "density_raster_contract_path": "docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json",
+    "density_raster_contract_sha256": "c6015c919cc79e7c746f4b6c0d8b42672e4165cfc0253663bbfe89e04121cc33",
+    "gmi_raster_contract_path": "docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json",
+    "gmi_raster_contract_sha256": "874fe6b9ea252f7063200655d584e549b5a2fc6e3587693b1b23b5041a52aa08",
+    "combined_development_path": "docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json",
+    "combined_development_sha256": "dd4d87c0fa7312787d91392c7143e0cda1aa43dd774556be2b9ef5f5ed83e48b",
+    "headroom_development_path": "docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json",
+    "headroom_development_sha256": "3d0b54ad113c716a4a32b41dd0e3a60c41fecb6318379b5665d9c19c1ccd1b2b",
+    "official_performance_path": "docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json",
+    "official_performance_sha256": "cf50842df072edf53617e5ef98b4d194cbb30490ffac5c9431fb890d9841e328"
+  },
+  "stop_conditions": [
+    "Any external renderer or rendering/test/benchmark package requires a task_management amendment before download or implementation.",
+    "Any .NET SDK, Desktop Runtime, target framework, Release x64, or offline restore pin change stops this decision.",
+    "A miss on AB-PERF-REF-v1 cannot be bypassed by this compatible-PC development evidence or by the headroom observation."
+  ],
+  "residual_limits": [
+    "Official acceptance is limited to the frozen P0-R1 fixtures, AB-PERF-REF-v1, AB-PERF-RUNNER-v1, and the recorded source revision.",
+    "The headroom result remains observation-only and does not substitute for a hard scatter, combined, or soak gate.",
+    "This decision selects the Phase 2 rendering seam and does not certify a production shell, acquisition isolation, or production throughput."
+  ]
+}

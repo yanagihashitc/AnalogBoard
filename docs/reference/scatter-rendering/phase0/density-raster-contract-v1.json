@@ -1,0 +1,35 @@
+{
+  "contract_id": "AB-DENSITY-RASTER-v1",
+  "pixel_format": "Bgra32",
+  "alpha": 255,
+  "orientation": {
+    "source": "row-major y-min-first",
+    "destination": "top-down",
+    "mapping": "destination_y = height - 1 - source_y"
+  },
+  "normalization": "linear integer interpolation against declared maximum",
+  "background_argb": "#FF0D1117",
+  "palette_argb": [
+    "#FF440154",
+    "#FF3B528B",
+    "#FF21918C",
+    "#FF5EC962",
+    "#FFFDE725"
+  ],
+  "oracle": {
+    "width": 5,
+    "height": 3,
+    "maximum_count": 8,
+    "source_counts": [
+      0, 1, 2, 3, 4,
+      5, 6, 7, 8, 0,
+      8, 4, 0, 1, 7
+    ],
+    "expected_bgra_hex": "25e7fdff8c9121ff17110dff702a40ff44d8aeff77ad40ff62c95eff44d8aeff25e7fdff17110dff17110dff702a40ff8b523bff8c722eff8c9121ff",
+    "expected_bgra_sha256": "c8a77a1763f021806b01ed9c2503251e1bf8c71884888bc0ba022b3960252de7"
+  },
+  "zero_raster_sha256": {
+    "512x512": "4e256ce791cdeb9fe2cf1f8e7b1b46fba9ed073cb5faaf822236e129104add99",
+    "1024x1024": "f1eb9a7db54a39b63c7b88184c3ed2d0855e254ef5845e2b40f5cdb1398443b4"
+  }
+}

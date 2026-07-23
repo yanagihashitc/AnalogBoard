@@ -8,3 +8,36 @@ trim_trailing_whitespace = true
 
 [*.md]
 trim_trailing_whitespace = false
+
+[.editorconfig]
+end_of_line = lf
+
+[.gitattributes]
+end_of_line = lf
+
+[global.json]
+end_of_line = lf
+
+[prototypes/scatter-rendering/**]
+end_of_line = lf
+
+[docs/reference/scatter-rendering/phase0/*.json]
+end_of_line = lf
+
+[Directory.Build.props]
+end_of_line = lf
+
+[Directory.Build.targets]
+end_of_line = lf
+
+[Directory.Packages.props]
+end_of_line = lf
+
+[prototypes/Directory.Build.props]
+end_of_line = lf
+
+[prototypes/Directory.Build.targets]
+end_of_line = lf
+
+[prototypes/Directory.Packages.props]
+end_of_line = lf

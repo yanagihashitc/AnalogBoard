@@ -1,0 +1,7 @@
+# P0-R1 ancestor response-file search terminator and user-extension isolation.
+/p:ImportUserLocationsByWildcardBeforeMicrosoftCommonProps=false
+/p:ImportUserLocationsByWildcardAfterMicrosoftCommonProps=false
+/p:ImportUserLocationsByWildcardBeforeMicrosoftCommonTargets=false
+/p:ImportUserLocationsByWildcardAfterMicrosoftCommonTargets=false
+/p:ImportUserLocationsByWildcardBeforeMicrosoftCSharpTargets=false
+/p:ImportUserLocationsByWildcardAfterMicrosoftCSharpTargets=false

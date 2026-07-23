@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ApplicationName" xml:space="preserve">
+    <value>AnalogBoard Scatter Rendering Prototype</value>
+  </data>
+  <data name="HarnessOwnerDispatcherRequired" xml:space="preserve">
+    <value>Combined visualization harness access must run on its owner dispatcher.</value>
+  </data>
+  <data name="HarnessCopyBufferLengthMismatch" xml:space="preserve">
+    <value>Combined visualization copy destination must equal {0} bytes; actual: {1}.</value>
+  </data>
+  <data name="HarnessFrameShapeMismatch" xml:space="preserve">
+    <value>{0} raster frame must match surface size {1}x{2}; actual: {3}x{4}.</value>
+  </data>
+  <data name="RequiredPrototypeResourceAbsent" xml:space="preserve">
+    <value>Required prototype resource is absent: {0}.</value>
+  </data>
+  <data name="StatusReady" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="SurfaceBufferLengthMismatch" xml:space="preserve">
+    <value>BGRA publication length must equal {0} bytes; actual: {1}.</value>
+  </data>
+  <data name="SurfaceDisposed" xml:space="preserve">
+    <value>Raster surface has been disposed.</value>
+  </data>
+  <data name="SurfaceGenerationNotIncreasing" xml:space="preserve">
+    <value>Publication generation must increase monotonically; previous: {0}; actual: {1}.</value>
+  </data>
+  <data name="SurfaceHeightOutOfRange" xml:space="preserve">
+    <value>Raster surface height must be between 1 and {0} inclusive; actual: {1}.</value>
+  </data>
+  <data name="SurfaceOwnerMustBeSta" xml:space="preserve">
+    <value>Raster surface must be created on an STA UI thread.</value>
+  </data>
+  <data name="SurfaceWidthOutOfRange" xml:space="preserve">
+    <value>Raster surface width must be between 1 and {0} inclusive; actual: {1}.</value>
+  </data>
+  <data name="SurfaceWrongThread" xml:space="preserve">
+    <value>Raster surface publication must run on its owner UI thread.</value>
+  </data>
+</root>

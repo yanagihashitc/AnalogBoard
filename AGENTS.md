@@ -13,9 +13,9 @@ This file is automatically read before starting work.
 - **横断ロードマップ**: [../task_management/260710-cross-repo-execution-roadmap.html](../task_management/260710-cross-repo-execution-roadmap.html)
   — AnalogBoard / gcsa / sys_app / gain_scope の実行順・現在 phase/status・同期 gate と証拠の正規インデックス。詳細設計の正本は各リポジトリのプランに置く
 
-**フェーズ0実機確認と地固めの現在地（2026-07-22）**：r7/r18直結A/B、スイッチ区間A/B、D17確認は完了し、r18相当全4runは`queue_full_timeout`でD4 gate未成立。旧build＋driver `1.2.3.20`のGate Bはlogが34/34 Type CだがFL/FH data integrityとtelemetry CSV／summary不足で全体未判定。新driver `1.3.0.4`のSet→automatic wait EP4 failure（3/3）は、10ms polling remediation buildでも実機3/3 Fail（poll-rate仮説棄却）ののち、**2026-07-16のDFX A-B-A（session `20260716_111343`）でDFXが因果要因と確定**（A=3/3 fail→B=NoDfxでlow/high Type C全Pass→復元A=再発）。**owner decision D23でNoDfx（`WdfDirectedPowerTransitionEnable=0`）を正式採用**。判定build `r7-driver-telemetry-graceful-stop-20260716T1314JST`（`TELEMETRY_CSV_READY_1314`・hash pin済み）による**NoDfx dual-driver session（D23 session `20260716_2`）は2026-07-16〜17に実施済み**：N leg＝N0／N-smoke Pass＋30 valid high cycle非formal aggregate（EP4 failure 0・rearm中央値15ms／max 16ms）、R＝`1.2.3.20`へrollback Pass、B leg＝初回pre-trigger EP4 failure（`UsbdStatus=0xC0000011`）→Type B drain stall→承認済みUSB replug後recovery 33/33 Type Cで、**ownerがGate Bを条件付きPassとして閉鎖（2026-07-17 13:02 JST）**。legacy re-arm baseline取得済み（B-formal p50 15／p99 32／max 32ms）。旧driver側EP4 failure／Type B stall（DFX registryはdriver default状態で発生・因果未確定）はopen reliability note——D23だけで全故障解消とは言えない。session証跡は`artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/TELEMETRY_CSV_READY_1314/evidence/session/20260716_2/`、2026-07-17 characterization＋USBPcap captureは`artifacts/field-session/2026-07-17-characterization/`。注意：新driver INFはインストール毎に`WdfDirectedPowerTransitionEnable=1`を上書きするため、driver入替後はNoDfx再適用＋`dfx_status.ps1`検証が必須。**2026-07-19のowner gateでD4＝「r7移植例外」承認・N leg formal soak＝phase 4の100run soakへ集約が確定**（実機gate・owner gateは全決着）。USBPcap P0-C1〜C3はcompleted。**P0-S1/P0-S2は2026-07-22 completed**（D19保護込み accepted gcsa 往復合格、round-robin採用。PR #4／#5 merged・中央独立再検証Pass）。次のrepository action：**P0-R1 preparatory PR**——Phase 0の残作業はP0-C4／初期録画コーパス、scatter描画プロトタイプ（UX-04／FR-13）、D17対応のgolden regression、A-4b／Frozen v1。フェーズ1着手はFrozen v1後。hardwareはdriver `1.2.3.20`のまま。
+**フェーズ0実機確認と地固めの現在地（2026-07-22）**：r7/r18直結A/B、スイッチ区間A/B、D17確認は完了し、r18相当全4runは`queue_full_timeout`でD4 gate未成立。旧build＋driver `1.2.3.20`のGate Bはlogが34/34 Type CだがFL/FH data integrityとtelemetry CSV／summary不足で全体未判定。新driver `1.3.0.4`のSet→automatic wait EP4 failure（3/3）は、10ms polling remediation buildでも実機3/3 Fail（poll-rate仮説棄却）ののち、**2026-07-16のDFX A-B-A（session `20260716_111343`）でDFXが因果要因と確定**（A=3/3 fail→B=NoDfxでlow/high Type C全Pass→復元A=再発）。**owner decision D23でNoDfx（`WdfDirectedPowerTransitionEnable=0`）を正式採用**。判定build `r7-driver-telemetry-graceful-stop-20260716T1314JST`（`TELEMETRY_CSV_READY_1314`・hash pin済み）による**NoDfx dual-driver session（D23 session `20260716_2`）は2026-07-16〜17に実施済み**：N leg＝N0／N-smoke Pass＋30 valid high cycle非formal aggregate（EP4 failure 0・rearm中央値15ms／max 16ms）、R＝`1.2.3.20`へrollback Pass、B leg＝初回pre-trigger EP4 failure（`UsbdStatus=0xC0000011`）→Type B drain stall→承認済みUSB replug後recovery 33/33 Type Cで、**ownerがGate Bを条件付きPassとして閉鎖（2026-07-17 13:02 JST）**。legacy re-arm baseline取得済み（B-formal p50 15／p99 32／max 32ms）。旧driver側EP4 failure／Type B stall（DFX registryはdriver default状態で発生・因果未確定）はopen reliability note——D23だけで全故障解消とは言えない。session証跡は`artifacts/field-session/packages/r7-driver-ep4-polling-20260715T1618JST-source-package/TELEMETRY_CSV_READY_1314/evidence/session/20260716_2/`、2026-07-17 characterization＋USBPcap captureは`artifacts/field-session/2026-07-17-characterization/`。注意：新driver INFはインストール毎に`WdfDirectedPowerTransitionEnable=1`を上書きするため、driver入替後はNoDfx再適用＋`dfx_status.ps1`検証が必須。**2026-07-19のowner gateでD4＝「r7移植例外」承認・N leg formal soak＝phase 4の100run soakへ集約が確定**（実機gate・owner gateは全決着）。USBPcap P0-C1〜C3はcompleted。**P0-S1/P0-S2は2026-07-22 completed**（D19保護込み accepted gcsa 往復合格、round-robin採用。PR #4／#5 merged・中央独立再検証Pass）。現在のrepository actionは**P0-R1 active execution**（scatter描画プロトタイプ、UX-04／FR-13）。Phase 0の残作業はP0-C4／初期録画コーパス、D17対応のgolden regression、A-4b／Frozen v1。フェーズ1着手はFrozen v1後。hardwareはdriver `1.2.3.20`のまま。
 
-**P0-R1 preparatory 状態（roadmap v1.42・2026-07-22）**：次scopeは `P0-R1`（bounded real-time visualization path decision、FR-02／FR-13／UX-04／UX-20）で `planned`。本 preparatory PR は scope-neutral checkpoint router と versioned P0-S／P0-R1 profileを先行導入するだけで、P0-R1実装・`goal.md` dispatch・fixed `prompt.md`変更は行わない。merge後に `task_management` が .NET 10 owner amendment と P0-R1契約を正規planへauthoringし、profile path／Git blob SHAをpinした正式goalをdispatchする。それまではRun／Resume／Advanceを使わない。
+**P0-R1 active execution（roadmap v1.45・Draft 4.5・2026-07-22）**：現scopeは `P0-R1`（bounded real-time visualization path decision、FR-02／FR-13／UX-04／UX-20）。preparatory PR #6はmerged、`AB-DISPLAY-TRANSFORM-v1`を含むDraft 4.5とprofile blobをpinした正式`goal.md`はdispatch済みで、fixed `prompt.md`のResumeから実行する。.NET SDK `10.0.302`／Desktop Runtime `10.0.10`、target `net10.0-windows`をexact pinし、P0-R1のDefinition of doneとphase PR作成まで`goal.md`のbatch checkpointを継続する。
 
 ## Branch Strategy
 
@@ -45,7 +45,7 @@ This file is automatically read before starting work.
 
 | # | 決定 |
 |---|---|
-| D1 | UI = C#/.NET 8 WPF ＋ ネイティブ C++17 コア（C ABI 境界） |
+| D1 | UI = C#/.NET 10 WPF ＋ ネイティブ C++17 コア（C ABI 境界） |
 | D4 | 移植ベースライン = **r7（移植例外・2026-07-19 owner gate通過）**。当初の「r18合格後にdev」は2026-07-14のr18 gate Fail（4/4 `queue_full_timeout`）で不成立となり、owner gateでr7移植例外を承認。dev限定回復policyはheader単位でTier2回帰つきcherry-pick可。devの修正・再gateはcritical path外の任意作業 |
 | D5/D6 | 本アプリが A/H/W を算出・記録し、下流は再計算しない。gate 軸 = FL 8ch×{A,H,W} の24カラム |
 | D9/D10 | 主出力 = gcsaネイティブ Zarr ストア（float64 特徴量＋生FH＋生FL）。生FL保全は既定ON |
@@ -179,15 +179,15 @@ Outputs produced by this app are consumed by `../sys_app`. When investigating ho
 
 ## Windows Build/Test Execution
 
-- When running Windows build/test commands from an agent, always execute via `scripts\run_with_vsdevcmd.bat`
-- This wrapper initializes `VsDevCmd.bat` and then runs the requested command in x64 developer environment
-- この環境（WSL）からのビルドは **`msvc-build` スキル**（`.claude/skills/msvc-build/scripts/build.sh`）を使う。WSL→cmd.exe→VsDevCmd のブリッジと多重クォートを吸収する
+- legacy C++ のWindows build/testは `scripts\run_with_vsdevcmd.bat` 経由で実行する。このwrapperは`VsDevCmd.bat`を初期化してx64 developer environmentでcommandを実行する
+- legacy C++ のビルドには **`msvc-build` スキル**（`.claude/skills/msvc-build/scripts/build.sh`）を使う。WSL→cmd.exe→VsDevCmd のブリッジと多重クォートを吸収する
   - Solution build: `build.sh app|rebuild|clean [Debug|Release]`（`AnalogBoard_TestApp.sln` / 構成 Debug|x64, Release|x64 / プロジェクト `AnalogBoard_TestApp`, `AnalogBoard_Dll`）
   - Unit tests: `build.sh test` = `AnalogBoard_UnitTest\build_test.bat`（cl で ~10 スイートをビルド＆実行。**sln 外。msbuild ターゲットではない**）
   - Coverage: `build.sh coverage` = `scripts\run_coverage.bat`（OpenCppCoverage, 80% 閾値）
+- P0-R1の.NET WPF standalone prototypeは`net10.0-windows`、SDK `10.0.302`／Desktop Runtime `10.0.10`固定。`msvc-build`スキルを使わず、`scripts/scatter-rendering/verify.ps1`を`goal.md`指定のPowerShell commandで実行する
 - 素の msbuild 例（ソリューション）:
   - `cmd /d /c "scripts\run_with_vsdevcmd.bat msbuild AnalogBoard_TestApp.sln /p:Configuration=Debug /p:Platform=x64 /m:1"`
-- 新アプリ（.NET 8 / C++コア）のビルド手順はフェーズ1のプロジェクト雛形確定時に本節へ追記する
+- production新アプリ（.NET 10 / C++コア）のビルド手順はフェーズ1のプロジェクト雛形確定時に本節へ追記する
 
 ## Implementation Tracking
 

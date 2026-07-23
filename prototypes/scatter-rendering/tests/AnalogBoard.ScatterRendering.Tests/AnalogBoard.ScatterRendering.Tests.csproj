@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <RuntimeFrameworkVersion>10.0.10</RuntimeFrameworkVersion>
+    <RollForward>Disable</RollForward>
+    <PlatformTarget>x64</PlatformTarget>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AnalogBoard.ScatterRendering.Core\AnalogBoard.ScatterRendering.Core.csproj" />
+    <ProjectReference Include="..\..\src\AnalogBoard.ScatterRendering.Wpf\AnalogBoard.ScatterRendering.Wpf.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\..\docs\reference\scatter-rendering\phase0\display-transform-contract-v1.json"
+          Link="Fixtures\display-transform-contract-v1.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\..\docs\reference\scatter-rendering\phase0\density-raster-contract-v1.json"
+          Link="Fixtures\density-raster-contract-v1.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\..\docs\reference\scatter-rendering\phase0\gmi-raster-contract-v1.json"
+          Link="Fixtures\gmi-raster-contract-v1.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
