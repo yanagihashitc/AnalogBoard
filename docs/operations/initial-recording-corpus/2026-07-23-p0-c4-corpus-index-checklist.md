@@ -10,7 +10,7 @@ Created: 2026-07-23
 - [x] Batch 2: full 3,534-file discovery, readability, size, and streaming SHA-256 sweep
 - [x] Batch 3: per-run FL/FH and cfg/telemetry/capture clock/correspondence evidence
 - [x] Batch 4: availability/restore, locator/owner/retention, at-rest, and recovery procedure
-- [ ] Batch 5: tracked index closeout and phase-level deterministic verification
+- [x] Batch 5: tracked index closeout and phase-level deterministic verification
 - [ ] Phase checkpoint: acceptance conditions 1–6 proven and one PR created
 
 The non-binding recommended split is retained because it already isolates the
@@ -106,15 +106,49 @@ schema/policy update; the validator does not accept a speculative future state.
 Availability validation pins the contract/manifest and its read-only verification
 method but does not duplicate counts or total bytes.
 
+## Batch 5 test perspectives
+
+| Case ID | Input / Precondition | Perspective | Expected Result | Notes |
+|---|---|---|---|---|
+| C5-N-01 | Exact closeout plus all 13 pinned metadata/tool sources | Equivalence — normal | Typed closeout validates | No asset read in metadata seam |
+| C5-N-02 | Valid sources with live phase operations injected once each | Equivalence — normal | Manifest, relationships, and custody all compose | Verify-only; no tracked write |
+| C5-N-03 | Same semantic closeout keys arrive in different order | Equivalence — determinism | Canonical UTF-8 JSON is byte-identical | Sorted keys, one terminal LF |
+| C5-N-04 | Frozen P0-C1–C3 README/manifest/scenarios plus P0-C4 capture binding | Equivalence — historical overlap | Prior index remains distinct and linked | Historical `P0-C4 planned` text is not current status |
+| C5-N-05 | Two live compositions use unchanged generated metadata | Equivalence — repeatability | Both byte comparisons pass | Asset payload is never cached |
+| C5-B-01 | Schema version 1 vs NULL/bool/string/0/2 | Boundary — exact/min-1/+1/type/NULL | Only integer 1 passes | No implicit default |
+| C5-B-02 | Six ordered acceptance mappings vs five/seven/duplicate/reordered | Boundary — exact count ±1/order | Exact six-condition map required | Condition prose stays in plan |
+| C5-B-03 | Thirteen source roles vs twelve/fourteen/duplicate | Boundary — exact count ±1 | Exact role set required | No closeout self-hash cycle |
+| C5-B-04 | Three ordered open-item references vs two/four/duplicate/reordered | Boundary — exact count ±1/order | Exact custody open set required | Values are not resolved here |
+| C5-A-01 | NULL/empty/non-object, missing/unknown field, or duplicate JSON key | Equivalence — invalid | Typed closed-schema failure | No partial closeout |
+| C5-A-02 | Alternate/absolute/backslash/escaping index or source path, symlink, non-regular, unreadable | Equivalence — confinement | Typed path/source failure | Descriptor no-follow reads |
+| C5-A-03 | Source SHA/schema/version/revision/tool identity drifts | Equivalence — identity | Stop before live asset verification | Untrusted content is not printed |
+| C5-A-04 | Authority DAG has unknown/missing/extra/cyclic/reordered edge | Equivalence — authority graph | Typed DAG failure | Closeout is a sink, not a new value authority |
+| C5-A-05 | Closeout adds count/bytes/entry/run/pair/locator/payload/raw/host metadata | Equivalence — duplication/security | Prohibited metadata failure | Contract remains sole expected-count authority |
+| C5-A-06 | Status says completed/merged, gate closed, handoff published, or next transition authorized | Equivalence — manual gate | Typed status failure | Human merge remains required |
+| C5-A-07 | Acceptance condition is missing/extra/duplicated/reordered, non-verified, or references the wrong role | Equivalence — acceptance map | Typed acceptance failure | No warning or partial pass |
+| C5-A-08 | Custody open IDs differ, are resolved, or owner/retention/restore authority is invented | Equivalence — cross-authority | Typed open-item failure | Exact three unresolved items |
+| C5-A-09 | USB source/schema/hash drifts, capture binding differs, or failure-trace is not boolean false | Equivalence — P0-C1–C3 seam | Typed source/relationship failure | Success baseline is not failure-path proof |
+| C5-A-10 | Regenerated manifest differs by path/size/SHA/kind/order/newline | Equivalence — integrity/determinism | Byte-compare failure | One streaming full sweep |
+| C5-A-11 | Regenerated relationships differ by pair/mapping/clock/failure/order/newline | Equivalence — relationship/determinism | Byte-compare failure | Live telemetry only |
+| C5-A-12 | Manifest/relationship/custody dependency raises a typed failure | Equivalence — dependency | Bounded closeout failure, no success text | No partial gate |
+| C5-A-13 | Closeout/source leaf or component is swapped during check-to-read | Equivalence — TOCTOU | No-follow failure or stable opened inode | Never read the replacement target |
+| C5-A-14 | Duplicate key/path/error contains a 4 KiB secret-like value | Boundary — large untrusted input | Bounded stderr without echo/traceback | Existing error code retained |
+| C5-A-15 | CLI requests build/output/metadata-only success, assets are unavailable, or a source is missing | Equivalence — operation boundary | Exit 2; fixed bounded error | Live `verify` is the sole success path |
+
+No finite maximum asset count or file size is introduced here; those remain in
+the existing contract and streaming seams. The closed closeout lists have exact
+boundaries of six acceptance mappings, thirteen source roles, and three open-item
+references.
+
 ## Phase acceptance evidence
 
-- [ ] At-rest boundary distinguishes Git exclusion from D19 protection
-- [ ] Canonical locator, owner, and retention are explicit
-- [ ] Every manifest entry is present, readable, size-matched, and SHA-256-matched
-- [ ] Exact expected counts: bin 3,520; cfg 6; telemetry 2; capture 6
-- [ ] Restore and reacquisition procedures are distinct
-- [ ] Per-run FL/FH, cfg/telemetry/capture, clock basis, and tolerance are verified
-- [ ] Failure-trace absence remains explicit
-- [ ] Same input generates byte-identical tracked metadata
-- [ ] Focused tests and repository safety checks pass
+- [x] At-rest boundary distinguishes Git exclusion from D19 protection
+- [x] Canonical locator, owner, and retention are explicit
+- [x] Every manifest entry is present, readable, size-matched, and SHA-256-matched
+- [x] Exact expected counts: bin 3,520; cfg 6; telemetry 2; capture 6
+- [x] Restore and reacquisition procedures are distinct
+- [x] Per-run FL/FH, cfg/telemetry/capture, clock basis, and tolerance are verified
+- [x] Failure-trace absence remains explicit
+- [x] Same input generates byte-identical tracked metadata
+- [x] Focused tests and repository safety checks pass
 - [ ] Process log and checklist are archived after completion

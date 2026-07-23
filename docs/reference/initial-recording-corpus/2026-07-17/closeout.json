@@ -1,0 +1,214 @@
+{
+  "acceptance_conditions": [
+    {
+      "condition_id": "P0-C4-1",
+      "evidence_roles": [
+        "custody"
+      ],
+      "verdict": "verified"
+    },
+    {
+      "condition_id": "P0-C4-2",
+      "evidence_roles": [
+        "corpus_contract",
+        "custody"
+      ],
+      "verdict": "verified"
+    },
+    {
+      "condition_id": "P0-C4-3",
+      "evidence_roles": [
+        "corpus_manifest",
+        "manifest_tool",
+        "custody"
+      ],
+      "verdict": "verified"
+    },
+    {
+      "condition_id": "P0-C4-4",
+      "evidence_roles": [
+        "corpus_contract",
+        "corpus_manifest",
+        "manifest_tool"
+      ],
+      "verdict": "verified"
+    },
+    {
+      "condition_id": "P0-C4-5",
+      "evidence_roles": [
+        "custody",
+        "recovery_procedure"
+      ],
+      "verdict": "verified"
+    },
+    {
+      "condition_id": "P0-C4-6",
+      "evidence_roles": [
+        "relationship_contract",
+        "relationships",
+        "usb_manifest",
+        "relationship_tool"
+      ],
+      "verdict": "verified"
+    }
+  ],
+  "authority_dag": [
+    {
+      "consumer": "corpus_manifest",
+      "inputs": [
+        "corpus_contract"
+      ]
+    },
+    {
+      "consumer": "relationship_contract",
+      "inputs": [
+        "plan",
+        "corpus_contract",
+        "corpus_manifest",
+        "usb_manifest"
+      ]
+    },
+    {
+      "consumer": "relationships",
+      "inputs": [
+        "relationship_contract"
+      ]
+    },
+    {
+      "consumer": "custody",
+      "inputs": [
+        "plan",
+        "corpus_contract",
+        "corpus_manifest",
+        "manifest_tool",
+        "recovery_procedure"
+      ]
+    },
+    {
+      "consumer": "closeout",
+      "inputs": [
+        "plan",
+        "corpus_contract",
+        "corpus_manifest",
+        "relationship_contract",
+        "relationships",
+        "custody",
+        "recovery_procedure",
+        "usb_index_readme",
+        "usb_manifest",
+        "usb_scenarios",
+        "manifest_tool",
+        "relationship_tool",
+        "custody_tool"
+      ]
+    }
+  ],
+  "manual_gate": {
+    "base_branch": "main",
+    "central_handoff": "not_published",
+    "head_branch": "analysis/phase0-corpus-index",
+    "initial_corpus_gate": "not_closed",
+    "next_scope_transition": "not_authorized",
+    "pre_merge_action": "create_pr_then_stop",
+    "required_action": "human_merge",
+    "scope_completion": "not_declared"
+  },
+  "open_item_references": {
+    "ids": [
+      "P0-C4-ASSET-OWNER",
+      "P0-C4-RESTORE-SOURCE",
+      "P0-C4-RETENTION"
+    ],
+    "source_role": "custody"
+  },
+  "p0_c1_c3_overlap": {
+    "binding_role": "relationship_contract",
+    "evidence_role": "relationships",
+    "historical_index_roles": [
+      "usb_index_readme",
+      "usb_manifest",
+      "usb_scenarios"
+    ],
+    "shared_capture_identity_roles": [
+      "corpus_manifest",
+      "usb_manifest"
+    ],
+    "verdict": "verified"
+  },
+  "schema": "analogboard.phase0.initial-recording-corpus-closeout",
+  "schema_version": 1,
+  "scope": {
+    "status": "gate_ready",
+    "step_id": "P0-C4",
+    "transition": "pending_human_merge"
+  },
+  "source_references": {
+    "corpus_contract": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/contract.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-contract",
+      "schema_version": 1,
+      "sha256": "825503ad2cb84a6262a2b2a6c88e661973a0fba4a37f77be6d04dc451b7c51e6"
+    },
+    "corpus_manifest": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/manifest.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-manifest",
+      "schema_version": 1,
+      "sha256": "f51fc2759598dba71bfc51ede5d9128e63ab90a5dd70dd31e3c02bb015e56002"
+    },
+    "custody": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/custody.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-custody",
+      "schema_version": 1,
+      "sha256": "2aad123952d98aeaa1a43c0de43b6f02619b67618f778c6e18b5f6bbcf152ec5"
+    },
+    "custody_tool": {
+      "path": "scripts/corpus-index/corpus_custody.py",
+      "sha256": "9329994661435c77af1677b66127df740512dbb50fc5a2e1e5732a7c9d520d94"
+    },
+    "manifest_tool": {
+      "path": "scripts/corpus-index/corpus_index.py",
+      "sha256": "1ec9a0f21eb487298ba3228dd10eab464866900e90518bc8dea26a6d83c6df70"
+    },
+    "plan": {
+      "path": "docs/plans/260710-analogboard-rebuild-plan.html",
+      "revision": "Draft 4.7",
+      "sha256": "d0c927375efdb491159e4980e8b57f62210de7b4bc8b15db43a63c7acee36b66"
+    },
+    "recovery_procedure": {
+      "path": "docs/operations/initial-recording-corpus/restore-and-reacquisition.md",
+      "sha256": "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261"
+    },
+    "relationship_contract": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/relationship-contract.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-relationship-contract",
+      "schema_version": 1,
+      "sha256": "059805e2e7930604902aec668871061c5ddf0a5547df87ea8baafc48b30cf75f"
+    },
+    "relationship_tool": {
+      "path": "scripts/corpus-index/corpus_relationships.py",
+      "sha256": "74125a7cb039e66cc5a90fd0a01aaf78110a81d5a6705827ae5bd62c185908e7"
+    },
+    "relationships": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/relationships.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-relationships",
+      "schema_version": 1,
+      "sha256": "7649db7b8b845ab70228be2c0d5c845eeec0fe6162feef8389c45788e03c39a2"
+    },
+    "usb_index_readme": {
+      "path": "docs/reference/usb-recording-corpus/2026-07-17/README.md",
+      "sha256": "ba0073602438fdfbc0c5bb69a18c488d4c24b9252372f91429690c2359af8744"
+    },
+    "usb_manifest": {
+      "path": "docs/reference/usb-recording-corpus/2026-07-17/manifest.json",
+      "schema": "analogboard.phase0.usbpcap-corpus-index",
+      "schema_version": 1,
+      "sha256": "009d7d7732172fd01cb79ac6fc66741366004c2acbf12376b46a4ac98a3b2b8b"
+    },
+    "usb_scenarios": {
+      "path": "docs/reference/usb-recording-corpus/2026-07-17/scenarios.json",
+      "schema": "analogboard.phase0.usbpcap-scenarios",
+      "schema_version": 1,
+      "sha256": "0a86eb4e72f1704fcdf95f5ebd31a3f83fbda986ef23a5b053c2e6ff6fbe368e"
+    }
+  }
+}

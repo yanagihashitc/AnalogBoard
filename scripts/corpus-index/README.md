@@ -184,3 +184,41 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_custody.py \
   verify \
   --policy docs/reference/initial-recording-corpus/2026-07-17/custody.json
 ```
+
+## Phase closeout
+
+`docs/reference/initial-recording-corpus/2026-07-17/closeout.json` is the
+closed-schema composition of the accepted plan, corpus metadata, relationship
+evidence, custody policy, recovery procedure, historical P0-C1–C3 index, and
+the three accepted verifier identities. It contains source pins and authority
+bindings only; inventory totals, per-run values, source-location values, and
+acceptance prose stay in their existing authorities.
+
+`corpus_closeout.py` is verify-only. It first validates the exact closeout and
+source snapshot with descriptor-relative no-follow reads capped at one MiB per
+metadata source. It then performs one in-memory manifest regeneration and byte
+comparison, one relationship regeneration and byte comparison, and custody
+verification. A final read verifies that the closeout and every pinned source
+remained byte-identical throughout the operation. Errors are typed, bounded,
+and do not reflect untrusted source content.
+
+Run the 24 payload-free synthetic cases:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -s scripts/corpus-index/tests -p 'test_corpus_closeout.py' -v
+```
+
+Run the live phase verifier only on the asset-retaining machine. This command
+performs the full streaming corpus read and must not run in CI or on a
+development machine:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_closeout.py \
+  verify \
+  --index docs/reference/initial-recording-corpus/2026-07-17/closeout.json
+```
+
+The successful closeout status is gate-ready and pending human merge. It does
+not declare scope completion, gate closure, central handoff publication, or a
+next-scope transition. The pre-merge workflow creates the planned PR and stops.
