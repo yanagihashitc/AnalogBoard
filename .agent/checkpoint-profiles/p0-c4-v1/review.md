@@ -29,9 +29,9 @@ until every finding is fixed and retested or explicitly blocked.
 - The index states that the assets are pre-D19 plaintext, local-only evidence
   and records the 2026-07-20 no-export owner decision without claiming D19
   protection from `.gitignore` or Git exclusion.
-- Tracked asset entries contain metadata only: normalized repository-relative
-  path, byte size, SHA-256, kind, run/pair relationship, and required
-  timestamp/clock information.
+- Tracked asset entries contain metadata only: canonical locator (normalized
+  repository-relative path), owner, retention, byte size, SHA-256, kind,
+  run/pair relationship, and required timestamp/clock information.
 - Procedures do not upload, attach, copy, migrate, reacquire, or otherwise
   move asset payloads. Logged commands and evidence are bounded and
   payload-free.

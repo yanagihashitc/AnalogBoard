@@ -31,9 +31,10 @@ improving clarity, determinism, and maintainability.
 - Preserve the 2026-07-20 owner decision: these assets are pre-D19 plaintext,
   local-only evidence. Do not claim that Git exclusion supplies D19 at-rest
   protection and do not migrate or reacquire the assets in this scope.
-- Tracked indexes may contain metadata only: normalized repository-relative
-  path, byte size, SHA-256, asset kind, run/pair correspondence, and required
-  timestamp/clock information. They must remain payload-free.
+- Tracked indexes may contain metadata only: canonical locator (normalized
+  repository-relative path), owner, retention, byte size, SHA-256, asset kind,
+  run/pair correspondence, and required timestamp/clock information. They must
+  remain payload-free.
 - Validation and evidence output must never include payload bytes, waveform
   samples, pcap packet bodies, secrets, or unbounded command output.
 
