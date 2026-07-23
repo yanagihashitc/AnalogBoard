@@ -1,0 +1,66 @@
+{
+  "asset_kinds": [
+    {
+      "expected_count": 3520,
+      "filename_pattern": "(?P<run_id>[0-9]{6}_[0-9]{4})_(?:fl|fh)_[1-9][0-9]*[.]bin",
+      "kind": "bin"
+    },
+    {
+      "expected_count": 6,
+      "filename_pattern": "(?P<run_id>[0-9]{6}_[0-9]{4})_cfg[.]txt",
+      "kind": "cfg"
+    },
+    {
+      "expected_count": 2,
+      "filename_pattern": "[0-9]{6}_[0-9]{6}_rearm_telemetry[.]csv",
+      "kind": "telemetry"
+    },
+    {
+      "expected_count": 6,
+      "filename_pattern": "[a-z0-9_]+[.]pcapng",
+      "kind": "capture"
+    }
+  ],
+  "canonical_locator": "artifacts/field-session/2026-07-17-characterization",
+  "excluded_paths": [
+    "analysis"
+  ],
+  "expected_total_bytes": 22310526580,
+  "idle_captures": [
+    "idle_180_1700.pcapng"
+  ],
+  "run_capture_mapping": [
+    {
+      "capture": "low_mid.pcapng",
+      "density": "low",
+      "run_id": "260717_1529"
+    },
+    {
+      "capture": "low_mid.pcapng",
+      "density": "mid",
+      "run_id": "260717_1532"
+    },
+    {
+      "capture": "mid.pcapng",
+      "density": "mid",
+      "run_id": "260717_1535"
+    },
+    {
+      "capture": "low.pcapng",
+      "density": "low",
+      "run_id": "260717_1539"
+    },
+    {
+      "capture": "high1.pcapng",
+      "density": "high",
+      "run_id": "260717_1542"
+    },
+    {
+      "capture": "high2.pcapng",
+      "density": "high",
+      "run_id": "260717_1545"
+    }
+  ],
+  "schema": "analogboard.phase0.initial-recording-corpus-contract",
+  "schema_version": 1
+}
