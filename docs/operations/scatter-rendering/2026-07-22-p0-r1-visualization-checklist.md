@@ -58,6 +58,7 @@
 
 依存: Batches 1–5
 
+- [x] Pin the owner-approved Dell live observation as canonical `AB-PERF-REF-v1`
 - [ ] Rebuild from a clean generated root and rerun full correctness/determinism/dependency checks
 - [ ] Run hard scatter and combined scenarios on `AB-PERF-REF-v1` with 30-second warm-up plus three independent 60-second measurements
 - [ ] Run the independent 10-minute soak and verify all memory/scheduling metrics

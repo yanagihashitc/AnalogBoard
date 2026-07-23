@@ -150,6 +150,105 @@ function Assert-ThrowsDynamicOutput {
     throw "Expected $ExpectedType matching dynamic output '$ExpectedMessagePattern'."
 }
 
+$canonicalProfileRelativePath =
+    'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json'
+$canonicalProfilePath = Join-Path $RepositoryRoot $canonicalProfileRelativePath
+if (-not (Test-Path -LiteralPath $canonicalProfilePath -PathType Leaf)) {
+    throw "RED: owner-approved canonical performance profile is absent: $canonicalProfileRelativePath"
+}
+
+# Given: The owner-approved Dell observation at the only canonical profile path.
+$canonicalProfileContract =
+    Assert-P0R1CanonicalReferenceProfileContract -RepositoryRoot $RepositoryRoot
+$expectedCanonicalProfile = [ordered]@{
+    schema_id = 'analogboard.scatter-rendering.reference-profile.v1'
+    profile_id = 'AB-PERF-REF-v1'
+    profile_status = 'owner_pinned'
+    owner_approval_id = 'P0-R1-AB-PERF-REF-v1-20260723'
+    manufacturer = 'Dell Inc.'
+    model = 'Precision 3680'
+    machine_name = 'ANALYZER_S1'
+    os_product = 'Microsoft Windows 11 Pro'
+    os_version = '10.0.26200'
+    os_build = '26200'
+    cpu = 'Intel(R) Core(TM) i9-14900'
+    ram_bytes = [int64]68390989824
+    gpu_name = 'Intel(R) UHD Graphics 770 | NVIDIA RTX 4000 Ada Generation'
+    gpu_driver_version = '32.0.101.7085 | 32.0.15.9595'
+    display_width = [int64]1920
+    display_height = [int64]1080
+    display_refresh_hz = [int64]60
+    display_dpi_x = [int64]96
+    display_dpi_y = [int64]96
+    power_scheme_guid = '381b4222-f694-41f0-9685-ff5bb260df2e'
+    storage_model = 'NVMe PC SN820 NVMe WD 4096GB'
+    storage_serial = 'E823_8FA6_BF53_0001_001B_444A_4100_7672.'
+    storage_bus_type = 'SCSI'
+    monotonic_clock = 'System.Diagnostics.Stopwatch'
+    stopwatch_frequency = [int64]10000000
+    sdk_version = '10.0.302'
+    desktop_runtime_version = '10.0.10'
+    target_framework = 'net10.0-windows'
+    configuration = 'Release'
+    architecture = 'x64'
+    remote_session = $false
+}
+
+# When: The canonical file is parsed through the production contract.
+$actualCanonicalFields = @($canonicalProfileContract.Profile.PSObject.Properties.Name)
+
+# Then: Every approved identity field, status, and approval ID is exact.
+Assert-Equal `
+    -Actual $actualCanonicalFields.Count `
+    -Expected $expectedCanonicalProfile.Count `
+    -Message 'Canonical profile field count'
+foreach ($fieldName in $expectedCanonicalProfile.Keys) {
+    Assert-Contains `
+        -Actual $actualCanonicalFields `
+        -Expected $fieldName `
+        -Message 'Canonical profile field set'
+    if ($canonicalProfileContract.Profile.$fieldName -cne $expectedCanonicalProfile[$fieldName]) {
+        throw "Canonical profile field mismatch: $fieldName."
+    }
+}
+
+$profileDriftRoot =
+    Join-Path ([IO.Path]::GetTempPath()) ("p0r1-profile-drift-" + [guid]::NewGuid().ToString('N'))
+try {
+    $profileDriftPath = Join-Path $profileDriftRoot $canonicalProfileRelativePath
+    $null = New-Item -ItemType Directory -Path (Split-Path -Parent $profileDriftPath) -Force
+    Copy-Item -LiteralPath $canonicalProfilePath -Destination $profileDriftPath
+
+    # Given: The canonical identity is accidentally returned to live-observation status.
+    (Get-Content -LiteralPath $profileDriftPath -Raw -Encoding UTF8).Replace(
+        '"profile_status": "owner_pinned"',
+        '"profile_status": "live_observation"'
+    ) | Set-Content -LiteralPath $profileDriftPath -Encoding UTF8
+
+    # When/Then: The production contract rejects it with the exact status field.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1CanonicalReferenceProfileContract -RepositoryRoot $profileDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 canonical reference profile field mismatch: profile_status.'
+
+    Copy-Item -LiteralPath $canonicalProfilePath -Destination $profileDriftPath -Force
+
+    # Given: One approved hardware identity value drifts.
+    (Get-Content -LiteralPath $profileDriftPath -Raw -Encoding UTF8).Replace(
+        '"gpu_driver_version": "32.0.101.7085 | 32.0.15.9595"',
+        '"gpu_driver_version": "32.0.101.7085 | 32.0.15.9999"'
+    ) | Set-Content -LiteralPath $profileDriftPath -Encoding UTF8
+
+    # When/Then: The production contract names the drifting identity field.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1CanonicalReferenceProfileContract -RepositoryRoot $profileDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 canonical reference profile field mismatch: gpu_driver_version.'
+}
+finally {
+    Remove-Item -LiteralPath $profileDriftRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 function Set-FixtureSolution {
     param(
         [Parameter(Mandatory = $true)][string]$PrototypeRoot,
@@ -1099,7 +1198,18 @@ if ($sourceEvidenceIndex -lt 0 -or $sourceEvidenceIndex -gt $dotnetIndex) {
 $rendererDecision = Assert-P0R1RendererDecisionContract -RepositoryRoot $RepositoryRoot
 Assert-Equal -Actual $rendererDecision.DecisionId -Expected 'P0-R1-RENDERER-v1' -Message 'Renderer decision identity'
 Assert-Equal -Actual $rendererDecision.SelectedCandidateId -Expected 'wpf-writeablebitmap-preallocated' -Message 'Renderer selection'
-Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected 'c2f44d15e68b77997ed8cf730c8ef6d7b712ac800badb5690985f2e7f23b4fae' -Message 'Measured source tree identity'
+Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '506291b58292b5a73fd8d49fb1cb1b9e4bb01a665368eb19a61d71411aa6476f' -Message 'Measured source tree identity'
+$historicalDevelopmentSource = Get-P0R1MeasuredSourceTreeHash `
+    -RepositoryRoot $RepositoryRoot `
+    -ReferenceProfileState 'Absent'
+Assert-Equal `
+    -Actual $historicalDevelopmentSource.Sha256 `
+    -Expected 'c2f44d15e68b77997ed8cf730c8ef6d7b712ac800badb5690985f2e7f23b4fae' `
+    -Message 'Historical profile-absent development source identity'
+Assert-Equal `
+    -Actual $historicalDevelopmentSource.FileCount `
+    -Expected 61 `
+    -Message 'Historical profile-absent development source file count'
 $expectedMeasurementCommand = 'dotnet run --project tests/AnalogBoard.ScatterRendering.Tests/AnalogBoard.ScatterRendering.Tests.csproj --configuration Release -p:Platform=x64 --no-build --no-restore --disable-build-servers --'
 foreach ($relativeEvidencePath in @(
     'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
@@ -1117,6 +1227,7 @@ try {
         'docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json',
         'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
         'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json',
         'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
@@ -1147,6 +1258,7 @@ try {
         'docs/reference/scatter-rendering/phase0/display-transform-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json',
+        'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json',
         'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
         'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json',
         'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'

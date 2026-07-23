@@ -832,9 +832,96 @@ function Assert-P0R1NoDuplicateJsonProperties {
     }
 }
 
-function Get-P0R1MeasuredSourceTreeHash {
+function Assert-P0R1CanonicalReferenceProfileContract {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+    $relativePath =
+        'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json'
+    $profilePath = Join-Path $resolvedRoot $relativePath
+    if (-not (Test-Path -LiteralPath $profilePath -PathType Leaf)) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 canonical reference profile is absent: $relativePath."
+        )
+    }
+
+    $json = Get-Content -LiteralPath $profilePath -Raw -Encoding UTF8
+    Assert-P0R1NoDuplicateJsonProperties -Json $json -Label 'canonical reference profile'
+    try {
+        $profile = $json | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw [InvalidOperationException]::new(
+            'P0-R1 canonical reference profile must be valid JSON.'
+        )
+    }
+
+    $expected = [ordered]@{
+        schema_id = 'analogboard.scatter-rendering.reference-profile.v1'
+        profile_id = 'AB-PERF-REF-v1'
+        profile_status = 'owner_pinned'
+        owner_approval_id = 'P0-R1-AB-PERF-REF-v1-20260723'
+        manufacturer = 'Dell Inc.'
+        model = 'Precision 3680'
+        machine_name = 'ANALYZER_S1'
+        os_product = 'Microsoft Windows 11 Pro'
+        os_version = '10.0.26200'
+        os_build = '26200'
+        cpu = 'Intel(R) Core(TM) i9-14900'
+        ram_bytes = [int64]68390989824
+        gpu_name = 'Intel(R) UHD Graphics 770 | NVIDIA RTX 4000 Ada Generation'
+        gpu_driver_version = '32.0.101.7085 | 32.0.15.9595'
+        display_width = [int64]1920
+        display_height = [int64]1080
+        display_refresh_hz = [int64]60
+        display_dpi_x = [int64]96
+        display_dpi_y = [int64]96
+        power_scheme_guid = '381b4222-f694-41f0-9685-ff5bb260df2e'
+        storage_model = 'NVMe PC SN820 NVMe WD 4096GB'
+        storage_serial = 'E823_8FA6_BF53_0001_001B_444A_4100_7672.'
+        storage_bus_type = 'SCSI'
+        monotonic_clock = 'System.Diagnostics.Stopwatch'
+        stopwatch_frequency = [int64]10000000
+        sdk_version = '10.0.302'
+        desktop_runtime_version = '10.0.10'
+        target_framework = 'net10.0-windows'
+        configuration = 'Release'
+        architecture = 'x64'
+        remote_session = $false
+    }
+    $actualFields = @($profile.PSObject.Properties.Name)
+    if ($actualFields.Count -ne $expected.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 canonical reference profile must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expected.Keys) {
+        if ($actualFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                'P0-R1 canonical reference profile must contain the exact field set.'
+            )
+        }
+        if ($profile.$fieldName -cne $expected[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 canonical reference profile field mismatch: $fieldName."
+            )
+        }
+    }
+
+    return [pscustomobject]@{
+        Path = $relativePath
+        Sha256 = (Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Profile = $profile
+    }
+}
+
+function Get-P0R1MeasuredSourceTreeHash {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [ValidateSet('Current', 'Absent')]
+        [string]$ReferenceProfileState = 'Current'
     )
 
     $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
@@ -882,7 +969,10 @@ function Get-P0R1MeasuredSourceTreeHash {
     $optionalReferenceProfile =
         'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json'
     $optionalReferencePath = Join-Path $resolvedRoot $optionalReferenceProfile
-    $optionalReferenceValue = if (Test-Path -LiteralPath $optionalReferencePath -PathType Leaf) {
+    $optionalReferenceValue = if ($ReferenceProfileState -ceq 'Absent') {
+        '<absent>'
+    }
+    elseif (Test-Path -LiteralPath $optionalReferencePath -PathType Leaf) {
         (Get-FileHash -LiteralPath $optionalReferencePath -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     else {
@@ -1614,6 +1704,7 @@ function Assert-P0R1RendererDecisionContract {
     )
 
     $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+    $null = Assert-P0R1CanonicalReferenceProfileContract -RepositoryRoot $resolvedRoot
     $relativeDecisionPath = 'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
     $decisionPath = Join-Path $resolvedRoot $relativeDecisionPath
     if (-not (Test-Path -LiteralPath $decisionPath -PathType Leaf)) {
@@ -1841,14 +1932,17 @@ function Assert-P0R1RendererDecisionContract {
     }
 
     $measuredSourceTree = Get-P0R1MeasuredSourceTreeHash -RepositoryRoot $resolvedRoot
+    $developmentEvidenceSourceTree = Get-P0R1MeasuredSourceTreeHash `
+        -RepositoryRoot $resolvedRoot `
+        -ReferenceProfileState 'Absent'
     Assert-P0R1MeasuredEvidenceSourceContract `
         -EvidencePath (Join-Path $resolvedRoot $decision.evidence.combined_development_path) `
         -Label 'combined development evidence' `
-        -MeasuredSourceTree $measuredSourceTree
+        -MeasuredSourceTree $developmentEvidenceSourceTree
     Assert-P0R1MeasuredEvidenceSourceContract `
         -EvidencePath (Join-Path $resolvedRoot $decision.evidence.headroom_development_path) `
         -Label 'headroom development evidence' `
-        -MeasuredSourceTree $measuredSourceTree
+        -MeasuredSourceTree $developmentEvidenceSourceTree
 
     foreach ($fieldName in @('stop_conditions', 'residual_limits')) {
         $items = @($decision.$fieldName)
@@ -2116,6 +2210,7 @@ Export-ModuleMember -Function @(
     'Clear-P0R1GeneratedBuildRoots',
     'Get-P0R1PrototypeState',
     'Get-P0R1TestSummary',
+    'Assert-P0R1CanonicalReferenceProfileContract',
     'Get-P0R1MeasuredSourceTreeHash',
     'Get-P0R1DevelopmentObservation',
     'Get-P0R1CombinedDevelopmentObservation',

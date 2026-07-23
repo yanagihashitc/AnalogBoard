@@ -5,6 +5,7 @@
 - [AnalogBoard rebuild plan](../plans/260710-analogboard-rebuild-plan.html)
 - [Checklist](../operations/scatter-rendering/2026-07-22-p0-r1-visualization-checklist.md)
 - [Process Log INDEX](INDEX.md)
+- [Part 2](2026-07-23-p0-r1-visualization-log-02.md)
 
 ## Scope
 
