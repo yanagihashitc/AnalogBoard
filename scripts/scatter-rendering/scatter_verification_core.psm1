@@ -917,6 +917,566 @@ function Assert-P0R1CanonicalReferenceProfileContract {
     }
 }
 
+function Assert-P0R1OfficialPerformanceEvidenceContract {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot
+    )
+
+    $resolvedRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+    $relativePath =
+        'docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json'
+    $evidencePath = Join-Path $resolvedRoot $relativePath
+    if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+        throw [InvalidOperationException]::new(
+            "P0-R1 Official performance evidence file is absent: $relativePath."
+        )
+    }
+
+    $json = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8
+    Assert-P0R1NoDuplicateJsonProperties `
+        -Json $json `
+        -Label 'Official performance evidence'
+    try {
+        $evidence = $json | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official performance evidence must be valid JSON.'
+        )
+    }
+
+    $requiredFields = @(
+        'schema_id', 'evidence_id', 'step_id', 'runner_contract_id',
+        'metric_schema_id', 'metric_definitions_sha256', 'development_only',
+        'official_acceptance', 'production_throughput_guarantee',
+        'may_substitute_production', 'session', 'reference_profile',
+        'observed_profiles', 'provenance', 'process_exits', 'schedule_contract',
+        'hard_threshold_contract', 'runs', 'audit', 'summary_method',
+        'residual_limits'
+    )
+    $actualFields = @($evidence.PSObject.Properties.Name)
+    if ($actualFields.Count -ne $requiredFields.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence must contain only the exact versioned field set.'
+        )
+    }
+    foreach ($fieldName in $requiredFields) {
+        if ($actualFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence field is absent: $fieldName."
+            )
+        }
+    }
+
+    $expectedStrings = [ordered]@{
+        schema_id = 'analogboard.scatter-rendering.official-performance-evidence.v1'
+        evidence_id = 'P0-R1-OFFICIAL-PERFORMANCE-v1'
+        step_id = 'P0-R1'
+        runner_contract_id = 'AB-PERF-RUNNER-v1'
+        metric_schema_id = 'analogboard.scatter-rendering.metrics.v1'
+        metric_definitions_sha256 =
+            '44ed2f4922e09c3bc577ba22e5f51fc704aa7e51c7e21a6e1fb7e56c31baf92f'
+        summary_method =
+            'all three independent scatter and combined runs pass individually; soak passes; headroom observed separately; nearest-rank from sealed raw ticks'
+    }
+    foreach ($fieldName in $expectedStrings.Keys) {
+        if ($evidence.$fieldName -isnot [string] -or
+            $evidence.$fieldName -cne $expectedStrings[$fieldName]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence identity mismatch: $fieldName."
+            )
+        }
+    }
+    foreach ($fieldName in @(
+        'development_only', 'official_acceptance',
+        'production_throughput_guarantee', 'may_substitute_production'
+    )) {
+        if ($evidence.$fieldName -isnot [bool]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence field must be a JSON boolean: $fieldName."
+            )
+        }
+    }
+    if ($evidence.development_only -or
+        -not $evidence.official_acceptance -or
+        $evidence.production_throughput_guarantee -or
+        $evidence.may_substitute_production) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence must be official, non-development, and not a production throughput guarantee.'
+        )
+    }
+
+    $expectedSession = [ordered]@{
+        session_id = '20260723T065013547Z-3248-df621100'
+        artifact_root =
+            'artifacts/phase0-scatter-rendering/20260723T065013547Z-3248-df621100'
+        mode = 'Official'
+        status = 'pass'
+        source_revision = '5937a113755784acda5ec03ad4e254f9f881b885'
+        source_dirty = $false
+        manifest_size_bytes = [int64]4202
+        manifest_sha256 =
+            'b175b532f99ada8d1da8ad58b52b29613f594c79d8e1fd9de4234e98c0beb729'
+    }
+    $sessionFields = @($evidence.session.PSObject.Properties.Name)
+    if ($sessionFields.Count -ne $expectedSession.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence session must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedSession.Keys) {
+        if ($sessionFields -cnotcontains $fieldName) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence session field is absent: $fieldName."
+            )
+        }
+        $expected = $expectedSession[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $evidence.session.$fieldName -is [string] -and
+                $evidence.session.$fieldName -ceq $expected
+        }
+        elseif ($expected -is [bool]) {
+            $evidence.session.$fieldName -is [bool] -and
+                $evidence.session.$fieldName -eq $expected
+        }
+        else {
+            (Test-P0R1JsonInteger -Value $evidence.session.$fieldName) -and
+                [int64]$evidence.session.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence session identity mismatch: $fieldName."
+            )
+        }
+    }
+
+    $expectedReference = [ordered]@{
+        path =
+            'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json'
+        size_bytes = [int64]1200
+        sha256 = 'eec722a4766b5e58b807420a00f8a2938c2461fb7a8d7310e4ec52ba917063d8'
+        profile_id = 'AB-PERF-REF-v1'
+        profile_status = 'owner_pinned'
+        owner_approval_id = 'P0-R1-AB-PERF-REF-v1-20260723'
+    }
+    $referenceFields = @($evidence.reference_profile.PSObject.Properties.Name)
+    if ($referenceFields.Count -ne $expectedReference.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence reference profile must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedReference.Keys) {
+        $expected = $expectedReference[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $referenceFields -ccontains $fieldName -and
+                $evidence.reference_profile.$fieldName -is [string] -and
+                $evidence.reference_profile.$fieldName -ceq $expected
+        }
+        else {
+            $referenceFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.reference_profile.$fieldName) -and
+                [int64]$evidence.reference_profile.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence reference profile mismatch: $fieldName."
+            )
+        }
+    }
+    $profileContract =
+        Assert-P0R1CanonicalReferenceProfileContract -RepositoryRoot $resolvedRoot
+    if ($profileContract.Path -cne $evidence.reference_profile.path -or
+        $profileContract.Sha256 -cne $evidence.reference_profile.sha256) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence canonical reference profile file mismatch.'
+        )
+    }
+
+    $expectedObservedProfiles = [ordered]@{
+        actual_path = 'profile.actual.json'
+        actual_size_bytes = [int64]1336
+        actual_sha256 = '0c0f90c7cf05cac1098c99a9a078ff76f974501ee6371b35ee7af911331d2064'
+        final_path = 'profile.final.json'
+        final_size_bytes = [int64]1336
+        final_sha256 = '0c0f90c7cf05cac1098c99a9a078ff76f974501ee6371b35ee7af911331d2064'
+        byte_identical = $true
+    }
+    $observedFields = @($evidence.observed_profiles.PSObject.Properties.Name)
+    if ($observedFields.Count -ne $expectedObservedProfiles.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence observed profiles must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedObservedProfiles.Keys) {
+        $expected = $expectedObservedProfiles[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $observedFields -ccontains $fieldName -and
+                $evidence.observed_profiles.$fieldName -is [string] -and
+                $evidence.observed_profiles.$fieldName -ceq $expected
+        }
+        elseif ($expected -is [bool]) {
+            $observedFields -ccontains $fieldName -and
+                $evidence.observed_profiles.$fieldName -is [bool] -and
+                $evidence.observed_profiles.$fieldName -eq $expected
+        }
+        else {
+            $observedFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.observed_profiles.$fieldName) -and
+                [int64]$evidence.observed_profiles.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence observed profile mismatch: $fieldName."
+            )
+        }
+    }
+
+    $expectedProvenance = [ordered]@{
+        path = 'provenance.json'
+        size_bytes = [int64]354
+        sha256 = 'e4c58ca7093087e91aa2026d8533b3560be96624f9da6cd78dcf25389991bcfc'
+        source_revision = '5937a113755784acda5ec03ad4e254f9f881b885'
+        source_dirty = $false
+    }
+    $provenanceFields = @($evidence.provenance.PSObject.Properties.Name)
+    if ($provenanceFields.Count -ne $expectedProvenance.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence provenance must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedProvenance.Keys) {
+        $expected = $expectedProvenance[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $provenanceFields -ccontains $fieldName -and
+                $evidence.provenance.$fieldName -is [string] -and
+                $evidence.provenance.$fieldName -ceq $expected
+        }
+        elseif ($expected -is [bool]) {
+            $provenanceFields -ccontains $fieldName -and
+                $evidence.provenance.$fieldName -is [bool] -and
+                $evidence.provenance.$fieldName -eq $expected
+        }
+        else {
+            $provenanceFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.provenance.$fieldName) -and
+                [int64]$evidence.provenance.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence provenance mismatch: $fieldName."
+            )
+        }
+    }
+
+    $expectedProcessExits = [ordered]@{
+        path = 'process-exits.json'
+        size_bytes = [int64]2000
+        sha256 = 'd5a0fa20b90b8b3b18f1d6a591b0d6aa17173d72e7ddfcd56b96ed4a07ad1a0b'
+        record_count = [int64]8
+        distinct_process_id_count = [int64]8
+        all_exit_codes_zero = $true
+    }
+    $processFields = @($evidence.process_exits.PSObject.Properties.Name)
+    if ($processFields.Count -ne $expectedProcessExits.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence process exits must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedProcessExits.Keys) {
+        $expected = $expectedProcessExits[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $processFields -ccontains $fieldName -and
+                $evidence.process_exits.$fieldName -is [string] -and
+                $evidence.process_exits.$fieldName -ceq $expected
+        }
+        elseif ($expected -is [bool]) {
+            $processFields -ccontains $fieldName -and
+                $evidence.process_exits.$fieldName -is [bool] -and
+                $evidence.process_exits.$fieldName -eq $expected
+        }
+        else {
+            $processFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.process_exits.$fieldName) -and
+                [int64]$evidence.process_exits.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence process exit mismatch: $fieldName."
+            )
+        }
+    }
+
+    $expectedSchedule = [ordered]@{
+        stopwatch_frequency = [int64]10000000
+        planned_warmup_seconds = [int64]30
+        planned_hard_measurement_seconds = [int64]60
+        hard_run_count_per_scenario = [int64]3
+        planned_soak_measurement_seconds = [int64]600
+        planned_headroom_measurement_seconds = [int64]60
+        actual_duration_rule = 'each actual duration is greater than or equal to its planned duration'
+        percentile_method = 'nearest-rank-ceiling-no-interpolation'
+    }
+    $scheduleFields = @($evidence.schedule_contract.PSObject.Properties.Name)
+    if ($scheduleFields.Count -ne $expectedSchedule.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence schedule must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedSchedule.Keys) {
+        $expected = $expectedSchedule[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $scheduleFields -ccontains $fieldName -and
+                $evidence.schedule_contract.$fieldName -is [string] -and
+                $evidence.schedule_contract.$fieldName -ceq $expected
+        }
+        else {
+            $scheduleFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.schedule_contract.$fieldName) -and
+                [int64]$evidence.schedule_contract.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence schedule mismatch: $fieldName."
+            )
+        }
+    }
+
+    $expectedThresholds = [ordered]@{
+        scatter_delivered_rate_hz_min = 30.0
+        scatter_frame_time_p95_ms_max = 33.3
+        scatter_frame_time_max_ms_max = 100.0
+        gmi_delivered_rate_hz_min = 5.0
+        gmi_max_interval_ms_max = 500.0
+        ui_input_latency_p95_ms_max = 100.0
+        ui_input_latency_max_ms_max = 250.0
+        producer_publication_p99_ms_max = 1.0
+        pending_frame_max_per_feed = [int64]1
+        pending_callback_max_per_feed = [int64]1
+        managed_allocation_bytes_per_frame_max = [int64]65536
+        event_allocation_delta_bytes_per_frame_max = [int64]8192
+        soak_retained_managed_heap_growth_bytes_max = [int64]8388608
+        soak_private_bytes_growth_limit =
+            'max(33554432, starting_private_bytes * 0.10)'
+    }
+    $thresholdFields = @($evidence.hard_threshold_contract.PSObject.Properties.Name)
+    if ($thresholdFields.Count -ne $expectedThresholds.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence threshold contract must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedThresholds.Keys) {
+        $expected = $expectedThresholds[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $thresholdFields -ccontains $fieldName -and
+                $evidence.hard_threshold_contract.$fieldName -is [string] -and
+                $evidence.hard_threshold_contract.$fieldName -ceq $expected
+        }
+        elseif ($expected -is [int64]) {
+            $thresholdFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.hard_threshold_contract.$fieldName) -and
+                [int64]$evidence.hard_threshold_contract.$fieldName -eq $expected
+        }
+        else {
+            $thresholdFields -ccontains $fieldName -and
+                (Test-P0R1JsonNumber -Value $evidence.hard_threshold_contract.$fieldName) -and
+                [double]$evidence.hard_threshold_contract.$fieldName -eq [double]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence threshold mismatch: $fieldName."
+            )
+        }
+    }
+
+    $expectedRuns = @(
+        [ordered]@{
+            path = 'runs/hard-scatter-01.raw.json'; size_bytes = [int64]386104
+            sha256 = 'fbd1066ff885cdb3b7765ce1d895180666c882f492a0377c47dc405b29eff74e'
+            process_id = [int64]23240; process_exit_code = [int64]0
+            scenario = 'hard_scatter'; run_index = [int64]1; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/hard-scatter-02.raw.json'; size_bytes = [int64]383974
+            sha256 = 'c789a28eab62bc3580687ede632d396fcf68ba6b6247216c9011f63aa9c4ba07'
+            process_id = [int64]23032; process_exit_code = [int64]0
+            scenario = 'hard_scatter'; run_index = [int64]2; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/hard-scatter-03.raw.json'; size_bytes = [int64]380839
+            sha256 = '63f20606794db3360523e7c277d6ba14b9ac859930c47151207811991fad1bce'
+            process_id = [int64]16204; process_exit_code = [int64]0
+            scenario = 'hard_scatter'; run_index = [int64]3; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/hard-combined-01.raw.json'; size_bytes = [int64]440241
+            sha256 = 'bec83e422ffc6acc005681e8cd7c9ad501e8a895ce615ef0c77ee1f3bb719da0'
+            process_id = [int64]25004; process_exit_code = [int64]0
+            scenario = 'hard_combined'; run_index = [int64]1; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/hard-combined-02.raw.json'; size_bytes = [int64]443847
+            sha256 = '1868d31ef3d236703fdc2c323edb9f8c5a3eb543d865634830d2e4ed2fc9c308'
+            process_id = [int64]34324; process_exit_code = [int64]0
+            scenario = 'hard_combined'; run_index = [int64]2; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/hard-combined-03.raw.json'; size_bytes = [int64]438535
+            sha256 = 'bf7585af82552d4f47c1be4c78b0a52579691e28ffa765bd32625cc98ca7637e'
+            process_id = [int64]34248; process_exit_code = [int64]0
+            scenario = 'hard_combined'; run_index = [int64]3; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/soak-01.raw.json'; size_bytes = [int64]4243247
+            sha256 = '5a300ef9633c37cc39539e5513f6e209901f774a2ff39bbd9b4769b3c126722d'
+            process_id = [int64]32660; process_exit_code = [int64]0
+            scenario = 'soak'; run_index = [int64]1; verdict = 'pass'
+            hard_gate_member = $true; official_candidate = $true
+        },
+        [ordered]@{
+            path = 'runs/headroom-01.raw.json'; size_bytes = [int64]40492
+            sha256 = '700e636ff1b06c0140e0ad5237b8557f90fb60e58019198f192d2630ec979498'
+            process_id = [int64]16724; process_exit_code = [int64]0
+            scenario = 'headroom'; run_index = [int64]1; verdict = 'observed'
+            hard_gate_member = $false; official_candidate = $false
+        }
+    )
+    $runs = @($evidence.runs)
+    if ($evidence.runs -isnot [array] -or $runs.Count -ne $expectedRuns.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence must contain exactly eight ordered run seals.'
+        )
+    }
+    $runFields = @(
+        'path', 'size_bytes', 'sha256', 'process_id', 'process_exit_code',
+        'scenario', 'run_index', 'verdict', 'hard_gate_member',
+        'official_candidate'
+    )
+    foreach ($index in 0..($expectedRuns.Count - 1)) {
+        $run = $runs[$index]
+        $expectedRun = $expectedRuns[$index]
+        $actualRunFields = @($run.PSObject.Properties.Name)
+        if ($actualRunFields.Count -ne $runFields.Count) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence run at index $index must contain the exact field set."
+            )
+        }
+        foreach ($fieldName in $runFields) {
+            if ($actualRunFields -cnotcontains $fieldName) {
+                throw [InvalidOperationException]::new(
+                    "P0-R1 Official evidence run field is absent at index $index`: $fieldName."
+                )
+            }
+            $expected = $expectedRun[$fieldName]
+            $valid = if ($expected -is [string]) {
+                $run.$fieldName -is [string] -and $run.$fieldName -ceq $expected
+            }
+            elseif ($expected -is [bool]) {
+                $run.$fieldName -is [bool] -and $run.$fieldName -eq $expected
+            }
+            else {
+                (Test-P0R1JsonInteger -Value $run.$fieldName) -and
+                    [int64]$run.$fieldName -eq [int64]$expected
+            }
+            if (-not $valid) {
+                throw [InvalidOperationException]::new(
+                    "P0-R1 Official evidence run identity mismatch at index $index`: $fieldName."
+                )
+            }
+        }
+    }
+    $processIds = @($runs | ForEach-Object { [int64]$_.process_id })
+    if (@($processIds | Sort-Object -Unique).Count -ne 8) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence child process identities must be distinct.'
+        )
+    }
+
+    $expectedAudit = [ordered]@{
+        manifest_reference_count = [int64]12
+        size_match_count = [int64]12
+        sha256_match_count = [int64]12
+        sealed_root_exact = $true
+        inprogress_absent = $true
+        profiles_byte_identical = $true
+        post_run_worktree_clean = $true
+        audit_basis =
+            'suite finalizer plus independent Get-Item and Get-FileHash verification'
+    }
+    $auditFields = @($evidence.audit.PSObject.Properties.Name)
+    if ($auditFields.Count -ne ($expectedAudit.Count + 1) -or
+        $auditFields -cnotcontains 'mismatches') {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence audit must contain the exact field set.'
+        )
+    }
+    foreach ($fieldName in $expectedAudit.Keys) {
+        $expected = $expectedAudit[$fieldName]
+        $valid = if ($expected -is [string]) {
+            $auditFields -ccontains $fieldName -and
+                $evidence.audit.$fieldName -is [string] -and
+                $evidence.audit.$fieldName -ceq $expected
+        }
+        elseif ($expected -is [bool]) {
+            $auditFields -ccontains $fieldName -and
+                $evidence.audit.$fieldName -is [bool] -and
+                $evidence.audit.$fieldName -eq $expected
+        }
+        else {
+            $auditFields -ccontains $fieldName -and
+                (Test-P0R1JsonInteger -Value $evidence.audit.$fieldName) -and
+                [int64]$evidence.audit.$fieldName -eq [int64]$expected
+        }
+        if (-not $valid) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence audit mismatch: $fieldName."
+            )
+        }
+    }
+    if ($evidence.audit.mismatches -isnot [array] -or
+        @($evidence.audit.mismatches).Count -ne 0) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence audit mismatches must be an empty JSON array.'
+        )
+    }
+
+    $limits = @($evidence.residual_limits)
+    $expectedLimits = @(
+        'Official acceptance is limited to the frozen P0-R1 fixtures, AB-PERF-REF-v1, AB-PERF-RUNNER-v1, and source revision recorded here.',
+        'The headroom run is observation-only and does not substitute for any hard scatter, combined, or soak gate.',
+        'This prototype result selects the Phase 2 rendering seam; it is not a production throughput or acquisition-isolation guarantee.'
+    )
+    if ($evidence.residual_limits -isnot [array] -or
+        $limits.Count -ne $expectedLimits.Count) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 Official evidence must contain exactly three residual limits.'
+        )
+    }
+    for ($index = 0; $index -lt $expectedLimits.Count; $index++) {
+        if ($limits[$index] -isnot [string] -or
+            $limits[$index] -cne $expectedLimits[$index]) {
+            throw [InvalidOperationException]::new(
+                "P0-R1 Official evidence residual limit mismatch at index $index."
+            )
+        }
+    }
+
+    return [pscustomobject]@{
+        EvidenceId = $evidence.evidence_id
+        OfficialAcceptance = $evidence.official_acceptance
+        SessionId = $evidence.session.session_id
+        ManifestSha256 = $evidence.session.manifest_sha256
+        RunCount = $runs.Count
+        Path = $relativePath
+        Sha256 = (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+}
+
 function Get-P0R1MeasuredSourceTreeHash {
     param(
         [Parameter(Mandatory = $true)][string]$RepositoryRoot,
@@ -1746,7 +2306,7 @@ function Assert-P0R1RendererDecisionContract {
     $expectedStrings = [ordered]@{
         schema_id = 'analogboard.scatter-rendering.renderer-decision.v1'
         decision_id = 'P0-R1-RENDERER-v1'
-        status = 'selected_for_phase_checkpoint'
+        status = 'accepted_at_phase_checkpoint'
         scope = 'P0-R1 bounded visualization prototype only'
         selected_candidate_id = 'wpf-writeablebitmap-preallocated'
     }
@@ -1767,11 +2327,11 @@ function Assert-P0R1RendererDecisionContract {
             )
         }
     }
-    if (-not $decision.development_only -or
-        $decision.official_acceptance -or
+    if ($decision.development_only -or
+        -not $decision.official_acceptance -or
         $decision.production_throughput_guarantee) {
         throw [InvalidOperationException]::new(
-            'P0-R1 renderer decision must remain development-only, non-official, and not a production throughput guarantee.'
+            'P0-R1 renderer decision must be Official, non-development, and not a production throughput guarantee.'
         )
     }
 
@@ -1849,7 +2409,7 @@ function Assert-P0R1RendererDecisionContract {
         'phase2_portability'
     )
     $expectedCandidates = [ordered]@{
-        'wpf-writeablebitmap-preallocated' = 'selected_for_phase_checkpoint'
+        'wpf-writeablebitmap-preallocated' = 'accepted_at_phase_checkpoint'
         'wpf-writeablebitmap-direct-backbuffer' = 'rejected_for_phase0'
         'wpf-vector-or-rendertargetbitmap-events' = 'rejected_contract_mismatch'
     }
@@ -1893,6 +2453,8 @@ function Assert-P0R1RendererDecisionContract {
         combined_development_sha256 = '8aa304e759f2598ad7436651dacf431c35a92ffc512be4a3fc77c091b63b575e'
         headroom_development_path = 'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json'
         headroom_development_sha256 = '214d0ad9aebacee0896825c4df14f1735924954424f30c1d2a8562d49d555e37'
+        official_performance_path = 'docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json'
+        official_performance_sha256 = 'cf50842df072edf53617e5ef98b4d194cbb30490ffac5c9431fb890d9841e328'
     }
     if (@($decision.evidence.PSObject.Properties.Name).Count -ne $expectedEvidence.Count) {
         throw [InvalidOperationException]::new(
@@ -1914,7 +2476,8 @@ function Assert-P0R1RendererDecisionContract {
         @{ Path = $decision.evidence.density_raster_contract_path; Hash = $decision.evidence.density_raster_contract_sha256 },
         @{ Path = $decision.evidence.gmi_raster_contract_path; Hash = $decision.evidence.gmi_raster_contract_sha256 },
         @{ Path = $decision.evidence.combined_development_path; Hash = $decision.evidence.combined_development_sha256 },
-        @{ Path = $decision.evidence.headroom_development_path; Hash = $decision.evidence.headroom_development_sha256 }
+        @{ Path = $decision.evidence.headroom_development_path; Hash = $decision.evidence.headroom_development_sha256 },
+        @{ Path = $decision.evidence.official_performance_path; Hash = $decision.evidence.official_performance_sha256 }
     )
     foreach ($item in $hashedFiles) {
         $path = Join-Path $resolvedRoot $item.Path
@@ -1943,6 +2506,15 @@ function Assert-P0R1RendererDecisionContract {
         -EvidencePath (Join-Path $resolvedRoot $decision.evidence.headroom_development_path) `
         -Label 'headroom development evidence' `
         -MeasuredSourceTree $developmentEvidenceSourceTree
+    $officialEvidence =
+        Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $resolvedRoot
+    if ($officialEvidence.Path -cne $decision.evidence.official_performance_path -or
+        $officialEvidence.Sha256 -cne $decision.evidence.official_performance_sha256 -or
+        -not $officialEvidence.OfficialAcceptance) {
+        throw [InvalidOperationException]::new(
+            'P0-R1 renderer decision Official performance evidence contract mismatch.'
+        )
+    }
 
     foreach ($fieldName in @('stop_conditions', 'residual_limits')) {
         $items = @($decision.$fieldName)
@@ -1964,6 +2536,7 @@ function Assert-P0R1RendererDecisionContract {
         DecisionId = $decision.decision_id
         SelectedCandidateId = $decision.selected_candidate_id
         Status = $decision.status
+        OfficialAcceptance = $decision.official_acceptance
         Path = $relativeDecisionPath
         Sha256 = (Get-FileHash -LiteralPath $decisionPath -Algorithm SHA256).Hash.ToLowerInvariant()
         MeasuredSourceTreeSha256 = $measuredSourceTree.Sha256
@@ -2238,6 +2811,7 @@ Export-ModuleMember -Function @(
     'Get-P0R1PrototypeState',
     'Get-P0R1TestSummary',
     'Assert-P0R1CanonicalReferenceProfileContract',
+    'Assert-P0R1OfficialPerformanceEvidenceContract',
     'Get-P0R1MeasuredSourceTreeHash',
     'Get-P0R1DevelopmentObservation',
     'Get-P0R1CombinedDevelopmentObservation',

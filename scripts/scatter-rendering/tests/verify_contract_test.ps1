@@ -389,6 +389,116 @@ finally {
     Remove-Item -LiteralPath $profileDriftRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# Given: The bounded summary of the sealed Dell Official suite.
+$officialEvidence =
+    Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $RepositoryRoot
+
+# When/Then: Its immutable suite identity and exact eight-run boundary validate.
+Assert-Equal `
+    -Actual $officialEvidence.EvidenceId `
+    -Expected 'P0-R1-OFFICIAL-PERFORMANCE-v1' `
+    -Message 'Official performance evidence identity'
+Assert-Equal `
+    -Actual $officialEvidence.ManifestSha256 `
+    -Expected 'b175b532f99ada8d1da8ad58b52b29613f594c79d8e1fd9de4234e98c0beb729' `
+    -Message 'Official performance manifest identity'
+Assert-Equal `
+    -Actual $officialEvidence.RunCount `
+    -Expected 8 `
+    -Message 'Official performance run count'
+Assert-Equal `
+    -Actual $officialEvidence.OfficialAcceptance `
+    -Expected $true `
+    -Message 'Official performance acceptance'
+
+$officialEvidenceRelativePath =
+    'docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json'
+$officialEvidencePath = Join-Path $RepositoryRoot $officialEvidenceRelativePath
+$officialEvidenceDriftRoot =
+    Join-Path ([IO.Path]::GetTempPath()) ("p0r1-official-evidence-drift-" + [guid]::NewGuid().ToString('N'))
+try {
+    foreach ($relativePath in @(
+        $canonicalProfileRelativePath,
+        $officialEvidenceRelativePath
+    )) {
+        $destination = Join-Path $officialEvidenceDriftRoot $relativePath
+        $null = New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force
+        Copy-Item -LiteralPath (Join-Path $RepositoryRoot $relativePath) -Destination $destination
+    }
+    $driftPath = Join-Path $officialEvidenceDriftRoot $officialEvidenceRelativePath
+
+    # Given: The sealed source revision drifts from the audited Official HEAD.
+    (Get-Content -LiteralPath $driftPath -Raw -Encoding UTF8).Replace(
+        '5937a113755784acda5ec03ad4e254f9f881b885',
+        '4937a113755784acda5ec03ad4e254f9f881b885'
+    ) | Set-Content -LiteralPath $driftPath -Encoding UTF8
+    # When/Then: The production contract names the source identity.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $officialEvidenceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 Official evidence session identity mismatch: source_revision.'
+
+    Copy-Item -LiteralPath $officialEvidencePath -Destination $driftPath -Force
+
+    # Given: The suite is relabelled as non-official.
+    (Get-Content -LiteralPath $driftPath -Raw -Encoding UTF8).Replace(
+        '"official_acceptance": true',
+        '"official_acceptance": false'
+    ) | Set-Content -LiteralPath $driftPath -Encoding UTF8
+    # When/Then: Official acceptance fails closed.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $officialEvidenceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 Official evidence must be official, non-development, and not a production throughput guarantee.'
+
+    Copy-Item -LiteralPath $officialEvidencePath -Destination $driftPath -Force
+
+    # Given: One raw artifact seal is changed without changing the run identity.
+    (Get-Content -LiteralPath $driftPath -Raw -Encoding UTF8).Replace(
+        'fbd1066ff885cdb3b7765ce1d895180666c882f492a0377c47dc405b29eff74e',
+        '0bd1066ff885cdb3b7765ce1d895180666c882f492a0377c47dc405b29eff74e'
+    ) | Set-Content -LiteralPath $driftPath -Encoding UTF8
+    # When/Then: The exact run seal fails closed.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $officialEvidenceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 Official evidence run identity mismatch at index 0: sha256.'
+
+    Copy-Item -LiteralPath $officialEvidencePath -Destination $driftPath -Force
+
+    # Given: The observation-only headroom run is promoted into a hard pass.
+    (Get-Content -LiteralPath $driftPath -Raw -Encoding UTF8).Replace(
+        '"verdict": "observed"',
+        '"verdict": "pass"'
+    ) | Set-Content -LiteralPath $driftPath -Encoding UTF8
+    # When/Then: Hard/headroom separation is immutable.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $officialEvidenceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 Official evidence run identity mismatch at index 7: verdict.'
+
+    Copy-Item -LiteralPath $officialEvidencePath -Destination $driftPath -Force
+
+    # Given: A duplicate acceptance property attempts to shadow the true value.
+    $duplicateEvidence = (Get-Content -LiteralPath $driftPath -Raw -Encoding UTF8).Replace(
+        '"official_acceptance": true,',
+        '"official_acceptance": true, "official_acceptance": false,'
+    )
+    Set-Content -LiteralPath $driftPath -Value $duplicateEvidence -Encoding UTF8
+    # When/Then: Duplicate JSON properties are rejected before conversion.
+    Assert-ThrowsExact -Action {
+        Assert-P0R1OfficialPerformanceEvidenceContract -RepositoryRoot $officialEvidenceDriftRoot
+    } -ExpectedType 'System.InvalidOperationException' `
+        -ExpectedMessage 'P0-R1 Official performance evidence must not contain duplicate JSON property names: official_acceptance.'
+}
+finally {
+    Remove-Item `
+        -LiteralPath $officialEvidenceDriftRoot `
+        -Recurse `
+        -Force `
+        -ErrorAction SilentlyContinue
+}
+
 function Set-FixtureSolution {
     param(
         [Parameter(Mandatory = $true)][string]$PrototypeRoot,
@@ -1393,6 +1503,8 @@ if ($sourceEvidenceIndex -lt 0 -or $sourceEvidenceIndex -gt $dotnetIndex) {
 $rendererDecision = Assert-P0R1RendererDecisionContract -RepositoryRoot $RepositoryRoot
 Assert-Equal -Actual $rendererDecision.DecisionId -Expected 'P0-R1-RENDERER-v1' -Message 'Renderer decision identity'
 Assert-Equal -Actual $rendererDecision.SelectedCandidateId -Expected 'wpf-writeablebitmap-preallocated' -Message 'Renderer selection'
+Assert-Equal -Actual $rendererDecision.Status -Expected 'accepted_at_phase_checkpoint' -Message 'Renderer decision status'
+Assert-Equal -Actual $rendererDecision.OfficialAcceptance -Expected $true -Message 'Renderer Official acceptance'
 Assert-Equal -Actual $rendererDecision.MeasuredSourceTreeSha256 -Expected '506291b58292b5a73fd8d49fb1cb1b9e4bb01a665368eb19a61d71411aa6476f' -Message 'Measured source tree identity'
 $historicalDevelopmentSource = Get-P0R1MeasuredSourceTreeHash `
     -RepositoryRoot $RepositoryRoot `
@@ -1423,6 +1535,7 @@ try {
         'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json',
+        'docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json',
         'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
         'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json',
         'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
@@ -1433,7 +1546,7 @@ try {
     }
     $duplicateDecisionPath = Join-Path $duplicateRendererRoot 'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'
     $duplicateDecision = (Get-Content -LiteralPath $duplicateDecisionPath -Raw -Encoding UTF8).Replace(
-        '"official_acceptance": false,',
+        '"official_acceptance": true,',
         '"official_acceptance": true, "official_acceptance": false,'
     )
     Set-Content -LiteralPath $duplicateDecisionPath -Value $duplicateDecision -Encoding UTF8
@@ -1454,6 +1567,7 @@ try {
         'docs/reference/scatter-rendering/phase0/density-raster-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/gmi-raster-contract-v1.json',
         'docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json',
+        'docs/reference/scatter-rendering/phase0/official-performance-evidence-v1.json',
         'docs/reference/scatter-rendering/phase0/batch4-combined-development-observation.json',
         'docs/reference/scatter-rendering/phase0/batch4-headroom-development-observation.json',
         'docs/reference/scatter-rendering/phase0/renderer-decision-v1.json'

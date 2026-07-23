@@ -1,0 +1,195 @@
+{
+  "schema_id": "analogboard.scatter-rendering.official-performance-evidence.v1",
+  "evidence_id": "P0-R1-OFFICIAL-PERFORMANCE-v1",
+  "step_id": "P0-R1",
+  "runner_contract_id": "AB-PERF-RUNNER-v1",
+  "metric_schema_id": "analogboard.scatter-rendering.metrics.v1",
+  "metric_definitions_sha256": "44ed2f4922e09c3bc577ba22e5f51fc704aa7e51c7e21a6e1fb7e56c31baf92f",
+  "development_only": false,
+  "official_acceptance": true,
+  "production_throughput_guarantee": false,
+  "may_substitute_production": false,
+  "session": {
+    "session_id": "20260723T065013547Z-3248-df621100",
+    "artifact_root": "artifacts/phase0-scatter-rendering/20260723T065013547Z-3248-df621100",
+    "mode": "Official",
+    "status": "pass",
+    "source_revision": "5937a113755784acda5ec03ad4e254f9f881b885",
+    "source_dirty": false,
+    "manifest_size_bytes": 4202,
+    "manifest_sha256": "b175b532f99ada8d1da8ad58b52b29613f594c79d8e1fd9de4234e98c0beb729"
+  },
+  "reference_profile": {
+    "path": "docs/reference/scatter-rendering/phase0/performance-reference-profile-v1.json",
+    "size_bytes": 1200,
+    "sha256": "eec722a4766b5e58b807420a00f8a2938c2461fb7a8d7310e4ec52ba917063d8",
+    "profile_id": "AB-PERF-REF-v1",
+    "profile_status": "owner_pinned",
+    "owner_approval_id": "P0-R1-AB-PERF-REF-v1-20260723"
+  },
+  "observed_profiles": {
+    "actual_path": "profile.actual.json",
+    "actual_size_bytes": 1336,
+    "actual_sha256": "0c0f90c7cf05cac1098c99a9a078ff76f974501ee6371b35ee7af911331d2064",
+    "final_path": "profile.final.json",
+    "final_size_bytes": 1336,
+    "final_sha256": "0c0f90c7cf05cac1098c99a9a078ff76f974501ee6371b35ee7af911331d2064",
+    "byte_identical": true
+  },
+  "provenance": {
+    "path": "provenance.json",
+    "size_bytes": 354,
+    "sha256": "e4c58ca7093087e91aa2026d8533b3560be96624f9da6cd78dcf25389991bcfc",
+    "source_revision": "5937a113755784acda5ec03ad4e254f9f881b885",
+    "source_dirty": false
+  },
+  "process_exits": {
+    "path": "process-exits.json",
+    "size_bytes": 2000,
+    "sha256": "d5a0fa20b90b8b3b18f1d6a591b0d6aa17173d72e7ddfcd56b96ed4a07ad1a0b",
+    "record_count": 8,
+    "distinct_process_id_count": 8,
+    "all_exit_codes_zero": true
+  },
+  "schedule_contract": {
+    "stopwatch_frequency": 10000000,
+    "planned_warmup_seconds": 30,
+    "planned_hard_measurement_seconds": 60,
+    "hard_run_count_per_scenario": 3,
+    "planned_soak_measurement_seconds": 600,
+    "planned_headroom_measurement_seconds": 60,
+    "actual_duration_rule": "each actual duration is greater than or equal to its planned duration",
+    "percentile_method": "nearest-rank-ceiling-no-interpolation"
+  },
+  "hard_threshold_contract": {
+    "scatter_delivered_rate_hz_min": 30.0,
+    "scatter_frame_time_p95_ms_max": 33.3,
+    "scatter_frame_time_max_ms_max": 100.0,
+    "gmi_delivered_rate_hz_min": 5.0,
+    "gmi_max_interval_ms_max": 500.0,
+    "ui_input_latency_p95_ms_max": 100.0,
+    "ui_input_latency_max_ms_max": 250.0,
+    "producer_publication_p99_ms_max": 1.0,
+    "pending_frame_max_per_feed": 1,
+    "pending_callback_max_per_feed": 1,
+    "managed_allocation_bytes_per_frame_max": 65536,
+    "event_allocation_delta_bytes_per_frame_max": 8192,
+    "soak_retained_managed_heap_growth_bytes_max": 8388608,
+    "soak_private_bytes_growth_limit": "max(33554432, starting_private_bytes * 0.10)"
+  },
+  "runs": [
+    {
+      "path": "runs/hard-scatter-01.raw.json",
+      "size_bytes": 386104,
+      "sha256": "fbd1066ff885cdb3b7765ce1d895180666c882f492a0377c47dc405b29eff74e",
+      "process_id": 23240,
+      "process_exit_code": 0,
+      "scenario": "hard_scatter",
+      "run_index": 1,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/hard-scatter-02.raw.json",
+      "size_bytes": 383974,
+      "sha256": "c789a28eab62bc3580687ede632d396fcf68ba6b6247216c9011f63aa9c4ba07",
+      "process_id": 23032,
+      "process_exit_code": 0,
+      "scenario": "hard_scatter",
+      "run_index": 2,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/hard-scatter-03.raw.json",
+      "size_bytes": 380839,
+      "sha256": "63f20606794db3360523e7c277d6ba14b9ac859930c47151207811991fad1bce",
+      "process_id": 16204,
+      "process_exit_code": 0,
+      "scenario": "hard_scatter",
+      "run_index": 3,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/hard-combined-01.raw.json",
+      "size_bytes": 440241,
+      "sha256": "bec83e422ffc6acc005681e8cd7c9ad501e8a895ce615ef0c77ee1f3bb719da0",
+      "process_id": 25004,
+      "process_exit_code": 0,
+      "scenario": "hard_combined",
+      "run_index": 1,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/hard-combined-02.raw.json",
+      "size_bytes": 443847,
+      "sha256": "1868d31ef3d236703fdc2c323edb9f8c5a3eb543d865634830d2e4ed2fc9c308",
+      "process_id": 34324,
+      "process_exit_code": 0,
+      "scenario": "hard_combined",
+      "run_index": 2,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/hard-combined-03.raw.json",
+      "size_bytes": 438535,
+      "sha256": "bf7585af82552d4f47c1be4c78b0a52579691e28ffa765bd32625cc98ca7637e",
+      "process_id": 34248,
+      "process_exit_code": 0,
+      "scenario": "hard_combined",
+      "run_index": 3,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/soak-01.raw.json",
+      "size_bytes": 4243247,
+      "sha256": "5a300ef9633c37cc39539e5513f6e209901f774a2ff39bbd9b4769b3c126722d",
+      "process_id": 32660,
+      "process_exit_code": 0,
+      "scenario": "soak",
+      "run_index": 1,
+      "verdict": "pass",
+      "hard_gate_member": true,
+      "official_candidate": true
+    },
+    {
+      "path": "runs/headroom-01.raw.json",
+      "size_bytes": 40492,
+      "sha256": "700e636ff1b06c0140e0ad5237b8557f90fb60e58019198f192d2630ec979498",
+      "process_id": 16724,
+      "process_exit_code": 0,
+      "scenario": "headroom",
+      "run_index": 1,
+      "verdict": "observed",
+      "hard_gate_member": false,
+      "official_candidate": false
+    }
+  ],
+  "audit": {
+    "manifest_reference_count": 12,
+    "size_match_count": 12,
+    "sha256_match_count": 12,
+    "mismatches": [],
+    "sealed_root_exact": true,
+    "inprogress_absent": true,
+    "profiles_byte_identical": true,
+    "post_run_worktree_clean": true,
+    "audit_basis": "suite finalizer plus independent Get-Item and Get-FileHash verification"
+  },
+  "summary_method": "all three independent scatter and combined runs pass individually; soak passes; headroom observed separately; nearest-rank from sealed raw ticks",
+  "residual_limits": [
+    "Official acceptance is limited to the frozen P0-R1 fixtures, AB-PERF-REF-v1, AB-PERF-RUNNER-v1, and source revision recorded here.",
+    "The headroom run is observation-only and does not substitute for any hard scatter, combined, or soak gate.",
+    "This prototype result selects the Phase 2 rendering seam; it is not a production throughput or acquisition-isolation guarantee."
+  ]
+}

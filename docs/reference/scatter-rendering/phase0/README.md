@@ -12,8 +12,36 @@ pending-one latest-frame scheduling, and bounded development instrumentation.
 Batch 4 adds bounded selected-channel GMI, combined scatter/GMI/input fairness,
 separate compatible-PC combined/headroom observations, and the renderer-path
 decision. Batch 5 adds the missing fixed-window runner and fail-closed evidence
-transaction. Official reference-PC performance evidence remains pending its
-Phase Checkpoint.
+transaction. The Phase Checkpoint now records the sealed Dell reference-PC
+Official result as bounded evidence while leaving raw metric arrays ignored.
+
+## Phase Checkpoint Official evidence
+
+- [`official-performance-evidence-v1.json`](official-performance-evidence-v1.json)
+  binds the sealed session `20260723T065013547Z-3248-df621100` to source
+  revision `5937a113755784acda5ec03ad4e254f9f881b885`, canonical
+  `AB-PERF-REF-v1`, and manifest SHA-256
+  `b175b532f99ada8d1da8ad58b52b29613f594c79d8e1fd9de4234e98c0beb729`.
+- Hard scatter and hard combined each pass all frozen numeric gates in three
+  independent 60-second measurement children after separate 30-second
+  warm-ups. The independent ten-minute combined soak passes. All seven hard
+  children are Official candidates.
+- The 131,072-event, 1024-square, three-tile child is retained as a separate
+  `observed` headroom result. It is neither an Official candidate nor a hard
+  gate member.
+- Eight process IDs are distinct and all exits are zero. The live profile is
+  byte-identical before and after the suite. The independent audit matched all
+  12 manifest references by size and SHA-256, found the exact sealed root, and
+  found no `.inprogress` session.
+- Raw timing, latency, publication, allocation, memory, scheduler, and
+  diagnostic arrays remain in the ignored reference-PC artifact root. The
+  tracked evidence stores their exact relative locators, sizes, hashes,
+  verdicts, schedule/threshold contracts, and audit result; it does not copy or
+  summarize unreturned numeric values.
+- [`renderer-decision-v1.json`](renderer-decision-v1.json) therefore accepts
+  the preallocated `WriteableBitmap.WritePixels` seam at the P0-R1 Phase
+  Checkpoint. This remains a prototype decision, not a production throughput or
+  acquisition-isolation guarantee.
 
 ## Batch 5 official runner boundary
 
@@ -61,8 +89,8 @@ Phase Checkpoint.
   fix `development_only=true`, `official_eligible=false`,
   `official_acceptance=false`, and `may_substitute_official=false`.
 - Official execution accepts only the Git-tracked canonical path
-  `performance-reference-profile-v1.json`. That file is intentionally absent
-  until a fresh Gate B Dell capture is owner-pinned; the runner never creates or
+  `performance-reference-profile-v1.json`. The owner-pinned file records
+  approval ID `P0-R1-AB-PERF-REF-v1-20260723`; the runner neither creates nor
   approves a reference profile itself.
 
 The retained Gate B inventories agree on Dell Precision 3680, ANALYZER_S1,
@@ -123,9 +151,10 @@ toolchain, so they are provenance anchors rather than `AB-PERF-REF-v1`.
   for official hard scenarios.
 - [`renderer-decision-v1.json`](renderer-decision-v1.json) selects built-in WPF
   `WriteableBitmap.WritePixels` with preallocated BGRA32 buffers for the Phase
-  Checkpoint. It records rejected candidates, dependency/license identity,
-  CPU/compositor boundaries, fallback, maintenance, evidence hashes, and the
-  Phase 2 seam. It is not a production throughput guarantee.
+  Checkpoint and now binds the accepted Official evidence. It records rejected
+  candidates, dependency/license identity, CPU/compositor boundaries, fallback,
+  maintenance, evidence hashes, and the Phase 2 seam. It is not a production
+  throughput guarantee.
 
 ## Boundaries
 

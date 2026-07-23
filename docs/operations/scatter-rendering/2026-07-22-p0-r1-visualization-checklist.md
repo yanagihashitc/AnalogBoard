@@ -76,22 +76,24 @@
 
 ## Phase Checkpoint
 
-依存: Batches 1–5
+依存: Batches 1–8
 
 - [x] Pin the owner-approved Dell live observation as canonical `AB-PERF-REF-v1`
-- [ ] Rebuild from a clean generated root and rerun full correctness/determinism/dependency checks
-- [ ] Run hard scatter and combined scenarios on `AB-PERF-REF-v1` with 30-second warm-up plus three independent 60-second measurements
-- [ ] Run the independent 10-minute soak and verify all memory/scheduling metrics
-- [ ] Run the 131,072-event/1024-square/three-tile headroom observation separately
-- [ ] Audit source revision, machine/toolchain/profile/fixture identity, clocks, raw metrics, summaries, exits, and artifact hashes
+- [x] Rebuild from a clean generated root and rerun full correctness/determinism/dependency checks
+- [x] Run hard scatter and combined scenarios on `AB-PERF-REF-v1` with 30-second warm-up plus three independent 60-second measurements
+- [x] Run the independent 10-minute soak and verify all memory/scheduling metrics
+- [x] Run the 131,072-event/1024-square/three-tile headroom observation separately
+- [x] Audit source revision, machine/toolchain/profile/fixture identity, clocks, raw metrics, summaries, exits, and artifact hashes
 - [ ] Verify todo/archive, branch/remote parity, clean tracked worktree, and ignored generated payloads
 - [ ] Create the single `perf/phase0-scatter-prototype` to `main` PR and stop before merge
 
 Batches 5–7 are preparatory corrections discovered by checkpoint audits.
 Batch 5 supplies the mandatory timed evidence transaction. Batch 6 makes its
 contract preflight independent of ignored generated trees. Batch 7 keeps that
-preflight compatible with Windows PowerShell 5.1. None relaxes or replaces any
-Phase Checkpoint threshold.
+preflight compatible with Windows PowerShell 5.1. Batch 8 records the returned
+sealed session as bounded tracked evidence and closes the renderer decision
+without tracking raw payload. None relaxes or replaces any Phase Checkpoint
+threshold.
 
 ## Scope guard
 
