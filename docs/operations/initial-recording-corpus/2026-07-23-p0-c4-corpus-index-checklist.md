@@ -6,8 +6,8 @@ Created: 2026-07-23
 
 ## Frozen scope and batch sequence
 
-- [ ] Batch 1: one typed contract surface plus manifest tooling TDD
-- [ ] Batch 2: full 3,534-file discovery, readability, size, and streaming SHA-256 sweep
+- [x] Batch 1: one typed contract surface plus manifest tooling TDD
+- [x] Batch 2: full 3,534-file discovery, readability, size, and streaming SHA-256 sweep
 - [ ] Batch 3: per-run FL/FH and cfg/telemetry/capture clock/correspondence evidence
 - [ ] Batch 4: availability/restore, locator/owner/retention, at-rest, and recovery procedure
 - [ ] Batch 5: tracked index closeout and phase-level deterministic verification
