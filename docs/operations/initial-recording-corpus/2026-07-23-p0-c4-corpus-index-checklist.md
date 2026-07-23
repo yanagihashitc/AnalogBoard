@@ -9,7 +9,7 @@ Created: 2026-07-23
 - [x] Batch 1: one typed contract surface plus manifest tooling TDD
 - [x] Batch 2: full 3,534-file discovery, readability, size, and streaming SHA-256 sweep
 - [x] Batch 3: per-run FL/FH and cfg/telemetry/capture clock/correspondence evidence
-- [ ] Batch 4: availability/restore, locator/owner/retention, at-rest, and recovery procedure
+- [x] Batch 4: availability/restore, locator/owner/retention, at-rest, and recovery procedure
 - [ ] Batch 5: tracked index closeout and phase-level deterministic verification
 - [ ] Phase checkpoint: acceptance conditions 1–6 proven and one PR created
 
@@ -77,6 +77,34 @@ one-second telemetry filename quantization width. The containment rule adds
 zero seconds beyond those label buckets; calibrated cross-clock skew remains
 `null` because it is not established. No timezone conversion or filesystem
 mtime participates in matching.
+
+## Batch 4 test perspectives
+
+| Case ID | Input / Precondition | Perspective | Expected Result | Notes |
+|---|---|---|---|---|
+| C4-N-01 | Current custody policy: availability verified; owner/retention decision required; restore not performed | Equivalence — normal | Typed policy validates | Missing authority stays open |
+| C4-N-02 | Same semantic policy keys arrive in different order | Equivalence — determinism | Canonical UTF-8 JSON is byte-identical | Sorted keys, one terminal LF |
+| C4-N-03 | Procedure has all required verdict/restore/reacquisition/stop sections and only the read-only verifier command | Equivalence — normal | Procedure pin and semantic lint pass | No transfer or reacquisition command |
+| C4-A-01 | Policy is NULL/empty, schema is wrong/future, or version is bool/string/0/2 | Boundary — NULL/empty/type/min-1/+1 | Typed schema failure | No implicit default |
+| C4-A-02 | Required field missing, unknown field present, duplicate JSON key, or empty identifier/reason | Equivalence — invalid | Typed closed-schema failure | No partial policy |
+| C4-A-03 | Source path is absolute/backslash/escaping/alternate, a component or leaf is a symlink, or SHA drifts | Equivalence — confinement/identity | Typed source failure before target read | Metadata only |
+| C4-A-04 | Contract/manifest schema/version drifts or policy locator differs from either source | Equivalence — authority mismatch | Typed source/locator failure | Counts remain solely in contract |
+| C4-A-05 | Policy adds expected counts, entry count, total bytes, payload, raw rows, packet body, or host locator | Equivalence — duplication/payload | Unknown/prohibited metadata rejection | No authority duplication |
+| C4-A-06 | Owner is named/resolved while authority is absent, or decision-required has non-NULL identity | Equivalence — unsupported claim | Typed owner failure | Repository/decision owner is not asset owner |
+| C4-A-07 | Retention policy/duration/disposition is supplied, or decision-required lacks its open item | Boundary — unsupported/non-NULL | Typed retention/open-item failure | No inferred expiry/deletion |
+| C4-A-08 | Availability is not verified, omits/reorders a required check, or infers restore | Boundary — missing/order/contradiction | Typed availability failure | Live mismatch is a stop condition |
+| C4-A-09 | Restore is verified/failed, source is identified, verification is non-NULL, or availability is reused | Equivalence — unsupported claim | Typed restore failure | Current verdict is not performed |
+| C4-A-10 | Reacquisition is in scope, replaces the current corpus, or requires the same SHA | Equivalence — contradiction | Typed reacquisition failure | Always a separately authorized new version |
+| C4-A-11 | D19 is marked applied, Git exclusion is protection, export is allowed, or relocation/reprotection is in scope | Equivalence — at-rest contradiction | Typed at-rest failure | Preserve 2026-07-20 boundary |
+| C4-A-12 | Open items are missing/extra/duplicate/unsorted/resolved or do not match owner/retention/restore state | Boundary — set/order/state | Typed open-item failure | Exact three-item set |
+| C4-A-13 | Procedure is missing, hash-mismatched, missing a required section/token, or has fenced copy/move/upload/network/reacquisition command | Equivalence — procedure failure | Typed procedure failure | This scope performs no material operation |
+| C4-A-14 | Policy path is not the exact tracked path or output contains absolute locator/secret-like content | Equivalence — scope/security | Typed path/content failure | No alternate authority |
+
+The custody schema intentionally accepts only the currently authorized state.
+Resolving owner, retention, or restore source requires a separately reviewed
+schema/policy update; the validator does not accept a speculative future state.
+Availability validation pins the contract/manifest and its read-only verification
+method but does not duplicate counts or total bytes.
 
 ## Phase acceptance evidence
 

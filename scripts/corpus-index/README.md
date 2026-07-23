@@ -131,3 +131,56 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_relationships.py \
 ```
 
 Do not run these relationship commands in CI or a synthetic-only TDD batch.
+
+## Custody policy
+
+`docs/reference/initial-recording-corpus/2026-07-17/custody.json` is the
+verify-only, static current-state custody index. It is not generated from the
+asset tree and deliberately does not duplicate expected counts, manifest entry
+count, or aggregate bytes. The exact five source roles pin the Draft 4.7 plan,
+corpus contract, corpus manifest, manifest verifier, and
+`restore-and-reacquisition.md` by normalized repository-relative path and
+SHA-256. Contract and manifest schema/version plus their shared canonical
+locator are validated through the public metadata-only corpus-index validators.
+
+The schema accepts only the authorized present state:
+
+- assets are pre-D19 plaintext, local-only on the asset-retaining machine;
+  export is prohibited, and Git exclusion is not at-rest protection;
+- availability is verified for the manifest's exact source set, regular-file
+  readability, size, and SHA-256, without inferring restore;
+- restore is not performed because a distinct restore source is not identified;
+- reacquisition is out of scope, would create a new corpus version, and is
+  neither restore nor a replacement for the current corpus;
+- asset owner, retention, and restore-source identity remain three exact,
+  typed open items.
+
+The validator rejects alternate policy/source paths, symlink traversal,
+duplicate JSON keys, non-canonical bytes, source identity drift, speculative
+resolved states, authority duplication, and payload/host metadata. It reads
+only tracked metadata and the procedure; it does not read the local corpus
+assets. The procedure permits one read-only canonical availability verifier
+command and contains no restore transfer or reacquisition command.
+
+Run the synthetic custody cases:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -s scripts/corpus-index/tests -p 'test_corpus_custody.py' -v
+```
+
+The cases cover checklist C4-N-01–03 and C4-A-01–14. They include NULL/empty,
+zero/one/future schema boundaries, source confinement and symlinks, duplicate
+keys, source/hash/schema/locator drift, every current-state contradiction,
+open-item set/order/linkage, procedure lint, and bounded CLI output. No finite
+maximum policy size is invented because the policy has a closed, fixed schema.
+The repository has no pinned Python coverage runner, so branch coverage is not
+reported by this command.
+
+Verify the tracked static custody index without reading assets:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_custody.py \
+  verify \
+  --policy docs/reference/initial-recording-corpus/2026-07-17/custody.json
+```
