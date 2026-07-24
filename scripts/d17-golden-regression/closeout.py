@@ -106,13 +106,13 @@ FIXED_SOURCE_DECLARATIONS: dict[str, SourceDeclaration] = {
     ),
     "selection_tool": SourceDeclaration(
         path="scripts/d17-golden-regression/golden_selection.py",
-        sha256="dcea6136c66c03d70e4c926b07f5f71435c50a4063665541a1c4c3f145b32561",
-        size_bytes=22_014,
+        sha256="317bce7cfcf3c0a7926ef244089ec256b79d30e656b26198f0182274ea38df8e",
+        size_bytes=22_278,
     ),
     "selection_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_golden_selection.py",
-        sha256="33525f78649dd1ec92a7fbb8bf45c6fa3c6a0f0d73306c72385f247af3934e21",
-        size_bytes=30_458,
+        sha256="b575651994c5ef24dab5eb1e6b16719a703042a7f5c78d0923db1d99f0219596",
+        size_bytes=32_139,
     ),
     "golden_reference": SourceDeclaration(
         path="docs/reference/d17-golden-regression/golden-reference-v1.json",

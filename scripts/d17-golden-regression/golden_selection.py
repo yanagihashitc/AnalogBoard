@@ -332,6 +332,12 @@ def _load_corpus_index_module() -> types.ModuleType:
             raise TypeError("missing load_contract_data")
         if not callable(getattr(module, "validate_manifest_metadata", None)):
             raise TypeError("missing validate_manifest_metadata")
+        corpus_index_error = getattr(module, "CorpusIndexError", None)
+        if not isinstance(corpus_index_error, type) or not issubclass(
+            corpus_index_error,
+            Exception,
+        ):
+            raise TypeError("invalid CorpusIndexError")
     except (OSError, SyntaxError, TypeError) as exc:
         raise SelectionSchemaError(
             "selection.schema.validator",

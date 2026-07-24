@@ -7,10 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Callable
+from unittest import mock
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_ROOT))
 
+import golden_selection as golden_selection_module  # noqa: E402
 from golden_selection import (  # noqa: E402
     SelectionDecisionRequiredError,
     SelectionDensityError,
@@ -346,6 +348,45 @@ class GoldenSelectionTests(unittest.TestCase):
                         manifest, contract
                     ),
                 )
+
+    def test_s_a_20_rejects_invalid_validator_exception_surface(self) -> None:
+        # Given: Validator modules with a missing or invalid exception class.
+        cases = (
+            ("missing", ""),
+            ("non_class", "CorpusIndexError = object()\n"),
+            ("non_exception_class", "class CorpusIndexError:\n    pass\n"),
+        )
+        validator_body = (
+            "def load_contract_data(value):\n"
+            "    return value\n"
+            "\n"
+            "def validate_manifest_metadata(contract, manifest):\n"
+            "    return {}\n"
+        )
+
+        for case_name, declaration in cases:
+            with self.subTest(case=case_name):
+                source = (declaration + validator_body).encode("utf-8")
+
+                # When/Then: Loading fails through the stable schema error path.
+                with (
+                    mock.patch.object(
+                        golden_selection_module,
+                        "_CORPUS_INDEX_MODULE",
+                        None,
+                    ),
+                    mock.patch.object(
+                        golden_selection_module,
+                        "_read_regular_beneath_root",
+                        return_value=source,
+                    ),
+                ):
+                    self.assert_failure(
+                        SelectionSchemaError,
+                        "selection.schema.validator",
+                        "unable to load the canonical P0-C4 metadata validator",
+                        golden_selection_module._load_corpus_index_module,
+                    )
 
     def test_s_a_03_requires_exactly_low_mid_high(self) -> None:
         # Given: A contract missing one required density.
