@@ -70,6 +70,19 @@ OPEN_ITEMS = [
         "status": "open",
     },
 ]
+DECISION_AUTHORITY = {
+    "anchor": "dispatch-owner-decisions-20260724-2",
+    "document": "task_management/260710-cross-repo-execution-roadmap.html",
+}
+RETENTION_CONSTRAINTS = [
+    "expiry_unset",
+    "deletion_prohibited",
+]
+RETENTION_REEVALUATION_REQUIRES = [
+    "c9-frozen-corpus-materialized",
+    "verified-restore-source-established",
+    "owner-explicit-reevaluation",
+]
 ALLOWED_COMMAND = """PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_index.py \\
   verify \\
   --manifest docs/reference/initial-recording-corpus/2026-07-17/manifest.json"""
@@ -277,6 +290,62 @@ def _fixture(repo_root: Path) -> dict[str, Any]:
     return policy
 
 
+def _resolved_fixture(repo_root: Path) -> dict[str, Any]:
+    source_payloads = {
+        PLAN_PATH: b"<html>Draft 4.11 synthetic plan</html>\n",
+        CONTRACT_PATH: _canonical_json(_contract()),
+        MANIFEST_PATH: _canonical_json(_manifest()),
+        TOOL_PATH: b"# synthetic manifest verifier\n",
+        PROCEDURE_PATH: PROCEDURE_TEXT.encode("utf-8"),
+    }
+    for path, payload in source_payloads.items():
+        _write(repo_root, path, payload)
+    policy = _policy(source_payloads)
+    policy["schema_version"] = 2
+    policy["source_references"]["plan"]["revision"] = "Draft 4.11"
+    policy["asset_owner"] = {
+        "authority": copy.deepcopy(DECISION_AUTHORITY),
+        "decided_on": "2026-07-24",
+        "identity": "yanagihashi",
+        "item_id": "P0-C4-ASSET-OWNER",
+        "verdict": "resolved",
+    }
+    policy["retention"] = {
+        "authority": copy.deepcopy(DECISION_AUTHORITY),
+        "constraints": list(RETENTION_CONSTRAINTS),
+        "decided_on": "2026-07-24",
+        "item_id": "P0-C4-RETENTION",
+        "policy": "retain-until-superseded",
+        "reevaluation_requires": list(RETENTION_REEVALUATION_REQUIRES),
+        "verdict": "resolved",
+    }
+    policy["open_items"] = [
+        {
+            "id": "P0-C4-ASSET-OWNER",
+            "resolution": {
+                "authority": copy.deepcopy(DECISION_AUTHORITY),
+                "decided_on": "2026-07-24",
+            },
+            "status": "resolved",
+        },
+        {
+            "id": "P0-C4-RESTORE-SOURCE",
+            "reason": "restore_source_not_identified",
+            "status": "open",
+        },
+        {
+            "id": "P0-C4-RETENTION",
+            "resolution": {
+                "authority": copy.deepcopy(DECISION_AUTHORITY),
+                "decided_on": "2026-07-24",
+            },
+            "status": "resolved",
+        },
+    ]
+    _write(repo_root, DEFAULT_CUSTODY_PATH, serialize_custody(policy))
+    return policy
+
+
 class CustodyPolicyTests(unittest.TestCase):
     def assert_failure(
         self,
@@ -384,6 +453,46 @@ class CustodyPolicyTests(unittest.TestCase):
                 ),
             )
 
+    def test_p11_n_01_resolved_owner_and_retention_validate(self) -> None:
+        # Given: The exact v2 owner and retention decisions with restore still open.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            policy = _resolved_fixture(repo_root)
+
+            # When: The versioned policy and pinned sources are verified.
+            verified = verify_custody(repo_root)
+
+            # Then: Owner and retention are resolved without resolving restore.
+            self.assertEqual(policy, verified)
+            self.assertEqual("yanagihashi", verified["asset_owner"]["identity"])
+            self.assertEqual(
+                "retain-until-superseded",
+                verified["retention"]["policy"],
+            )
+            self.assertEqual(
+                ["resolved", "open", "resolved"],
+                [item["status"] for item in verified["open_items"]],
+            )
+            self.assertEqual(
+                "not_identified",
+                verified["restore"]["source_status"],
+            )
+
+    def test_p11_n_02_resolved_policy_serialization_is_deterministic(self) -> None:
+        # Given: A valid v2 policy and the same keys in reverse insertion order.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            policy = _resolved_fixture(Path(temporary_directory))
+            reordered = dict(reversed(list(policy.items())))
+
+            # When: Both representations are serialized.
+            first = serialize_custody(policy)
+            second = serialize_custody(reordered)
+
+            # Then: Canonical bytes are identical and round-trip as schema v2.
+            self.assertEqual(first, second)
+            self.assertEqual(2, json.loads(first)["schema_version"])
+            self.assertEqual(policy, load_custody_data(json.loads(first)))
+
     def test_c4_a_01_schema_null_empty_type_and_boundaries_fail(self) -> None:
         # Given: NULL/empty policies and schema/version type or boundary mutations.
         invalid_values: list[tuple[object, str]] = [
@@ -396,7 +505,7 @@ class CustodyPolicyTests(unittest.TestCase):
                 candidate = copy.deepcopy(policy)
                 candidate["schema"] = schema
                 invalid_values.append((candidate, "custody.schema"))
-            for version in (None, True, "1", 0, 2):
+            for version in (None, True, "1", 0, 3):
                 candidate = copy.deepcopy(policy)
                 candidate["schema_version"] = version
                 invalid_values.append((candidate, "custody.schema_version"))
@@ -408,6 +517,227 @@ class CustodyPolicyTests(unittest.TestCase):
                         CustodyValidationError,
                         code,
                         lambda value=value: load_custody_data(value),
+                    )
+
+    def test_p11_a_01_resolved_owner_tampering_fails_closed(self) -> None:
+        # Given: A valid v2 policy with owner identity, decision, or shape drift.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            policy = _resolved_fixture(Path(temporary_directory))
+            mutations: list[tuple[dict[str, Any], str]] = []
+            for field, value in (
+                ("verdict", "owner_decision_required"),
+                ("identity", "repository-owner"),
+                ("decided_on", "2026-07-25"),
+                ("item_id", "P0-C4-RETENTION"),
+            ):
+                candidate = copy.deepcopy(policy)
+                candidate["asset_owner"][field] = value
+                mutations.append(
+                    (
+                        candidate,
+                        "asset owner must match the exact resolved owner decision",
+                    )
+                )
+            wrong_authority = copy.deepcopy(policy)
+            wrong_authority["asset_owner"]["authority"]["anchor"] = (
+                "dispatch-owner-decisions-20260725"
+            )
+            mutations.append(
+                (
+                    wrong_authority,
+                    (
+                        "authority must reference the exact owner-decision "
+                        "roadmap anchor"
+                    ),
+                )
+            )
+            extra = copy.deepcopy(policy)
+            extra["asset_owner"]["expiry"] = None
+            mutations.append(
+                (
+                    extra,
+                    "asset_owner must contain exactly the authorized fields",
+                )
+            )
+
+            # When/Then: Every unsupported owner mutation is a typed hard failure.
+            for candidate, message in mutations:
+                self.assert_exact_failure(
+                    CustodyValidationError,
+                    "custody.asset_owner",
+                    message,
+                    lambda candidate=candidate: load_custody_data(candidate),
+                )
+
+    def test_p11_a_02_resolved_retention_tampering_fails_closed(self) -> None:
+        # Given: A valid v2 policy with policy, constraint, or authority drift.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            policy = _resolved_fixture(Path(temporary_directory))
+            mutations: list[tuple[dict[str, Any], str]] = []
+            for field, value in (
+                ("verdict", "owner_decision_required"),
+                ("policy", "delete-after-30-days"),
+                ("decided_on", "2026-07-25"),
+                ("item_id", "P0-C4-ASSET-OWNER"),
+                ("constraints", RETENTION_CONSTRAINTS[:-1]),
+                (
+                    "reevaluation_requires",
+                    RETENTION_REEVALUATION_REQUIRES[:-1],
+                ),
+            ):
+                candidate = copy.deepcopy(policy)
+                candidate["retention"][field] = value
+                mutations.append(
+                    (
+                        candidate,
+                        "retention must match the exact resolved no-deletion policy",
+                    )
+                )
+            wrong_authority = copy.deepcopy(policy)
+            wrong_authority["retention"]["authority"]["document"] = (
+                "/absolute/roadmap.html"
+            )
+            mutations.append(
+                (
+                    wrong_authority,
+                    (
+                        "authority must reference the exact owner-decision "
+                        "roadmap anchor"
+                    ),
+                )
+            )
+            for forbidden_field, value in (
+                ("expiry", "2027-07-24"),
+                ("deletion_disposition", "delete"),
+            ):
+                candidate = copy.deepcopy(policy)
+                candidate["retention"][forbidden_field] = value
+                mutations.append(
+                    (
+                        candidate,
+                        "retention must contain exactly the authorized fields",
+                    )
+                )
+
+            # When/Then: Expiry/deletion invention and all drift fail closed.
+            for candidate, message in mutations:
+                self.assert_exact_failure(
+                    CustodyValidationError,
+                    "custody.retention",
+                    message,
+                    lambda candidate=candidate: load_custody_data(candidate),
+                )
+
+    def test_p11_a_03_resolution_links_and_restore_state_fail_closed(self) -> None:
+        # Given: A valid v2 policy with resolution or restore-state contradictions.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            policy = _resolved_fixture(Path(temporary_directory))
+            mutations: list[tuple[dict[str, Any], str]] = []
+            wrong_status = copy.deepcopy(policy)
+            wrong_status["open_items"][0]["status"] = "open"
+            mutations.append(
+                (
+                    wrong_status,
+                    (
+                        "open_items must resolve owner and retention while "
+                        "restore stays open"
+                    ),
+                )
+            )
+            wrong_resolution = copy.deepcopy(policy)
+            wrong_resolution["open_items"][2]["resolution"]["decided_on"] = (
+                "2026-07-25"
+            )
+            mutations.append(
+                (
+                    wrong_resolution,
+                    (
+                        "open_items must resolve owner and retention while "
+                        "restore stays open"
+                    ),
+                )
+            )
+            missing_resolution = copy.deepcopy(policy)
+            missing_resolution["open_items"][0].pop("resolution")
+            mutations.append(
+                (
+                    missing_resolution,
+                    (
+                        "open item fields must match their exact open/resolved "
+                        "state"
+                    ),
+                )
+            )
+            resolved_restore_item = copy.deepcopy(policy)
+            resolved_restore_item["open_items"][1] = {
+                "id": "P0-C4-RESTORE-SOURCE",
+                "resolution": {
+                    "authority": copy.deepcopy(DECISION_AUTHORITY),
+                    "decided_on": "2026-07-24",
+                },
+                "status": "resolved",
+            }
+            mutations.append(
+                (
+                    resolved_restore_item,
+                    (
+                        "open item fields must match their exact open/resolved "
+                        "state"
+                    ),
+                )
+            )
+
+            # When/Then: The exact two-resolved/one-open set is required.
+            for candidate, message in mutations:
+                self.assert_exact_failure(
+                    CustodyValidationError,
+                    "custody.open_items",
+                    message,
+                    lambda candidate=candidate: load_custody_data(candidate),
+                )
+
+            changed_restore = copy.deepcopy(policy)
+            changed_restore["restore"]["source_status"] = "identified"
+
+            # When/Then: Restore itself remains the unchanged typed open state.
+            self.assert_exact_failure(
+                CustodyValidationError,
+                "custody.restore",
+                "restore must remain not performed with no identified source",
+                lambda: load_custody_data(changed_restore),
+            )
+
+    def test_p11_a_04_open_item_type_and_length_fail_closed(self) -> None:
+        # Given: V2 open_items with a non-list value or one item below/above three.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            policy = _resolved_fixture(Path(temporary_directory))
+            cases: tuple[object, ...] = (
+                {"not": "a-list"},
+                copy.deepcopy(policy["open_items"][:2]),
+                copy.deepcopy(policy["open_items"])
+                + [
+                    {
+                        "id": "P0-C4-EXTRA",
+                        "reason": "unknown",
+                        "status": "open",
+                    }
+                ],
+            )
+
+            # When: Each invalid type or length is validated.
+            # Then: The shared v2 array guard emits its exact typed failure.
+            for open_items in cases:
+                with self.subTest(open_items=open_items):
+                    candidate = copy.deepcopy(policy)
+                    candidate["open_items"] = open_items
+                    self.assert_exact_failure(
+                        CustodyValidationError,
+                        "custody.open_items",
+                        (
+                            "open_items must be the exact sorted three-item "
+                            "resolution array"
+                        ),
+                        lambda candidate=candidate: load_custody_data(candidate),
                     )
 
     def test_c4_a_02_closed_fields_duplicate_json_and_empty_values_fail(self) -> None:

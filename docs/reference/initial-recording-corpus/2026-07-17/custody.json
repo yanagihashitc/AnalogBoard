@@ -1,8 +1,13 @@
 {
   "asset_owner": {
-    "identity": null,
-    "open_item": "P0-C4-ASSET-OWNER",
-    "verdict": "owner_decision_required"
+    "authority": {
+      "anchor": "dispatch-owner-decisions-20260724-2",
+      "document": "task_management/260710-cross-repo-execution-roadmap.html"
+    },
+    "decided_on": "2026-07-24",
+    "identity": "yanagihashi",
+    "item_id": "P0-C4-ASSET-OWNER",
+    "verdict": "resolved"
   },
   "at_rest": {
     "authorized_location": "asset-retaining-machine",
@@ -35,8 +40,14 @@
   "open_items": [
     {
       "id": "P0-C4-ASSET-OWNER",
-      "reason": "asset_owner_decision_required",
-      "status": "open"
+      "resolution": {
+        "authority": {
+          "anchor": "dispatch-owner-decisions-20260724-2",
+          "document": "task_management/260710-cross-repo-execution-roadmap.html"
+        },
+        "decided_on": "2026-07-24"
+      },
+      "status": "resolved"
     },
     {
       "id": "P0-C4-RESTORE-SOURCE",
@@ -45,8 +56,14 @@
     },
     {
       "id": "P0-C4-RETENTION",
-      "reason": "retention_policy_decision_required",
-      "status": "open"
+      "resolution": {
+        "authority": {
+          "anchor": "dispatch-owner-decisions-20260724-2",
+          "document": "task_management/260710-cross-repo-execution-roadmap.html"
+        },
+        "decided_on": "2026-07-24"
+      },
+      "status": "resolved"
     }
   ],
   "reacquisition": {
@@ -63,12 +80,26 @@
     "verification": null
   },
   "retention": {
-    "open_item": "P0-C4-RETENTION",
-    "policy": null,
-    "verdict": "owner_decision_required"
+    "authority": {
+      "anchor": "dispatch-owner-decisions-20260724-2",
+      "document": "task_management/260710-cross-repo-execution-roadmap.html"
+    },
+    "constraints": [
+      "expiry_unset",
+      "deletion_prohibited"
+    ],
+    "decided_on": "2026-07-24",
+    "item_id": "P0-C4-RETENTION",
+    "policy": "retain-until-superseded",
+    "reevaluation_requires": [
+      "c9-frozen-corpus-materialized",
+      "verified-restore-source-established",
+      "owner-explicit-reevaluation"
+    ],
+    "verdict": "resolved"
   },
   "schema": "analogboard.phase0.initial-recording-corpus-custody",
-  "schema_version": 1,
+  "schema_version": 2,
   "source_references": {
     "corpus_contract": {
       "path": "docs/reference/initial-recording-corpus/2026-07-17/contract.json",
@@ -88,8 +119,8 @@
     },
     "plan": {
       "path": "docs/plans/260710-analogboard-rebuild-plan.html",
-      "revision": "Draft 4.7",
-      "sha256": "d0c927375efdb491159e4980e8b57f62210de7b4bc8b15db43a63c7acee36b66"
+      "revision": "Draft 4.11",
+      "sha256": "c7d9b07630f83c84a0ae119cc6ab707b1dc6aee5efffe4f85f3afaee2d682186"
     },
     "recovery_procedure": {
       "path": "docs/operations/initial-recording-corpus/restore-and-reacquisition.md",
