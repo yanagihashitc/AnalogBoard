@@ -159,7 +159,7 @@
       "path": "docs/reference/initial-recording-corpus/2026-07-17/custody.json",
       "schema": "analogboard.phase0.initial-recording-corpus-custody",
       "schema_version": 1,
-      "sha256": "8b82a35ad710e8832af741f21ea777d0707fa1f870058cdf5fff3ebc3f285ec5"
+      "sha256": "5daca5b4acefef98b09fb627707f144820bab804b0dd427d2c6dcd76881f611d"
     },
     "custody_tool": {
       "path": "scripts/corpus-index/corpus_custody.py",
@@ -167,7 +167,7 @@
     },
     "manifest_tool": {
       "path": "scripts/corpus-index/corpus_index.py",
-      "sha256": "55d92c5cac861613940d6f4f18d75fbcf19c3a81dc0a088966b1798708e92453"
+      "sha256": "4297ec3b4067529d8c69d7164b248ddf6e548b150cae0c580e69fcdbfc89b737"
     },
     "plan": {
       "path": "docs/plans/260710-analogboard-rebuild-plan.html",
@@ -186,7 +186,7 @@
     },
     "relationship_tool": {
       "path": "scripts/corpus-index/corpus_relationships.py",
-      "sha256": "ada2a096722485f28b5a61ae2542dc401909e9a0af787527e142222026d08190"
+      "sha256": "f58977ce9530c0e75488d93575764b4397f29c2d1ead553fa7cf560f873f12f7"
     },
     "relationships": {
       "path": "docs/reference/initial-recording-corpus/2026-07-17/relationships.json",

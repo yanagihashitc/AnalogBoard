@@ -132,6 +132,58 @@ USB_CAPTURE_FIELDS = frozenset(
 USB_CONSTRAINT_FIELDS = frozenset(
     {"d19", "failure_trace_present", "raw_payload_tracked"}
 )
+USB_BOUNDED_SUMMARY_FIELDS = frozenset(
+    {
+        "byte_identity_runs",
+        "capture_summary_schema_version",
+        "path",
+        "schema",
+        "schema_version",
+        "sha256",
+        "size_bytes",
+    }
+)
+USB_CAPTURE_ANALYSIS_FIELDS = frozenset(
+    {"path", "schema", "schema_version", "sha256", "size_bytes"}
+)
+USB_INTERFACE_FIELDS = frozenset(
+    {
+        "capture_length",
+        "description",
+        "encapsulation",
+        "file_encapsulation",
+        "file_type",
+        "index",
+        "name",
+    }
+)
+USB_SOURCE_MANIFEST_FIELDS = frozenset(
+    {"path", "schema", "schema_version", "sha256", "size_bytes"}
+)
+USB_TOOLS_FIELDS = frozenset({"capinfos", "tshark"})
+USB_TOOL_FIELDS = frozenset({"path", "version"})
+USB_REQUIRED_TSHARK_FIELDS = (
+    "frame.number",
+    "frame.time_epoch",
+    "frame.time_relative",
+    "frame.cap_len",
+    "frame.len",
+    "usb.bus_id",
+    "usb.device_address",
+    "usb.irp_id",
+    "usb.urb_type",
+    "usb.irp_info.direction",
+    "usb.function",
+    "usb.transfer_type",
+    "usb.endpoint_address",
+    "usb.usbd_status",
+    "usb.urb_len",
+    "usb.data_len",
+    "usb.idVendor",
+    "usb.idProduct",
+    "usb.bInterfaceNumber",
+)
+USB_CAPTURE_DURATION_PATTERN = re.compile(r"^[0-9]+[.][0-9]{6}$")
 EVIDENCE_FIELDS = frozenset(
     {
         "schema",
@@ -977,8 +1029,51 @@ def _validate_cfg(
     return result
 
 
+def _exact_usb_object(
+    value: object,
+    fields: frozenset[str],
+    *,
+    code: str,
+    message: str,
+) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != set(fields):
+        raise SourceReferenceError(code, message)
+    return value
+
+
+def _validate_usb_file_reference(
+    value: object,
+    fields: frozenset[str],
+    *,
+    schema: str,
+    schema_version: int,
+    fields_code: str,
+    fields_message: str,
+    value_code: str,
+    value_message: str,
+) -> dict[str, Any]:
+    reference = _exact_usb_object(
+        value,
+        fields,
+        code=fields_code,
+        message=fields_message,
+    )
+    if (
+        not _normalized_relative_path(reference.get("path"))
+        or reference.get("schema") != schema
+        or not _is_int(reference.get("schema_version"))
+        or reference["schema_version"] != schema_version
+        or not isinstance(reference.get("sha256"), str)
+        or SHA256_PATTERN.fullmatch(reference["sha256"]) is None
+        or not _is_int(reference.get("size_bytes"))
+        or reference["size_bytes"] < 0
+    ):
+        raise SourceReferenceError(value_code, value_message)
+    return reference
+
+
 def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    if _unknown_fields(value, USB_FIELDS):
+    if not isinstance(value, dict) or set(value) != set(USB_FIELDS):
         raise SourceReferenceError(
             "relationship.usb.fields",
             "USB manifest fields are invalid",
@@ -993,6 +1088,38 @@ def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "relationship.usb.schema_version",
             "USB manifest schema_version must be 1",
         )
+    source_root = value.get("source_root")
+    analysis_root = value.get("analysis_root")
+    captured_date = value.get("captured_date")
+    try:
+        parsed_captured_date = (
+            datetime.strptime(captured_date, "%Y-%m-%d")
+            if isinstance(captured_date, str)
+            else None
+        )
+    except ValueError:
+        parsed_captured_date = None
+    if (
+        not _normalized_relative_path(source_root)
+        or not _normalized_relative_path(analysis_root)
+        or analysis_root != f"{source_root}/analysis"
+        or parsed_captured_date is None
+        or parsed_captured_date.strftime("%Y-%m-%d") != captured_date
+    ):
+        raise SourceReferenceError(
+            "relationship.usb.value",
+            "USB manifest values are invalid",
+        )
+    if value.get("provisional") is not True:
+        raise SourceReferenceError(
+            "relationship.usb.provisional",
+            "USB manifest must remain provisional",
+        )
+    if value.get("required_tshark_fields") != list(USB_REQUIRED_TSHARK_FIELDS):
+        raise SourceReferenceError(
+            "relationship.usb.required_tshark_fields",
+            "USB required TShark fields are invalid",
+        )
     if value.get("timestamp_basis") != (
         "pcapng packet timestamps rendered by Capinfos; "
         "timezone is not declared by the report"
@@ -1001,6 +1128,88 @@ def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "relationship.capture.timestamp_basis",
             "USB timestamp basis must remain Capinfos with undeclared timezone",
         )
+    bounded_summary = _exact_usb_object(
+        value.get("bounded_summary"),
+        USB_BOUNDED_SUMMARY_FIELDS,
+        code="relationship.usb.bounded_summary.fields",
+        message="USB bounded summary fields are invalid",
+    )
+    if (
+        bounded_summary.get("byte_identity_runs") != 2
+        or bounded_summary.get("capture_summary_schema_version") != 2
+        or not _normalized_relative_path(bounded_summary.get("path"))
+        or not str(bounded_summary["path"]).startswith(f"{analysis_root}/")
+        or bounded_summary.get("schema")
+        != "analogboard.phase0.usbpcap-extraction-bundle"
+        or not _is_int(bounded_summary.get("schema_version"))
+        or bounded_summary["schema_version"] != 1
+        or not isinstance(bounded_summary.get("sha256"), str)
+        or SHA256_PATTERN.fullmatch(bounded_summary["sha256"]) is None
+        or not _is_int(bounded_summary.get("size_bytes"))
+        or bounded_summary["size_bytes"] < 0
+    ):
+        raise SourceReferenceError(
+            "relationship.usb.bounded_summary.value",
+            "USB bounded summary values are invalid",
+        )
+    interface = _exact_usb_object(
+        value.get("interface"),
+        USB_INTERFACE_FIELDS,
+        code="relationship.usb.interface.fields",
+        message="USB interface fields are invalid",
+    )
+    if (
+        not _is_int(interface.get("capture_length"))
+        or interface["capture_length"] < 1
+        or not _is_int(interface.get("index"))
+        or interface["index"] < 0
+        or interface.get("file_type") != "pcapng"
+        or interface.get("file_encapsulation") != "usb-usbpcap"
+        or any(
+            not isinstance(interface.get(field), str) or not interface[field]
+            for field in ("description", "encapsulation", "name")
+        )
+    ):
+        raise SourceReferenceError(
+            "relationship.usb.interface.value",
+            "USB interface values are invalid",
+        )
+    source_manifest = _validate_usb_file_reference(
+        value.get("source_manifest"),
+        USB_SOURCE_MANIFEST_FIELDS,
+        schema="analogboard.phase0.usbpcap-source-manifest",
+        schema_version=1,
+        fields_code="relationship.usb.source_manifest.fields",
+        fields_message="USB source manifest fields are invalid",
+        value_code="relationship.usb.source_manifest.value",
+        value_message="USB source manifest values are invalid",
+    )
+    if not str(source_manifest["path"]).startswith(f"{analysis_root}/"):
+        raise SourceReferenceError(
+            "relationship.usb.source_manifest.value",
+            "USB source manifest values are invalid",
+        )
+    tools = _exact_usb_object(
+        value.get("tools"),
+        USB_TOOLS_FIELDS,
+        code="relationship.usb.tools.fields",
+        message="USB tools fields are invalid",
+    )
+    for tool_name in sorted(USB_TOOLS_FIELDS):
+        tool = _exact_usb_object(
+            tools.get(tool_name),
+            USB_TOOL_FIELDS,
+            code="relationship.usb.tool.fields",
+            message="USB tool fields are invalid",
+        )
+        if any(
+            not isinstance(tool.get(field), str) or not tool[field]
+            for field in USB_TOOL_FIELDS
+        ):
+            raise SourceReferenceError(
+                "relationship.usb.tool.value",
+                "USB tool values are invalid",
+            )
     captures = value.get("captures")
     if not isinstance(captures, list):
         raise RelationshipMappingError(
@@ -1009,10 +1218,7 @@ def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
         )
     by_name: dict[str, dict[str, Any]] = {}
     for capture in captures:
-        if (
-            not isinstance(capture, dict)
-            or _unknown_fields(capture, USB_CAPTURE_FIELDS)
-        ):
+        if not isinstance(capture, dict) or set(capture) != set(USB_CAPTURE_FIELDS):
             raise SourceReferenceError(
                 "relationship.usb.capture.fields",
                 "USB capture fields are invalid",
@@ -1023,6 +1229,37 @@ def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 "relationship.capture.name",
                 "USB capture filename must be a string",
             )
+        analysis = _validate_usb_file_reference(
+            capture.get("analysis"),
+            USB_CAPTURE_ANALYSIS_FIELDS,
+            schema="analogboard.phase0.usbpcap-bounded-summary",
+            schema_version=2,
+            fields_code="relationship.usb.capture.analysis.fields",
+            fields_message="USB capture analysis fields are invalid",
+            value_code="relationship.usb.capture.analysis.value",
+            value_message="USB capture analysis values are invalid",
+        )
+        duration = capture.get("duration_seconds")
+        if (
+            not _normalized_relative_path(name)
+            or len(PurePosixPath(name).parts) != 1
+            or not isinstance(capture.get("sha256"), str)
+            or SHA256_PATTERN.fullmatch(capture["sha256"]) is None
+            or not _is_int(capture.get("size_bytes"))
+            or capture["size_bytes"] < 0
+            or not _is_int(capture.get("packet_count"))
+            or capture["packet_count"] < 0
+            or not isinstance(duration, str)
+            or USB_CAPTURE_DURATION_PATTERN.fullmatch(duration) is None
+            or float(duration) < 0
+            or not isinstance(capture.get("earliest_packet_time"), str)
+            or not isinstance(capture.get("latest_packet_time"), str)
+            or not str(analysis["path"]).startswith(f"{analysis_root}/")
+        ):
+            raise SourceReferenceError(
+                "relationship.usb.capture.value",
+                "USB capture values are invalid",
+            )
         if name in by_name:
             raise RelationshipMappingError(
                 "relationship.capture.duplicate",
@@ -1030,10 +1267,7 @@ def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
             )
         by_name[name] = capture
     constraints = value.get("constraints")
-    if (
-        not isinstance(constraints, dict)
-        or _unknown_fields(constraints, USB_CONSTRAINT_FIELDS)
-    ):
+    if not isinstance(constraints, dict):
         raise RelationshipMappingError(
             "relationship.failure_trace",
             "USB failure_trace_present must be boolean false",
@@ -1047,6 +1281,16 @@ def _validate_usb_manifest(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
         raise RelationshipMappingError(
             "relationship.payload_boundary",
             "USB raw_payload_tracked must be boolean false",
+        )
+    if set(constraints) != set(USB_CONSTRAINT_FIELDS):
+        raise SourceReferenceError(
+            "relationship.usb.constraints.fields",
+            "USB constraints fields are invalid",
+        )
+    if not isinstance(constraints.get("d19"), str) or not constraints["d19"]:
+        raise SourceReferenceError(
+            "relationship.usb.constraints.value",
+            "USB constraints values are invalid",
         )
     return by_name
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ MANIFEST_SCHEMA = "analogboard.phase0.initial-recording-corpus-manifest"
 MANIFEST_SCHEMA_VERSION = 1
 REQUIRED_KINDS = ("bin", "cfg", "telemetry", "capture")
 DEFAULT_CHUNK_SIZE = 1024 * 1024
+METADATA_READ_CHUNK_SIZE = 64 * 1024
 DEFAULT_CONTRACT_PATH = (
     "docs/reference/initial-recording-corpus/2026-07-17/contract.json"
 )
@@ -53,6 +55,9 @@ MANIFEST_FIELDS = frozenset(
     }
 )
 MANIFEST_ENTRY_FIELDS = frozenset({"kind", "path", "sha256", "size_bytes"})
+OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
+STAT_SUPPORTS_NO_FOLLOW = os.stat in os.supports_follow_symlinks
 
 
 class CorpusIndexError(Exception):
@@ -71,6 +76,10 @@ class SourceUnreadableError(CorpusIndexError): pass
 class IntegrityMismatchError(CorpusIndexError): pass
 class ManifestValidationError(CorpusIndexError): pass
 class TotalBytesMismatchError(CorpusIndexError): pass
+
+
+class _SymlinkTraversalError(OSError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -172,6 +181,169 @@ def _required_string(
     if not isinstance(value, str) or not value:
         raise ContractValidationError(code, f"{field_name} must be a non-empty string")
     return value
+
+
+def _require_descriptor_no_follow() -> tuple[int, int]:
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if (
+        no_follow == 0
+        or directory == 0
+        or not OPEN_SUPPORTS_DIR_FD
+        or not STAT_SUPPORTS_DIR_FD
+        or not STAT_SUPPORTS_NO_FOLLOW
+    ):
+        raise OSError("descriptor no-follow traversal is unavailable")
+    return no_follow, directory
+
+
+def _metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _read_regular_no_follow(path: Path) -> bytes:
+    """Read a stable regular file through already-open no-follow descriptors."""
+    no_follow, directory = _require_descriptor_no_follow()
+    absolute = path.absolute()
+    if not absolute.anchor:
+        raise OSError("path must have an absolute anchor")
+    close_on_exec = getattr(os, "O_CLOEXEC", 0)
+    directory_flags = os.O_RDONLY | directory | no_follow | close_on_exec
+    file_flags = os.O_RDONLY | no_follow | close_on_exec
+    directory_descriptors: list[int] = []
+    file_descriptor: int | None = None
+    try:
+        root_descriptor = os.open(
+            absolute.anchor,
+            os.O_RDONLY | directory | close_on_exec,
+        )
+        directory_descriptors.append(root_descriptor)
+        parent_descriptor = root_descriptor
+        parts = absolute.parts[1:]
+        if not parts:
+            raise OSError("path must identify a file")
+        for part in parts[:-1]:
+            before = os.stat(
+                part,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            if stat.S_ISLNK(before.st_mode):
+                raise _SymlinkTraversalError("symlink component is not allowed")
+            if not stat.S_ISDIR(before.st_mode):
+                raise OSError("path component is not a directory")
+            try:
+                opened = os.open(
+                    part,
+                    directory_flags,
+                    dir_fd=parent_descriptor,
+                )
+            except OSError as error:
+                if error.errno == errno.ELOOP:
+                    raise _SymlinkTraversalError(
+                        "symlink component is not allowed"
+                    ) from error
+                raise
+            try:
+                after = os.fstat(opened)
+            except BaseException:
+                os.close(opened)
+                raise
+            if (
+                not stat.S_ISDIR(after.st_mode)
+                or (before.st_dev, before.st_ino)
+                != (after.st_dev, after.st_ino)
+            ):
+                os.close(opened)
+                raise OSError("directory identity changed during open")
+            directory_descriptors.append(opened)
+            parent_descriptor = opened
+
+        leaf = parts[-1]
+        before = os.stat(
+            leaf,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        if stat.S_ISLNK(before.st_mode):
+            raise _SymlinkTraversalError("symlink leaf is not allowed")
+        if not stat.S_ISREG(before.st_mode):
+            raise OSError("path leaf is not a regular file")
+        try:
+            file_descriptor = os.open(
+                leaf,
+                file_flags,
+                dir_fd=parent_descriptor,
+            )
+        except OSError as error:
+            if error.errno == errno.ELOOP:
+                raise _SymlinkTraversalError(
+                    "symlink leaf is not allowed"
+                ) from error
+            raise
+        opened = os.fstat(file_descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or (before.st_dev, before.st_ino)
+            != (opened.st_dev, opened.st_ino)
+        ):
+            raise OSError("file identity changed during open")
+
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(
+                file_descriptor,
+                min(METADATA_READ_CHUNK_SIZE, remaining),
+            )
+            if not chunk:
+                raise OSError("file ended before its recorded size")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        final = os.fstat(file_descriptor)
+        if _metadata_signature(opened) != _metadata_signature(final):
+            raise OSError("file changed while reading")
+        return b"".join(chunks)
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        for descriptor in reversed(directory_descriptors):
+            os.close(descriptor)
+
+
+def _decode_metadata_json(
+    payload: bytes,
+    *,
+    error_type: type[CorpusIndexError],
+    invalid_code: str,
+    invalid_message: str,
+    duplicate_code: str,
+    duplicate_message: str,
+) -> object:
+    def strict_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise error_type(duplicate_code, duplicate_message)
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=strict_pairs,
+        )
+    except error_type:
+        raise
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise error_type(invalid_code, invalid_message) from error
 
 
 def _parse_asset_kinds(value: object) -> tuple[AssetKind, ...]:
@@ -430,13 +602,25 @@ def load_contract_data(value: object) -> CorpusContract:
 
 def load_contract(path: Path) -> CorpusContract:
     try:
-        text = path.read_text(encoding="utf-8")
-        value = json.loads(text)
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        payload = _read_regular_no_follow(path)
+    except _SymlinkTraversalError as error:
+        raise ContractValidationError(
+            "contract.path.symlink",
+            "contract must be a regular file without symlink traversal",
+        ) from error
+    except OSError as error:
         raise ContractValidationError(
             "contract.json.invalid",
             "contract must contain valid UTF-8 JSON",
         ) from error
+    value = _decode_metadata_json(
+        payload,
+        error_type=ContractValidationError,
+        invalid_code="contract.json.invalid",
+        invalid_message="contract must contain valid UTF-8 JSON",
+        duplicate_code="contract.json.duplicate_key",
+        duplicate_message="contract must not contain duplicate JSON keys",
+    )
     return load_contract_data(value)
 
 
@@ -956,13 +1140,25 @@ def verify_manifest(
 
 def load_manifest(path: Path) -> object:
     try:
-        text = path.read_text(encoding="utf-8")
-        return json.loads(text)
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        payload = _read_regular_no_follow(path)
+    except _SymlinkTraversalError as error:
+        raise ManifestValidationError(
+            "manifest.path.symlink",
+            "manifest must be a regular file without symlink traversal",
+        ) from error
+    except OSError as error:
         raise ManifestValidationError(
             "manifest.json.invalid",
             "manifest must contain valid UTF-8 JSON",
         ) from error
+    return _decode_metadata_json(
+        payload,
+        error_type=ManifestValidationError,
+        invalid_code="manifest.json.invalid",
+        invalid_message="manifest must contain valid UTF-8 JSON",
+        duplicate_code="manifest.json.duplicate_key",
+        duplicate_message="manifest must not contain duplicate JSON keys",
+    )
 
 
 def _cli_relative_path(value: str, field_name: str) -> str:
@@ -1079,6 +1275,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         repo_root = Path(arguments.repo_root)
         contract_relative = _cli_relative_path(arguments.contract, "contract")
+        if contract_relative != DEFAULT_CONTRACT_PATH:
+            raise PathValidationError(
+                "path.contract.scope",
+                f"contract must be {DEFAULT_CONTRACT_PATH}",
+            )
         contract = load_contract(repo_root / PurePosixPath(contract_relative))
         if arguments.command == "build":
             output_relative = _cli_relative_path(arguments.output, "output")

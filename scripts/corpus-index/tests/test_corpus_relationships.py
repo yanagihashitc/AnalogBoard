@@ -61,6 +61,27 @@ TELEMETRY_HEADER = [
     "rearm_ms",
     "external_trigger_wait_ms",
 ]
+USB_REQUIRED_TSHARK_FIELDS = [
+    "frame.number",
+    "frame.time_epoch",
+    "frame.time_relative",
+    "frame.cap_len",
+    "frame.len",
+    "usb.bus_id",
+    "usb.device_address",
+    "usb.irp_id",
+    "usb.urb_type",
+    "usb.irp_info.direction",
+    "usb.function",
+    "usb.transfer_type",
+    "usb.endpoint_address",
+    "usb.usbd_status",
+    "usb.urb_len",
+    "usb.data_len",
+    "usb.idVendor",
+    "usb.idProduct",
+    "usb.bInterfaceNumber",
+]
 
 
 def _canonical_json(value: object) -> bytes:
@@ -312,6 +333,17 @@ class SyntheticRelationshipCorpus:
 
         unique_captures = sorted(set(captures))
         self.usb_manifest: dict[str, Any] = {
+            "analysis_root": "fixtures/corpus/analysis",
+            "bounded_summary": {
+                "byte_identity_runs": 2,
+                "capture_summary_schema_version": 2,
+                "path": "fixtures/corpus/analysis/bounded_summary.json",
+                "schema": "analogboard.phase0.usbpcap-extraction-bundle",
+                "schema_version": 1,
+                "sha256": "a" * 64,
+                "size_bytes": 1,
+            },
+            "captured_date": "2026-07-17",
             "schema": USB_MANIFEST_SCHEMA,
             "schema_version": 1,
             "timestamp_basis": (
@@ -323,6 +355,35 @@ class SyntheticRelationshipCorpus:
                 "d19": "synthetic local-only",
                 "failure_trace_present": False,
                 "raw_payload_tracked": False,
+            },
+            "interface": {
+                "capture_length": 8_000_000,
+                "description": "synthetic",
+                "encapsulation": "USB packets with USBPcap header",
+                "file_encapsulation": "usb-usbpcap",
+                "file_type": "pcapng",
+                "index": 0,
+                "name": "USBPcap1",
+            },
+            "provisional": True,
+            "required_tshark_fields": list(USB_REQUIRED_TSHARK_FIELDS),
+            "source_manifest": {
+                "path": "fixtures/corpus/analysis/source_manifest.json",
+                "schema": "analogboard.phase0.usbpcap-source-manifest",
+                "schema_version": 1,
+                "sha256": "b" * 64,
+                "size_bytes": 1,
+            },
+            "source_root": "fixtures/corpus",
+            "tools": {
+                "capinfos": {
+                    "path": "capinfos.exe",
+                    "version": "Capinfos synthetic",
+                },
+                "tshark": {
+                    "path": "tshark.exe",
+                    "version": "TShark synthetic",
+                },
             },
         }
         for capture_index, capture in enumerate(unique_captures, start=1):
@@ -344,6 +405,17 @@ class SyntheticRelationshipCorpus:
             latest_minute = max(mapped_minutes)
             self.usb_manifest["captures"].append(
                 {
+                    "analysis": {
+                        "path": (
+                            "fixtures/corpus/analysis/"
+                            f"{Path(capture).stem}.summary.json"
+                        ),
+                        "schema": "analogboard.phase0.usbpcap-bounded-summary",
+                        "schema_version": 2,
+                        "sha256": "c" * 64,
+                        "size_bytes": 1,
+                    },
+                    "duration_seconds": "60.000000",
                     "filename": capture,
                     "size_bytes": capture_index,
                     "sha256": capture_identity,
@@ -355,6 +427,7 @@ class SyntheticRelationshipCorpus:
                         f"2026-07-17 {latest_minute // 100:02d}:"
                         f"{latest_minute % 100 + 1:02d}:00.000000"
                     ),
+                    "packet_count": 1,
                 }
             )
 
@@ -1394,6 +1467,114 @@ class CorpusRelationshipTests(unittest.TestCase):
                 "USB raw_payload_tracked must be boolean false",
                 fixture.build,
             )
+
+    def test_pr9_cx_a01_usb_index_requires_complete_nested_schema(self) -> None:
+        # Given: One required field is removed from each USB index object shape.
+        cases = (
+            (
+                "top",
+                lambda value: value.pop("provisional"),
+                "relationship.usb.fields",
+                "USB manifest fields are invalid",
+            ),
+            (
+                "bounded-summary",
+                lambda value: value["bounded_summary"].pop("path"),
+                "relationship.usb.bounded_summary.fields",
+                "USB bounded summary fields are invalid",
+            ),
+            (
+                "capture",
+                lambda value: value["captures"][0].pop("packet_count"),
+                "relationship.usb.capture.fields",
+                "USB capture fields are invalid",
+            ),
+            (
+                "capture-analysis",
+                lambda value: value["captures"][0]["analysis"].pop("schema"),
+                "relationship.usb.capture.analysis.fields",
+                "USB capture analysis fields are invalid",
+            ),
+            (
+                "constraints",
+                lambda value: value["constraints"].pop("d19"),
+                "relationship.usb.constraints.fields",
+                "USB constraints fields are invalid",
+            ),
+            (
+                "interface",
+                lambda value: value["interface"].pop("name"),
+                "relationship.usb.interface.fields",
+                "USB interface fields are invalid",
+            ),
+            (
+                "source-manifest",
+                lambda value: value["source_manifest"].pop("sha256"),
+                "relationship.usb.source_manifest.fields",
+                "USB source manifest fields are invalid",
+            ),
+            (
+                "tool",
+                lambda value: value["tools"]["tshark"].pop("version"),
+                "relationship.usb.tool.fields",
+                "USB tool fields are invalid",
+            ),
+        )
+        for name, mutate, code, message in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary_directory:
+                fixture = SyntheticRelationshipCorpus(Path(temporary_directory))
+                mutate(fixture.usb_manifest)
+                fixture.write_sources()
+
+                # When/Then: Re-pinning cannot make incomplete P0-C1-C3 evidence valid.
+                self.assert_failure(
+                    SourceReferenceError,
+                    code,
+                    message,
+                    fixture.build,
+                )
+
+    def test_pr9_cx_a02_usb_index_rejects_invalid_required_values(self) -> None:
+        # Given: Required USB evidence fields have boundary-invalid values.
+        cases = (
+            (
+                "provisional",
+                lambda value: value.update(provisional=False),
+                "relationship.usb.provisional",
+                "USB manifest must remain provisional",
+            ),
+            (
+                "capture-size-bool",
+                lambda value: value["captures"][0].update(size_bytes=True),
+                "relationship.usb.capture.value",
+                "USB capture values are invalid",
+            ),
+            (
+                "bounded-digest",
+                lambda value: value["bounded_summary"].update(sha256="invalid"),
+                "relationship.usb.bounded_summary.value",
+                "USB bounded summary values are invalid",
+            ),
+            (
+                "source-path",
+                lambda value: value["source_manifest"].update(path="../outside.json"),
+                "relationship.usb.source_manifest.value",
+                "USB source manifest values are invalid",
+            ),
+        )
+        for name, mutate, code, message in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary_directory:
+                fixture = SyntheticRelationshipCorpus(Path(temporary_directory))
+                mutate(fixture.usb_manifest)
+                fixture.write_sources()
+
+                # When/Then: Invalid values fail before relationship evidence is emitted.
+                self.assert_failure(
+                    SourceReferenceError,
+                    code,
+                    message,
+                    fixture.build,
+                )
 
     def test_r3_n_07_semantic_order_changes_keep_evidence_byte_identical(self) -> None:
         # Given: Equivalent relationship/session/source object orderings.

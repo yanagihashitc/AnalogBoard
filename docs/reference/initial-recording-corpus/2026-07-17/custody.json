@@ -84,7 +84,7 @@
     },
     "manifest_tool": {
       "path": "scripts/corpus-index/corpus_index.py",
-      "sha256": "55d92c5cac861613940d6f4f18d75fbcf19c3a81dc0a088966b1798708e92453"
+      "sha256": "4297ec3b4067529d8c69d7164b248ddf6e548b150cae0c580e69fcdbfc89b737"
     },
     "plan": {
       "path": "docs/plans/260710-analogboard-rebuild-plan.html",

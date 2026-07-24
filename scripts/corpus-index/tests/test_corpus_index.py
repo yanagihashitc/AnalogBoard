@@ -17,6 +17,7 @@ from corpus_index import (  # noqa: E402
     ChunkSizeError,
     ContractValidationError,
     CountMismatchError,
+    DEFAULT_CONTRACT_PATH,
     DEFAULT_MANIFEST_PATH,
     IntegrityMismatchError,
     ManifestValidationError,
@@ -30,6 +31,8 @@ from corpus_index import (  # noqa: E402
     hash_file,
     load_contract,
     load_contract_data,
+    load_manifest,
+    main,
     serialize_manifest,
     validate_manifest_metadata,
     verify_manifest,
@@ -835,6 +838,121 @@ class CorpusIndexContractTests(unittest.TestCase):
                 "contract must contain valid UTF-8 JSON",
                 lambda: load_contract(contract_path),
             )
+
+    def test_pr9_cx_a03_cli_rejects_alternate_contract_authority(self) -> None:
+        # Given: A valid alternate contract and the one authorized manifest target.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            write_small_corpus(repo_root)
+            alternate = repo_root / "alternate-contract.json"
+            alternate.write_text(
+                json.dumps(small_contract()),
+                encoding="utf-8",
+            )
+            (repo_root / Path(DEFAULT_MANIFEST_PATH).parent).mkdir(
+                parents=True,
+            )
+
+            # When: The CLI is asked to build from the alternate authority.
+            result = main(
+                [
+                    "--repo-root",
+                    str(repo_root),
+                    "--contract",
+                    "alternate-contract.json",
+                    "build",
+                    "--output",
+                    DEFAULT_MANIFEST_PATH,
+                ]
+            )
+
+            # Then: Scope validation fails before publishing the tracked manifest.
+            self.assertEqual(2, result)
+            self.assertFalse((repo_root / DEFAULT_MANIFEST_PATH).exists())
+
+    def test_pr9_cx_a04_metadata_loaders_reject_symlink_traversal(self) -> None:
+        # Given: Valid contract/manifest bytes reached through a symlink leaf or parent.
+        cases = (
+            (
+                "contract",
+                load_contract,
+                json.dumps(small_contract()).encode("utf-8"),
+                ContractValidationError,
+                "contract.path.symlink",
+                "contract must be a regular file without symlink traversal",
+            ),
+            (
+                "manifest",
+                load_manifest,
+                b"{}\n",
+                ManifestValidationError,
+                "manifest.path.symlink",
+                "manifest must be a regular file without symlink traversal",
+            ),
+        )
+        for role, loader, payload, error_type, code, message in cases:
+            for placement in ("leaf", "parent"):
+                with self.subTest(
+                    role=role,
+                    placement=placement,
+                ), tempfile.TemporaryDirectory() as temporary_directory:
+                    repo_root = Path(temporary_directory)
+                    actual_parent = repo_root / "actual"
+                    actual_parent.mkdir()
+                    actual = actual_parent / f"{role}.json"
+                    actual.write_bytes(payload)
+                    if placement == "leaf":
+                        candidate = repo_root / f"{role}.json"
+                        candidate.symlink_to(actual)
+                    else:
+                        linked_parent = repo_root / "linked"
+                        linked_parent.symlink_to(
+                            actual_parent,
+                            target_is_directory=True,
+                        )
+                        candidate = linked_parent / f"{role}.json"
+
+                    # When/Then: Neither loader follows the symlink target.
+                    self.assert_failure(
+                        error_type,
+                        code,
+                        message,
+                        lambda loader=loader, candidate=candidate: loader(candidate),
+                    )
+
+    def test_pr9_cx_a05_metadata_loaders_reject_duplicate_json_keys(self) -> None:
+        # Given: Contract and manifest JSON with one repeated key.
+        cases = (
+            (
+                "contract",
+                load_contract,
+                ContractValidationError,
+                "contract.json.duplicate_key",
+                "contract must not contain duplicate JSON keys",
+            ),
+            (
+                "manifest",
+                load_manifest,
+                ManifestValidationError,
+                "manifest.json.duplicate_key",
+                "manifest must not contain duplicate JSON keys",
+            ),
+        )
+        for role, loader, error_type, code, message in cases:
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as temporary_directory:
+                candidate = Path(temporary_directory) / f"{role}.json"
+                candidate.write_text(
+                    '{"schema":"first","schema":"second"}',
+                    encoding="utf-8",
+                )
+
+                # When/Then: Ambiguous JSON fails with a bounded role-specific error.
+                self.assert_failure(
+                    error_type,
+                    code,
+                    message,
+                    lambda loader=loader, candidate=candidate: loader(candidate),
+                )
 
     def test_unknown_contract_field_is_rejected(self) -> None:
         # Given: A versioned contract with an unrecognized payload-bearing field.
