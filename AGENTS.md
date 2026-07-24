@@ -107,6 +107,7 @@ All coding standards, test strategies, and project conventions are defined in:
 - **Proactively use skills**: When a task matches a skill's trigger (e.g., code review, brainstorming, refactoring, test creation, commit message generation), read and apply the relevant skill before starting work.
 - Do not declare skill usage without actually reading and following the skill's instructions.
 - If no relevant skill exists for a task, proceed with the standard workflow.
+- **skill が available-skills 一覧に surface されないことがある**。一覧に無いことを「skill 不在」と即断せず、`.claude/skills/<name>/SKILL.md`（codex は `.codex/skills` からも同一実体）の存在を確認し、実在すれば名前指定で invoke する。実在するのに一覧化されていないだけなら通常どおり使い、SKILL.md が本当に欠落している場合だけ不在として扱う。
 
 ### 再構築プラン実装用スキル（`.claude/skills/`）
 
@@ -163,6 +164,7 @@ Outputs produced by this app are consumed by `../sys_app`. When investigating ho
 - **Long-term over short-term**: 短期的な対症療法（その場しのぎ）ではなく、長期的視点で実装する。将来の保守性・拡張性・一貫性を優先し、症状ではなく根本原因を修正する。安易な回避策・ハードコード・技術的負債の先送りで済ませない。
 - **Global over local optimization**: 局所最適ではなく、gcsa・sys_app・AnalogBoard の3アプリ全体を俯瞰した全体最適で設計・実装する。単一リポジトリ内の都合だけで判断せず、アプリ横断の一貫性・整合性、データ/契約の流れ、共有インタフェースへの影響を優先する。リポジトリ横断の計画・契約・依存関係ゲートは、sibling `../task_management` リポジトリの active roadmap を正本とする。
 - Do not commit/push unless explicitly requested. Instructions recorded in the active batch of `tasks/todo.md` to run checkpoint/review `git commit` or `git push` count as explicit user authorization for those actions.
+- **commit/push の前に必ず `$claude-review-fixer` を実行する**（codex 実装フロー等、対話・手動作業での commit/push が対象）。review を通し、必要な findings を修正してから commit/push する——未 review のまま commit/push しない。skill が available-skills 一覧に出ていなくても、`.claude/skills/claude-review-fixer/SKILL.md`（codex は `.codex/skills` からも同一実体）の存在を確認して名前指定で実行する（上記 Skill Usage の確認手順に従う）。SKILL.md が本当に欠落している場合は commit/push せず報告する。自律 `/goal` フロー（P0-C4 等）はこの限りでなく、`goal.md` の Batch Checkpoint review pass と外部 review 制約に従う。
 - For modifications to **gcsa / sys_app**, present a modification prompt instead of making changes directly（下流改変プランに集約する）
 - For questions and confirmations: present recommended options and use **AskUserQuestion** or **ask_user_input** style
 
