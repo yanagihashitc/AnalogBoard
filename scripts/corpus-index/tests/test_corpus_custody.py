@@ -839,6 +839,33 @@ class CustodyPolicyTests(unittest.TestCase):
                     ),
                 )
 
+    def test_pr9_gh_a02_policy_decoder_bounds_recursion_and_integer_limits(self) -> None:
+        # Given: Pathological JSON at the exact custody policy path.
+        cases = (
+            (
+                "deep",
+                ("[" * 2_000 + "0" + "]" * 2_000).encode("utf-8"),
+            ),
+            (
+                "huge-integer",
+                ('{"schema":' + "9" * 5_000 + "}").encode("utf-8"),
+            ),
+        )
+        for name, payload in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary_directory:
+                repo_root = Path(temporary_directory)
+                policy_path = repo_root / DEFAULT_CUSTODY_PATH
+                policy_path.parent.mkdir(parents=True)
+                policy_path.write_bytes(payload)
+
+                # When/Then: Decoder limits stay behind one bounded typed error.
+                self.assert_exact_failure(
+                    CustodyValidationError,
+                    "custody.json.invalid",
+                    "custody policy must contain strict UTF-8 JSON",
+                    lambda repo_root=repo_root: verify_custody(repo_root),
+                )
+
     def test_c4_a_13_procedure_identity_sections_tokens_and_commands_fail(self) -> None:
         # Given: Missing/hash-drifted/incomplete or operational procedure variants.
         with tempfile.TemporaryDirectory() as temporary_directory:

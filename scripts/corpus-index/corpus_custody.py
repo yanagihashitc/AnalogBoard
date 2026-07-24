@@ -256,7 +256,12 @@ def _decode_strict_json(
         return json.loads(text, object_pairs_hook=_strict_pairs)
     except CustodyValidationError:
         raise
-    except (UnicodeError, json.JSONDecodeError) as error:
+    except (
+        UnicodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as error:
         raise error_type(code, message) from error
 
 

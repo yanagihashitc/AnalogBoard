@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import errno
 import hashlib
 import io
 import json
@@ -21,6 +20,8 @@ from corpus_index import (
     CorpusIndexError,
     ManifestValidationError,
     SHA256_PATTERN,
+    _SymlinkTraversalError,
+    _read_regular_no_follow,
     load_contract_data,
     validate_manifest_metadata,
 )
@@ -249,12 +250,6 @@ CAPTURE_TIME_PATTERN = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2} "
     r"[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{6}$"
 )
-READ_CHUNK_SIZE = 64 * 1024
-OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
-STAT_SUPPORTS_DIR_FD = os.stat in os.supports_dir_fd
-STAT_SUPPORTS_NO_FOLLOW = os.stat in os.supports_follow_symlinks
-
-
 class RelationshipError(CorpusIndexError): pass
 class RelationshipContractError(RelationshipError): pass
 class SourceReferenceError(RelationshipError): pass
@@ -264,10 +259,6 @@ class ClockPolicyError(RelationshipError): pass
 class TelemetryValidationError(RelationshipError): pass
 class EvidenceValidationError(RelationshipError): pass
 class RelationshipPathError(RelationshipError): pass
-
-
-class _SymlinkTraversalError(OSError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -310,10 +301,6 @@ def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _unknown_fields(value: Mapping[object, object], allowed: frozenset[str]) -> bool:
-    return any(key not in allowed for key in value)
-
-
 def _normalized_relative_path(value: object) -> bool:
     if not isinstance(value, str) or not value or "\\" in value:
         return False
@@ -333,7 +320,7 @@ def _strict_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         if key in result:
             raise RelationshipContractError(
                 "relationship.json.duplicate_key",
-                f"duplicate JSON key is not allowed: {key}",
+                "duplicate JSON key is not allowed",
             )
         result[key] = value
     return result
@@ -350,148 +337,13 @@ def _decode_strict_json(
         return json.loads(text, object_pairs_hook=_strict_pairs)
     except RelationshipContractError:
         raise
-    except (UnicodeError, json.JSONDecodeError) as error:
+    except (
+        UnicodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as error:
         raise SourceReferenceError(code, message) from error
-
-
-def _file_signature(metadata: os.stat_result) -> tuple[int, ...]:
-    return (
-        metadata.st_dev,
-        metadata.st_ino,
-        metadata.st_mode,
-        metadata.st_size,
-        metadata.st_mtime_ns,
-        metadata.st_ctime_ns,
-    )
-
-
-def _require_descriptor_no_follow() -> tuple[int, int]:
-    no_follow = getattr(os, "O_NOFOLLOW", 0)
-    directory = getattr(os, "O_DIRECTORY", 0)
-    if (
-        no_follow == 0
-        or directory == 0
-        or not OPEN_SUPPORTS_DIR_FD
-        or not STAT_SUPPORTS_DIR_FD
-        or not STAT_SUPPORTS_NO_FOLLOW
-    ):
-        raise OSError("descriptor no-follow traversal is unavailable")
-    return no_follow, directory
-
-
-def _read_regular_no_follow(
-    path: Path,
-    *,
-    maximum_bytes: int | None = None,
-) -> bytes:
-    """Read a stable regular file through already-open no-follow descriptors."""
-    no_follow, directory = _require_descriptor_no_follow()
-    if maximum_bytes is not None and maximum_bytes < 0:
-        raise ValueError("maximum_bytes must be non-negative")
-    absolute = path.absolute()
-    if not absolute.anchor:
-        raise OSError("path must have an absolute anchor")
-    close_on_exec = getattr(os, "O_CLOEXEC", 0)
-    directory_flags = os.O_RDONLY | directory | no_follow | close_on_exec
-    file_flags = os.O_RDONLY | no_follow | close_on_exec
-    directory_descriptors: list[int] = []
-    file_descriptor: int | None = None
-    try:
-        root_descriptor = os.open(
-            absolute.anchor,
-            os.O_RDONLY | directory | close_on_exec,
-        )
-        directory_descriptors.append(root_descriptor)
-        parent_descriptor = root_descriptor
-        parts = absolute.parts[1:]
-        if not parts:
-            raise OSError("path must identify a file")
-        for part in parts[:-1]:
-            before = os.stat(
-                part,
-                dir_fd=parent_descriptor,
-                follow_symlinks=False,
-            )
-            if stat.S_ISLNK(before.st_mode):
-                raise _SymlinkTraversalError("symlink component is not allowed")
-            if not stat.S_ISDIR(before.st_mode):
-                raise OSError("path component is not a directory")
-            try:
-                opened = os.open(
-                    part,
-                    directory_flags,
-                    dir_fd=parent_descriptor,
-                )
-            except OSError as error:
-                if error.errno == errno.ELOOP:
-                    raise _SymlinkTraversalError(
-                        "symlink component is not allowed"
-                    ) from error
-                raise
-            try:
-                after = os.fstat(opened)
-            except BaseException:
-                os.close(opened)
-                raise
-            if (
-                not stat.S_ISDIR(after.st_mode)
-                or (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino)
-            ):
-                os.close(opened)
-                raise OSError("directory identity changed during open")
-            directory_descriptors.append(opened)
-            parent_descriptor = opened
-
-        leaf = parts[-1]
-        before = os.stat(
-            leaf,
-            dir_fd=parent_descriptor,
-            follow_symlinks=False,
-        )
-        if stat.S_ISLNK(before.st_mode):
-            raise _SymlinkTraversalError("symlink leaf is not allowed")
-        if not stat.S_ISREG(before.st_mode):
-            raise OSError("path leaf is not a regular file")
-        try:
-            file_descriptor = os.open(
-                leaf,
-                file_flags,
-                dir_fd=parent_descriptor,
-            )
-        except OSError as error:
-            if error.errno == errno.ELOOP:
-                raise _SymlinkTraversalError(
-                    "symlink leaf is not allowed"
-                ) from error
-            raise
-        opened = os.fstat(file_descriptor)
-        if (
-            not stat.S_ISREG(opened.st_mode)
-            or (before.st_dev, before.st_ino)
-            != (opened.st_dev, opened.st_ino)
-        ):
-            raise OSError("file identity changed during open")
-
-        read_limit = opened.st_size
-        if maximum_bytes is not None:
-            read_limit = min(read_limit, maximum_bytes)
-        chunks: list[bytes] = []
-        remaining = read_limit
-        while remaining:
-            chunk = os.read(file_descriptor, min(READ_CHUNK_SIZE, remaining))
-            if not chunk:
-                raise OSError("file ended before its recorded size")
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        final = os.fstat(file_descriptor)
-        if _file_signature(opened) != _file_signature(final):
-            raise OSError("file changed while reading")
-        return b"".join(chunks)
-    finally:
-        if file_descriptor is not None:
-            os.close(file_descriptor)
-        for descriptor in reversed(directory_descriptors):
-            os.close(descriptor)
 
 
 def _read_regular_metadata(

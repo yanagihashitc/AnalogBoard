@@ -25,6 +25,7 @@ from corpus_index import (  # noqa: E402
     SourceUnreadableError,
     TotalBytesMismatchError,
     UnexpectedFileError,
+    _read_regular_no_follow,
     _secure_binary_opener,
     _write_manifest,
     build_manifest,
@@ -953,6 +954,30 @@ class CorpusIndexContractTests(unittest.TestCase):
                     message,
                     lambda loader=loader, candidate=candidate: loader(candidate),
                 )
+
+    def test_pr9_gh_n01_shared_metadata_reader_honors_byte_limit(self) -> None:
+        # Given: A stable regular metadata file and limits around its exact size.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            candidate = Path(temporary_directory) / "metadata.json"
+            candidate.write_bytes(b"abc")
+
+            # When/Then: The shared reader returns only the bounded stable prefix.
+            for maximum_bytes, expected in (
+                (0, b""),
+                (2, b"ab"),
+                (3, b"abc"),
+                (4, b"abc"),
+            ):
+                with self.subTest(maximum_bytes=maximum_bytes):
+                    self.assertEqual(
+                        expected,
+                        _read_regular_no_follow(
+                            candidate,
+                            maximum_bytes=maximum_bytes,
+                        ),
+                    )
+            with self.assertRaises(ValueError):
+                _read_regular_no_follow(candidate, maximum_bytes=-1)
 
     def test_unknown_contract_field_is_rejected(self) -> None:
         # Given: A versioned contract with an unrecognized payload-bearing field.

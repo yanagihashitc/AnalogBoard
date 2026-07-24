@@ -159,15 +159,15 @@
       "path": "docs/reference/initial-recording-corpus/2026-07-17/custody.json",
       "schema": "analogboard.phase0.initial-recording-corpus-custody",
       "schema_version": 1,
-      "sha256": "5daca5b4acefef98b09fb627707f144820bab804b0dd427d2c6dcd76881f611d"
+      "sha256": "6bd16a00cf272dce43bde77f172af50882d704b0276df59410fc5fdc64295295"
     },
     "custody_tool": {
       "path": "scripts/corpus-index/corpus_custody.py",
-      "sha256": "a0e24837493f784b9f417ad168a66afce634d16b51e1d7faa4f194b1d8127368"
+      "sha256": "df3d6404b67a33d6c901fae46472f6426a7034d77ecc204fa15a9a0b11cff530"
     },
     "manifest_tool": {
       "path": "scripts/corpus-index/corpus_index.py",
-      "sha256": "4297ec3b4067529d8c69d7164b248ddf6e548b150cae0c580e69fcdbfc89b737"
+      "sha256": "d6589cdf99c733f1eea8455fcb4cdfa1c3f4289aa9662375c7382769648d87f7"
     },
     "plan": {
       "path": "docs/plans/260710-analogboard-rebuild-plan.html",
@@ -186,7 +186,7 @@
     },
     "relationship_tool": {
       "path": "scripts/corpus-index/corpus_relationships.py",
-      "sha256": "f58977ce9530c0e75488d93575764b4397f29c2d1ead553fa7cf560f873f12f7"
+      "sha256": "4cad0b8d9c2f4cbe16eaad2cfb9ec2727cb8cd9e079be7a056d320ff559b9f2a"
     },
     "relationships": {
       "path": "docs/reference/initial-recording-corpus/2026-07-17/relationships.json",

@@ -1608,7 +1608,7 @@ class CorpusRelationshipTests(unittest.TestCase):
             self.assert_failure(
                 RelationshipContractError,
                 "relationship.json.duplicate_key",
-                "duplicate JSON key is not allowed: schema",
+                "duplicate JSON key is not allowed",
                 lambda: load_relationship_contract(duplicate),
             )
             for field, value, code, message in (
@@ -1664,6 +1664,79 @@ class CorpusRelationshipTests(unittest.TestCase):
                 str(raised.exception),
             )
             self.assertNotIn(duplicated_key, str(raised.exception))
+
+    def test_pr9_gh_a01_decoders_bound_recursion_and_integer_limits(self) -> None:
+        # Given: Pathological JSON at the relationship contract/evidence boundaries.
+        deep_json = ("[" * 2_000 + "0" + "]" * 2_000).encode("utf-8")
+        huge_integer_json = (
+            '{"schema":' + "9" * 5_000 + "}"
+        ).encode("utf-8")
+        cases = (
+            (
+                "contract-deep",
+                deep_json,
+                load_relationship_contract,
+                RelationshipContractError,
+                "relationship.json.invalid",
+                "relationship contract must contain valid UTF-8 JSON",
+            ),
+            (
+                "contract-huge-integer",
+                huge_integer_json,
+                load_relationship_contract,
+                RelationshipContractError,
+                "relationship.json.invalid",
+                "relationship contract must contain valid UTF-8 JSON",
+            ),
+            (
+                "evidence-deep",
+                deep_json,
+                _load_evidence,
+                EvidenceValidationError,
+                "relationship.evidence.json",
+                "relationship evidence must contain valid UTF-8 JSON",
+            ),
+        )
+        for name, payload, loader, error_type, code, message in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary_directory:
+                candidate = Path(temporary_directory) / "metadata.json"
+                candidate.write_bytes(payload)
+
+                # When/Then: Decoder limits stay behind one bounded typed error.
+                self.assert_failure(
+                    error_type,
+                    code,
+                    message,
+                    lambda loader=loader, candidate=candidate: loader(candidate),
+                )
+
+    def test_pr9_gh_a03_contract_duplicate_key_is_not_reflected(self) -> None:
+        # Given: A duplicate secret-like relationship key at the maximum attack scale.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            candidate = Path(temporary_directory) / "relationship.json"
+            untrusted_key = "token=" + "s" * 4_096
+            candidate.write_text(
+                f'{{"{untrusted_key}":0,"{untrusted_key}":1}}',
+                encoding="utf-8",
+            )
+
+            # When: The strict relationship loader detects the duplicate.
+            with self.assertRaises(RelationshipContractError) as raised:
+                load_relationship_contract(candidate)
+
+            # Then: The stable error contains no attacker-controlled key text.
+            self.assertEqual(
+                "relationship.json.duplicate_key",
+                raised.exception.code,
+            )
+            self.assertEqual(
+                (
+                    "relationship.json.duplicate_key: "
+                    "duplicate JSON key is not allowed"
+                ),
+                str(raised.exception),
+            )
+            self.assertNotIn(untrusted_key, str(raised.exception))
 
     def test_relationship_output_is_exact_scoped_atomic_and_outside_assets(self) -> None:
         # Given: A repository and canonical relationship evidence bytes.

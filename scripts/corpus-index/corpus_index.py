@@ -208,9 +208,15 @@ def _metadata_signature(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
-def _read_regular_no_follow(path: Path) -> bytes:
+def _read_regular_no_follow(
+    path: Path,
+    *,
+    maximum_bytes: int | None = None,
+) -> bytes:
     """Read a stable regular file through already-open no-follow descriptors."""
     no_follow, directory = _require_descriptor_no_follow()
+    if maximum_bytes is not None and maximum_bytes < 0:
+        raise ValueError("maximum_bytes must be non-negative")
     absolute = path.absolute()
     if not absolute.anchor:
         raise OSError("path must have an absolute anchor")
@@ -296,8 +302,11 @@ def _read_regular_no_follow(path: Path) -> bytes:
         ):
             raise OSError("file identity changed during open")
 
+        read_limit = opened.st_size
+        if maximum_bytes is not None:
+            read_limit = min(read_limit, maximum_bytes)
         chunks: list[bytes] = []
-        remaining = opened.st_size
+        remaining = read_limit
         while remaining:
             chunk = os.read(
                 file_descriptor,
