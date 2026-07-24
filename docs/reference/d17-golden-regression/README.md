@@ -61,6 +61,46 @@ The selector reads metadata only; it does not open any asset. A selected run
 without a complete pair is a typed failure and is not replaced with another
 run.
 
+## Pinned golden reference
+
+The tracked [golden reference](golden-reference-v1.json) is produced by
+`scripts/d17-golden-regression/golden_reference.py`. Generation is permitted
+only with all of these identities:
+
+- gcsa commit `20689a991697217518ec2ff15aaaa2533b169eb0`;
+- `BinaryReader(version='v1')` source SHA-256
+  `620ab899b0fb75f75da0a1c8b5722a2f02212726910aea5115401506f8eb4254`;
+- parser v1 source SHA-256
+  `5035b9147ec42c2381cc2fd45a1f83a9f251edece7b21c4dd099f2da315a2964`;
+- container image
+  `sha256:e65e9f8b0ffafef5b5d2b9711c9a3411649ae80fd036cc79f0febb80b4c0b06e`;
+- the exact mapping and input-selection identities recorded under `sources`.
+
+The gcsa commit is exported to an immutable archive and mounted read-only into
+an ephemeral container. The repository, gcsa archive, and corpus root are
+mounted read-only; only this directory is overlaid for the single fenced
+output. Before decoding, each of the six selected inputs is opened without
+following symlinks and checked against its pinned path, byte size, and SHA-256.
+The same open descriptor is checked and re-hashed after decoding so a
+decode-time identity drift is a typed failure. No unselected corpus entry is
+decoded.
+
+The reader yields one FL array and one FH array per pair. The mapping contract
+then projects their 8 + 5 source columns into the 13 authoritative channel
+records. A record contains only mapping fields, canonical dtype `<u2`, shape,
+SHA-256 of canonical C-order bytes, and bounded integer statistics
+(`element_count`, `min`, `max`, `sum`, and `nonzero_count`). Decoded arrays
+remain process-local and are never serialized.
+
+The live result contains three pairs and 39 records, with every channel shaped
+`[100, 2400]`. Two complete regenerations were byte-identical at SHA-256
+`581fa28e05d85d4fb6ff0b5157958c1e908326505acf39a3f732b1b720d25095`.
+Reader environment versions are stored in the fixture as non-host-specific
+provenance. The generator also pins this output identity and refuses to
+overwrite a drifted or hard-linked fixture. Any source/input/reader identity
+change, unsafe path, decode failure, dtype/shape drift, or payload/locator leak
+is a typed hard failure.
+
 ## Boundaries
 
 - `../gcsa` is a read-only authority and reader dependency.

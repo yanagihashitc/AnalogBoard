@@ -8,7 +8,7 @@ Created: 2026-07-24
 
 - [x] Batch 1: pinned-gcsa channel authority and tracked mapping contract
 - [x] Batch 2: bounded golden-input selection and manifest identity pins
-- [ ] Batch 3: payload-free gcsa reference output and byte determinism
+- [x] Batch 3: payload-free gcsa reference output and byte determinism
 - [ ] Batch 4: typed candidate regression harness and synthetic negatives
 - [ ] Batch 5: Phase 1 connection contract and closeout evidence
 - [ ] Phase checkpoint: all six acceptance conditions proven and one PR created
