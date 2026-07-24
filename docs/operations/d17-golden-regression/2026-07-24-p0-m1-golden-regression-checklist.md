@@ -11,7 +11,8 @@ Created: 2026-07-24
 - [x] Batch 3: payload-free gcsa reference output and byte determinism
 - [x] Batch 4: typed candidate regression harness and synthetic negatives
 - [x] Batch 5: Phase 1 connection contract and closeout evidence
-- [ ] Phase checkpoint: all six acceptance conditions proven and one PR created
+- [x] Phase checkpoint: all six acceptance conditions proven
+- [ ] Phase PR: one `analysis/phase0-d17-golden` to `main` PR created
 
 The non-binding recommended split is retained because it preserves the fixed
 mapping-before-reference order and isolates each schema or fixture format
@@ -28,5 +29,5 @@ fail-closed, and deterministic behavior.
 - [x] Permutation, label, missing, extra, dtype, shape, and value drift fail typed
 - [x] Phase 1 candidate interface and all-channel acceptance rule are documented
 - [x] gcsa/assets remain read-only and no extra hardware run is performed
-- [ ] Focused tests, repository safety checks, and phase verification pass
+- [x] Focused tests, repository safety checks, and phase verification pass
 - [ ] Process log and checklist are archived after the phase PR is created
