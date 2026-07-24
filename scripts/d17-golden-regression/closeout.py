@@ -89,13 +89,13 @@ FIXED_SOURCE_DECLARATIONS: dict[str, SourceDeclaration] = {
     ),
     "mapping_tool": SourceDeclaration(
         path="scripts/d17-golden-regression/mapping_contract.py",
-        sha256="fb9e5ce1c3c74cbbe3d7c52523b98831753d92f3e17def337d6618b6f56d1dea",
-        size_bytes=32_353,
+        sha256="528712ab796e163885c56ed9cda7589037624330505d72c9b71c07a7d5169e93",
+        size_bytes=32_374,
     ),
     "mapping_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_mapping_contract.py",
-        sha256="ca43038533bae81c49e2bd679d47c70f272ff453b1eb1616ddabc3b991bc3e84",
-        size_bytes=53_732,
+        sha256="64ba999b3140ed13f05b3aa45eff6ae7216557c025b45e4d9395ea4e0a49c974",
+        size_bytes=54_995,
     ),
     "golden_inputs": SourceDeclaration(
         path="docs/reference/d17-golden-regression/golden-inputs-v1.json",

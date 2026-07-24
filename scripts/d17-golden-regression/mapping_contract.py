@@ -32,7 +32,7 @@ _APPROVED_OUTPUT = PurePosixPath(
     "docs/reference/d17-golden-regression/channel-mapping-v1.json"
 )
 _DYNAMIC_BINDING_OPERATIONS = frozenset(
-    {"globals", "vars", "exec", "eval", "setattr"}
+    {"globals", "locals", "vars", "exec", "eval", "setattr", "delattr"}
 )
 
 

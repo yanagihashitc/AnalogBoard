@@ -1102,10 +1102,11 @@ class MappingContractTests(unittest.TestCase):
                 )
 
     def test_m1_a_28_dynamic_namespace_bindings_are_rejected(self) -> None:
-        # Given: Valid authority followed by globals/vars namespace assignment.
+        # Given: Valid authority followed by globals/vars/locals namespace assignment.
         bindings = (
             ("globals", "globals()['FL_CHANNEL_MAP'] = {}\n"),
             ("vars", "vars()['FL_CHANNEL_MAP'] = {}\n"),
+            ("locals", "locals()['FL_CHANNEL_MAP'] = {}\n"),
         )
         for operation, binding in bindings:
             with self.subTest(operation=operation):
@@ -1213,6 +1214,37 @@ class MappingContractTests(unittest.TestCase):
                     (
                         "authority source has unsupported dynamic binding operation: "
                         f"{operation}"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_33_dynamic_module_delattr_is_rejected(self) -> None:
+        # Given: Valid authority plus direct and builtins-qualified module deletion.
+        cases = (
+            (
+                "direct",
+                "delattr(sys.modules[__name__], 'FL_CHANNEL_MAP')\n",
+            ),
+            (
+                "builtins",
+                (
+                    "builtins.delattr("
+                    "sys.modules[__name__], 'FL_CHANNEL_MAP')\n"
+                ),
+            ),
+        )
+        for form, call in cases:
+            with self.subTest(form=form):
+                source = authority_source() + call
+
+                # When: Derivation encounters dynamic deletion of authority state.
+                # Then: A stable typed dynamic-binding failure rejects the source.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority source has unsupported dynamic binding operation: "
+                        "delattr"
                     ),
                     lambda source=source: derive_mapping_from_source(source),
                 )
