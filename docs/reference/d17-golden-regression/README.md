@@ -29,11 +29,45 @@ fallback. Regeneration from the same blob must be byte-identical. Any missing
 authority, invalid index, non-13 result, label disagreement, or order mismatch
 is a typed failure; no local mapping value is inferred.
 
+## Bounded golden inputs
+
+The tracked [golden input selection](golden-inputs-v1.json) is generated only
+from the canonical P0-C4 manifest and corpus contract:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/d17-golden-regression/golden_selection.py generate
+```
+
+The selector validates both tracked schemas and every manifest entry identity,
+then applies one fixed rule in density order `low, mid, high`:
+
+1. choose the lexicographically first mapped run for the density;
+2. choose the lowest positive ordinal for which both FL and FH entries exist;
+3. pin both entries by path, SHA-256, and byte size.
+
+The result is three complete pairs (six files, 18,720,000 bytes):
+`260717_1529_{fl,fh}_1.bin`, `260717_1532_{fl,fh}_1.bin`, and
+`260717_1542_{fl,fh}_1.bin`. The exact identities remain in the JSON rather
+than being repeated by hand here. Each entry `path` is the exact
+canonical-manifest identity and is resolved only relative to the fixture's
+pinned repository-relative `asset_locator`; per-entry paths are not rewritten
+or hand-entered.
+
+The other mapped run for each density, every higher pair ordinal, the remaining
+3,514 bin entries, and all cfg, telemetry, and capture entries are excluded.
+They add volume but are not needed to prove the frozen 13-channel ordering.
+The selector reads metadata only; it does not open any asset. A selected run
+without a complete pair is a typed failure and is not replaced with another
+run.
+
 ## Boundaries
 
 - `../gcsa` is a read-only authority and reader dependency.
 - `artifacts/` is read-only and may be accessed only by later, pinned decode
   and integrity-verification steps.
+- Selected assets inherit the P0-C4 pre-D19 plaintext, local-only, no-export
+  custody boundary.
 - Tracked contracts and fixtures are payload-free: no decoded waveform array,
   asset payload byte, or absolute host locator is permitted.
 - Additional hardware runs, product integration, A-4b, Frozen v1, and Phase 0
