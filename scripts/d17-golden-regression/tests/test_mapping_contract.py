@@ -1001,6 +1001,239 @@ class MappingContractTests(unittest.TestCase):
             )
             self.assertFalse((outside / "channel-mapping-v1.json").exists())
 
+    def test_m1_a_24_authority_map_method_mutations_are_rejected(self) -> None:
+        # Given: Valid authority followed by a direct destructive map method call.
+        mutations = (
+            "FL_CHANNEL_MAP.update({'FSC': 7})\n",
+            "FL_CHANNEL_MAP.pop('FSC')\n",
+            "FL_CHANNEL_MAP.clear()\n",
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation.strip()):
+                source = authority_source() + mutation
+
+                # When: Derivation inspects an otherwise ignored method mutation.
+                # Then: It fails closed instead of extracting the stale assignment.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority symbol has unsupported use, binding, or mutation: "
+                        "FL_CHANNEL_MAP"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_25_alternate_assignment_forms_are_rejected(self) -> None:
+        # Given: Valid authority plus alternate Store/Del forms for one symbol.
+        alternate_forms = (
+            "def mutate():\n    FL_CHANNEL_MAP = {}\n",
+            "def mutate():\n    FL_CHANNEL_MAP: dict = {}\n",
+            "FL_CHANNEL_MAP |= {}\n",
+            "(FL_CHANNEL_MAP := FL_CHANNEL_MAP)\n",
+            "del FL_CHANNEL_MAP\n",
+            "FL_CHANNEL_MAP['FSC'] = 7\n",
+        )
+        for alternate in alternate_forms:
+            with self.subTest(alternate=alternate.strip()):
+                source = authority_source() + alternate
+
+                # When: Derivation scans bindings beyond the supported assignment.
+                # Then: A stable typed source failure rejects the ambiguity.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority symbol has unsupported use, binding, or mutation: "
+                        "FL_CHANNEL_MAP"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_26_non_assignment_authority_bindings_are_rejected(self) -> None:
+        # Given: Valid authority plus representative non-Assign binding forms.
+        bindings = (
+            "import collections as FL_CHANNEL_MAP\n",
+            "from collections import abc as FL_CHANNEL_MAP\n",
+            "def FL_CHANNEL_MAP():\n    pass\n",
+            "class FL_CHANNEL_MAP:\n    pass\n",
+            "def mutate():\n    global FL_CHANNEL_MAP\n",
+            "def mutate(FL_CHANNEL_MAP):\n    pass\n",
+            "for FL_CHANNEL_MAP in ():\n    pass\n",
+            "with context() as FL_CHANNEL_MAP:\n    pass\n",
+            "try:\n    pass\nexcept Exception as FL_CHANNEL_MAP:\n    pass\n",
+        )
+        for binding in bindings:
+            with self.subTest(binding=binding.strip()):
+                source = authority_source() + binding
+
+                # When: Derivation scans bindings not represented by ast.Name Store.
+                # Then: It rejects the alternate authority definition fail-closed.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority symbol has unsupported use, binding, or mutation: "
+                        "FL_CHANNEL_MAP"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_27_alias_based_authority_mutations_are_rejected(self) -> None:
+        # Given: Valid authority loaded through an alias before indirect mutation.
+        mutations = (
+            "map_alias = FL_CHANNEL_MAP\nmap_alias['FSC'] = 7\n",
+            "map_alias = FL_CHANNEL_MAP\nmap_alias.update({'FSC': 7})\n",
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation.strip()):
+                source = authority_source() + mutation
+
+                # When: Derivation scans an authority Load outside a supported RHS.
+                # Then: The alias seam fails closed before its mutation is ignored.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority symbol has unsupported use, binding, or mutation: "
+                        "FL_CHANNEL_MAP"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_28_dynamic_namespace_bindings_are_rejected(self) -> None:
+        # Given: Valid authority followed by globals/vars namespace assignment.
+        bindings = (
+            ("globals", "globals()['FL_CHANNEL_MAP'] = {}\n"),
+            ("vars", "vars()['FL_CHANNEL_MAP'] = {}\n"),
+        )
+        for operation, binding in bindings:
+            with self.subTest(operation=operation):
+                source = authority_source() + binding
+
+                # When: Derivation encounters a dynamic namespace access call.
+                # Then: A typed dynamic-binding failure rejects string-key evasion.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority source has unsupported dynamic binding operation: "
+                        f"{operation}"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_29_dynamic_code_execution_calls_are_rejected(self) -> None:
+        # Given: Valid authority followed by exec/eval of an authority mutation.
+        calls = (
+            ("exec", "exec(\"FL_CHANNEL_MAP = {}\")\n"),
+            (
+                "eval",
+                "eval(\"globals().__setitem__('FL_CHANNEL_MAP', {})\")\n",
+            ),
+        )
+        for operation, call in calls:
+            with self.subTest(operation=operation):
+                source = authority_source() + call
+
+                # When: Derivation encounters dynamic code execution.
+                # Then: A typed failure prevents opaque rebinding from being ignored.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority source has unsupported dynamic binding operation: "
+                        f"{operation}"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_30_dynamic_module_setattr_is_rejected(self) -> None:
+        # Given: Valid authority followed by setattr on the current module object.
+        source = authority_source() + (
+            "setattr(sys.modules[__name__], 'FL_CHANNEL_MAP', {})\n"
+        )
+
+        # When: Derivation encounters the dynamic module binding operation.
+        # Then: It rejects the binding without interpreting its string arguments.
+        self.assert_failure(
+            AuthoritySourceError,
+            "authority.source.unsupported",
+            "authority source has unsupported dynamic binding operation: setattr",
+            lambda: derive_mapping_from_source(source),
+        )
+
+    def test_m1_a_31_read_only_authority_uses_obey_rhs_whitelist(self) -> None:
+        # Given: Valid authority plus a read-only method outside supported RHS.
+        methods = ("items", "values", "get", "copy")
+        for method in methods:
+            with self.subTest(method=method):
+                arguments = "'FSC'" if method == "get" else ""
+                source = authority_source() + (
+                    f"FL_CHANNEL_MAP.{method}({arguments})\n"
+                )
+
+                # When: Derivation scans the extra authority Load.
+                # Then: The message states strict unsupported use, not only mutation.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority symbol has unsupported use, binding, or mutation: "
+                        "FL_CHANNEL_MAP"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_a_32_builtins_dynamic_binding_calls_are_rejected(self) -> None:
+        # Given: Valid authority plus a builtins-qualified dynamic binding form.
+        cases = (
+            ("exec", "builtins.exec(\"FL_CHANNEL_MAP = {}\")\n"),
+            (
+                "setattr",
+                (
+                    "builtins.setattr("
+                    "sys.modules[__name__], 'FL_CHANNEL_MAP', {})\n"
+                ),
+            ),
+            (
+                "globals",
+                "builtins.globals()['FL_CHANNEL_MAP'] = {}\n",
+            ),
+        )
+        for operation, call in cases:
+            with self.subTest(operation=operation):
+                source = authority_source() + call
+
+                # When: Derivation encounters the builtins-qualified operation.
+                # Then: The same stable typed dynamic-binding failure rejects it.
+                self.assert_failure(
+                    AuthoritySourceError,
+                    "authority.source.unsupported",
+                    (
+                        "authority source has unsupported dynamic binding operation: "
+                        f"{operation}"
+                    ),
+                    lambda source=source: derive_mapping_from_source(source),
+                )
+
+    def test_m1_n_06_single_top_level_annotated_bindings_remain_supported(
+        self,
+    ) -> None:
+        # Given: The five authority symbols use the pinned gcsa AnnAssign shape.
+        source = authority_source()
+        for symbol in PROVENANCE["symbols"]:
+            source = source.replace(
+                f"{symbol} =",
+                f"{symbol}: Final[object] =",
+            )
+
+        # When: Derivation scans exactly one supported top-level binding per symbol.
+        mapping = derive_mapping_from_source(source)
+
+        # Then: The existing pinned authority shape still yields the frozen mapping.
+        self.assertEqual(EXPECTED_MAPPING, mapping)
+
 
 if __name__ == "__main__":
     unittest.main()

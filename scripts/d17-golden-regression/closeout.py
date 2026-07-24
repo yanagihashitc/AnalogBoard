@@ -89,13 +89,13 @@ FIXED_SOURCE_DECLARATIONS: dict[str, SourceDeclaration] = {
     ),
     "mapping_tool": SourceDeclaration(
         path="scripts/d17-golden-regression/mapping_contract.py",
-        sha256="b072712d52fa5d8518271b1b6f1a03f71d70750fcdbb303f1cd386c0e32a8ae9",
-        size_bytes=28_552,
+        sha256="fb9e5ce1c3c74cbbe3d7c52523b98831753d92f3e17def337d6618b6f56d1dea",
+        size_bytes=32_353,
     ),
     "mapping_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_mapping_contract.py",
-        sha256="d78ce82be955eabdf2ce1bf390939729a22891f48444badf6973f58e816a1d7c",
-        size_bytes=43_240,
+        sha256="ca43038533bae81c49e2bd679d47c70f272ff453b1eb1616ddabc3b991bc3e84",
+        size_bytes=53_732,
     ),
     "golden_inputs": SourceDeclaration(
         path="docs/reference/d17-golden-regression/golden-inputs-v1.json",
@@ -116,8 +116,8 @@ FIXED_SOURCE_DECLARATIONS: dict[str, SourceDeclaration] = {
     ),
     "selection_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_golden_selection.py",
-        sha256="0522fe644a6721381ab66cba7753ec30cbf22651b6c855e6d2f0d1184774f202",
-        size_bytes=37_767,
+        sha256="d532db00485877cb963d08768b09f5a185a82645c6cd31f523b2a4bfa2722114",
+        size_bytes=39_311,
     ),
     "golden_reference": SourceDeclaration(
         path="docs/reference/d17-golden-regression/golden-reference-v1.json",

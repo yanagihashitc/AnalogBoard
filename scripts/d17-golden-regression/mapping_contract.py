@@ -31,6 +31,9 @@ _FULL_COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 _APPROVED_OUTPUT = PurePosixPath(
     "docs/reference/d17-golden-regression/channel-mapping-v1.json"
 )
+_DYNAMIC_BINDING_OPERATIONS = frozenset(
+    {"globals", "vars", "exec", "eval", "setattr"}
+)
 
 
 class MappingContractError(Exception):
@@ -93,8 +96,94 @@ def _assignment_name(statement: ast.stmt) -> tuple[str, ast.expr] | None:
     return None
 
 
+def _unsupported_authority_use(name: str) -> AuthoritySourceError:
+    return _source_error(
+        f"authority symbol has unsupported use, binding, or mutation: {name}"
+    )
+
+
+def _unsupported_dynamic_binding(operation: str) -> AuthoritySourceError:
+    return _source_error(
+        f"authority source has unsupported dynamic binding operation: {operation}"
+    )
+
+
+def _require_supported_authority_uses(
+    tree: ast.Module,
+    supported_targets: set[int],
+    supported_loads: set[int],
+) -> None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in _AUTHORITY_SYMBOLS:
+            if (
+                isinstance(node.ctx, (ast.Store, ast.Del))
+                and id(node) not in supported_targets
+            ):
+                raise _unsupported_authority_use(node.id)
+            if isinstance(node.ctx, ast.Load) and id(node) not in supported_loads:
+                raise _unsupported_authority_use(node.id)
+
+        if (
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Load)
+            and node.id in _DYNAMIC_BINDING_OPERATIONS
+        ):
+            raise _unsupported_dynamic_binding(node.id)
+
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "builtins"
+            and node.func.attr in _DYNAMIC_BINDING_OPERATIONS
+        ):
+            raise _unsupported_dynamic_binding(node.func.attr)
+
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.asname or alias.name.partition(".")[0]
+                if name in _AUTHORITY_SYMBOLS:
+                    raise _unsupported_authority_use(name)
+
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                name = alias.asname or alias.name
+                if name in _AUTHORITY_SYMBOLS:
+                    raise _unsupported_authority_use(name)
+
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if node.name in _AUTHORITY_SYMBOLS:
+                raise _unsupported_authority_use(node.name)
+
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            for name in node.names:
+                if name in _AUTHORITY_SYMBOLS:
+                    raise _unsupported_authority_use(name)
+
+        if isinstance(node, ast.arg) and node.arg in _AUTHORITY_SYMBOLS:
+            raise _unsupported_authority_use(node.arg)
+
+        if (
+            isinstance(node, ast.ExceptHandler)
+            and node.name in _AUTHORITY_SYMBOLS
+        ):
+            raise _unsupported_authority_use(node.name)
+
+        if isinstance(node, (ast.MatchAs, ast.MatchStar)):
+            if node.name in _AUTHORITY_SYMBOLS:
+                raise _unsupported_authority_use(node.name)
+
+        if (
+            isinstance(node, ast.MatchMapping)
+            and node.rest in _AUTHORITY_SYMBOLS
+        ):
+            raise _unsupported_authority_use(node.rest)
+
+
 def _collect_authority_assignments(tree: ast.Module) -> dict[str, ast.expr]:
     assignments: dict[str, ast.expr] = {}
+    supported_targets: set[int] = set()
+    supported_loads: set[int] = set()
     for statement in tree.body:
         assignment = _assignment_name(statement)
         if assignment is None:
@@ -105,6 +194,24 @@ def _collect_authority_assignments(tree: ast.Module) -> dict[str, ast.expr]:
         if name in assignments:
             raise _source_error(f"authority symbol is assigned more than once: {name}")
         assignments[name] = expression
+        if isinstance(statement, ast.Assign):
+            supported_targets.add(id(statement.targets[0]))
+        else:
+            supported_targets.add(id(statement.target))
+        supported_loads.update(
+            id(node)
+            for node in ast.walk(expression)
+            if (
+                isinstance(node, ast.Name)
+                and isinstance(node.ctx, ast.Load)
+                and node.id in _AUTHORITY_SYMBOLS
+            )
+        )
+    _require_supported_authority_uses(
+        tree,
+        supported_targets,
+        supported_loads,
+    )
     return assignments
 
 

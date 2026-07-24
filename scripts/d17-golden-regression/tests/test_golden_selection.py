@@ -314,6 +314,44 @@ class GoldenSelectionTests(unittest.TestCase):
             ],
         )
 
+    def test_s_n_04_tracked_sources_reconstruct_the_tracked_fixture(self) -> None:
+        # Given: The exact pinned metadata sources and tracked selection fixture.
+        repository_root = SCRIPT_ROOT.parents[1]
+        manifest_bytes = read_fixed_metadata_source(
+            repository_root,
+            Path(MANIFEST_PATH),
+        )
+        contract_bytes = read_fixed_metadata_source(
+            repository_root,
+            Path(CONTRACT_PATH),
+        )
+        tracked_fixture = golden_selection_module._read_regular_beneath_root(
+            repository_root,
+            golden_selection_module._OUTPUT_PATH,
+            allowed_paths=frozenset({golden_selection_module._OUTPUT_PATH}),
+        )
+        require_pinned_source_identities(manifest_bytes, contract_bytes)
+
+        # When: The canonical selection is rebuilt without reading asset payloads.
+        selection = select_golden_inputs(
+            decode_json_document(manifest_bytes, "manifest"),
+            decode_json_document(contract_bytes, "contract"),
+        )
+        first = serialize_golden_selection(
+            selection,
+            manifest_bytes=manifest_bytes,
+            contract_bytes=contract_bytes,
+        )
+        second = serialize_golden_selection(
+            selection,
+            manifest_bytes=manifest_bytes,
+            contract_bytes=contract_bytes,
+        )
+
+        # Then: Regeneration is deterministic and byte-equal to the tracked fixture.
+        self.assertEqual(first, second)
+        self.assertEqual(tracked_fixture, first)
+
     def test_s_b_01_exact_three_pairs_and_six_entries_are_accepted(self) -> None:
         # Given: Exactly one complete FL/FH pair for each selected run.
         manifest = valid_manifest()
