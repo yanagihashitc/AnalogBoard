@@ -7,6 +7,7 @@ import argparse
 import ast
 import hashlib
 import json
+import os
 import re
 import stat
 import subprocess
@@ -571,8 +572,173 @@ def _validated_contract_output(
     return approved_output
 
 
-def _write_contract_bytes(output_path: Path, content: bytes) -> None:
-    output_path.write_bytes(content)
+def _contract_directory_flags() -> int:
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if (
+        no_follow == 0
+        or directory == 0
+        or os.open not in os.supports_dir_fd
+        or os.stat not in os.supports_dir_fd
+        or os.stat not in os.supports_follow_symlinks
+    ):
+        raise ContractOutputError(
+            "contract.output.parent.unsafe",
+            "approved contract output parent cannot be opened safely",
+        )
+    return (
+        os.O_RDONLY
+        | directory
+        | no_follow
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+
+
+def _open_contract_output_parent(repository_root: Path) -> int:
+    flags = _contract_directory_flags()
+    opened: int | None = None
+    try:
+        directory = os.open(repository_root, flags)
+        for component in _APPROVED_OUTPUT.parent.parts:
+            before = os.stat(
+                component,
+                dir_fd=directory,
+                follow_symlinks=False,
+            )
+            if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+                raise OSError("unsafe output parent")
+            opened = os.open(component, flags, dir_fd=directory)
+            after = os.fstat(opened)
+            if (
+                not stat.S_ISDIR(after.st_mode)
+                or (before.st_dev, before.st_ino)
+                != (after.st_dev, after.st_ino)
+            ):
+                os.close(opened)
+                opened = None
+                raise OSError("output parent identity changed")
+            os.close(directory)
+            directory = opened
+            opened = None
+        return directory
+    except (OSError, ValueError) as exc:
+        if opened is not None:
+            os.close(opened)
+        if "directory" in locals():
+            os.close(directory)
+        raise ContractOutputError(
+            "contract.output.parent.unsafe",
+            "approved contract output parent cannot be opened safely",
+        ) from exc
+
+
+def _require_current_contract_parent(
+    repository_root: Path,
+    expected_descriptor: int,
+) -> None:
+    try:
+        current = _open_contract_output_parent(repository_root)
+    except ContractOutputError as exc:
+        raise ContractOutputError(
+            "contract.output.parent.changed",
+            "approved contract output parent changed during generation",
+        ) from exc
+    try:
+        expected = os.fstat(expected_descriptor)
+        actual = os.fstat(current)
+        if (expected.st_dev, expected.st_ino) != (actual.st_dev, actual.st_ino):
+            raise ContractOutputError(
+                "contract.output.parent.changed",
+                "approved contract output parent changed during generation",
+            )
+    finally:
+        os.close(current)
+
+
+def _read_existing_contract(parent: int) -> bytes | None:
+    filename = _APPROVED_OUTPUT.name
+    try:
+        metadata = os.stat(filename, dir_fd=parent, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise ContractOutputError(
+            "contract.output.read",
+            "unable to read existing approved contract output",
+        ) from exc
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_nlink != 1
+    ):
+        raise ContractOutputError(
+            "contract.output.target.unsafe",
+            "approved contract output must be absent or a regular unaliased file",
+        )
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(filename, flags, dir_fd=parent)
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (metadata.st_dev, metadata.st_ino)
+            != (opened.st_dev, opened.st_ino)
+        ):
+            raise OSError("contract output identity changed")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (
+            (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns)
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+            or after.st_nlink != 1
+        ):
+            raise OSError("contract output changed during read")
+        return b"".join(chunks)
+    except OSError as exc:
+        raise ContractOutputError(
+            "contract.output.read",
+            "unable to read existing approved contract output",
+        ) from exc
+    finally:
+        if "descriptor" in locals():
+            os.close(descriptor)
+
+
+def _write_contract_at(parent: int, content: bytes) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(
+            _APPROVED_OUTPUT.name,
+            flags,
+            0o644,
+            dir_fd=parent,
+        )
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise OSError("unsafe created contract output")
+        offset = 0
+        while offset < len(content):
+            written = os.write(descriptor, content[offset:])
+            if written <= 0:
+                raise OSError("short contract write")
+            offset += written
+    except OSError as exc:
+        raise ContractOutputError(
+            "contract.output.write",
+            "unable to write approved contract output",
+        ) from exc
+    finally:
+        if "descriptor" in locals():
+            os.close(descriptor)
 
 
 def generate_mapping_contract(
@@ -583,50 +749,51 @@ def generate_mapping_contract(
     commit: object,
     source_path: object,
     read_blob: BlobReader = read_git_blob,
-    write_bytes: ContractWriter = _write_contract_bytes,
+    write_bytes: ContractWriter | None = None,
 ) -> Path:
     """Generate the one approved tracked mapping contract."""
 
     approved_output = _validated_contract_output(repository_root, output_path)
-    source = _read_pinned_source(
-        gcsa_repository,
-        commit,
-        source_path,
-        read_blob,
-    )
-    mapping = derive_mapping_from_source(source)
-    provenance = {
-        "repository": "gcsa",
-        "commit": commit,
-        "path": source_path,
-        "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
-        "symbols": list(_AUTHORITY_SYMBOLS),
-    }
-    content = serialize_mapping_contract(mapping, provenance)
+    parent = _open_contract_output_parent(repository_root)
     try:
-        existing_content = approved_output.read_bytes()
-    except FileNotFoundError:
-        existing_content = None
-    except OSError as exc:
-        raise ContractOutputError(
-            "contract.output.read",
-            "unable to read existing approved contract output",
-        ) from exc
-    if existing_content is not None:
-        if existing_content != content:
-            raise ContractOutputError(
-                "contract.output.mismatch",
-                "existing contract output differs from generated content",
-            )
+        source = _read_pinned_source(
+            gcsa_repository,
+            commit,
+            source_path,
+            read_blob,
+        )
+        mapping = derive_mapping_from_source(source)
+        provenance = {
+            "repository": "gcsa",
+            "commit": commit,
+            "path": source_path,
+            "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+            "symbols": list(_AUTHORITY_SYMBOLS),
+        }
+        content = serialize_mapping_contract(mapping, provenance)
+        _require_current_contract_parent(repository_root, parent)
+        existing_content = _read_existing_contract(parent)
+        if existing_content is not None:
+            if existing_content != content:
+                raise ContractOutputError(
+                    "contract.output.mismatch",
+                    "existing contract output differs from generated content",
+                )
+            return approved_output
+        if write_bytes is None:
+            _write_contract_at(parent, content)
+        else:
+            try:
+                write_bytes(approved_output, content)
+            except OSError as exc:
+                raise ContractOutputError(
+                    "contract.output.write",
+                    "unable to write approved contract output",
+                ) from exc
+        _require_current_contract_parent(repository_root, parent)
         return approved_output
-    try:
-        write_bytes(approved_output, content)
-    except OSError as exc:
-        raise ContractOutputError(
-            "contract.output.write",
-            "unable to write approved contract output",
-        ) from exc
-    return approved_output
+    finally:
+        os.close(parent)
 
 
 def _build_parser() -> argparse.ArgumentParser:

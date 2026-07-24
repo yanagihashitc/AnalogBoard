@@ -558,7 +558,7 @@ def _validated_output(repository_root: Path, output_path: Path) -> Path:
 
     target = repository_root / Path(_OUTPUT_PATH.as_posix())
     try:
-        mode = target.lstat().st_mode
+        target_metadata = target.lstat()
     except FileNotFoundError:
         return target
     except OSError as exc:
@@ -566,10 +566,18 @@ def _validated_output(repository_root: Path, output_path: Path) -> Path:
             "selection.output.target",
             "selection output must be absent or a regular file",
         ) from exc
-    if not stat.S_ISREG(mode) or stat.S_ISLNK(mode):
+    if (
+        not stat.S_ISREG(target_metadata.st_mode)
+        or stat.S_ISLNK(target_metadata.st_mode)
+    ):
         raise SelectionOutputError(
             "selection.output.target",
             "selection output must be absent or a regular file",
+        )
+    if target_metadata.st_nlink != 1:
+        raise SelectionOutputError(
+            "selection.output.target",
+            "selection output must be absent or a regular unaliased file",
         )
     return target
 
@@ -585,21 +593,12 @@ def _expected_output_sources() -> dict[str, dict[str, object]]:
     }
 
 
-def _require_existing_output_source_pins(repository_root: Path) -> None:
-    target = repository_root / Path(_OUTPUT_PATH.as_posix())
-    if not target.exists():
-        return
+def _require_existing_output_source_pins(source: bytes) -> None:
     try:
-        source = _read_regular_beneath_root(
-            repository_root,
-            _OUTPUT_PATH,
-            allowed_paths=frozenset({_OUTPUT_PATH}),
-        )
         value = json.loads(source, object_pairs_hook=_unique_object)
         if type(value) is not dict or value.get("sources") != _expected_output_sources():
             raise ValueError("source identity mismatch")
     except (
-        OSError,
         UnicodeDecodeError,
         json.JSONDecodeError,
         _DuplicateKeyError,
@@ -614,6 +613,113 @@ def _require_existing_output_source_pins(repository_root: Path) -> None:
         ) from exc
 
 
+def _open_selection_output_parent(repository_root: Path) -> int:
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if (
+        no_follow == 0
+        or directory == 0
+        or os.open not in os.supports_dir_fd
+        or os.stat not in os.supports_dir_fd
+        or os.stat not in os.supports_follow_symlinks
+    ):
+        raise SelectionOutputError(
+            "selection.output.parent",
+            "selection output parent cannot be opened safely",
+        )
+    flags = (
+        os.O_RDONLY
+        | directory
+        | no_follow
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    opened: int | None = None
+    try:
+        parent = os.open(repository_root, flags)
+        for component in _OUTPUT_PATH.parent.parts:
+            before = os.stat(
+                component,
+                dir_fd=parent,
+                follow_symlinks=False,
+            )
+            if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+                raise OSError("unsafe selection output parent")
+            opened = os.open(component, flags, dir_fd=parent)
+            after = os.fstat(opened)
+            if (
+                not stat.S_ISDIR(after.st_mode)
+                or (before.st_dev, before.st_ino)
+                != (after.st_dev, after.st_ino)
+            ):
+                os.close(opened)
+                opened = None
+                raise OSError("selection output parent changed")
+            os.close(parent)
+            parent = opened
+            opened = None
+        return parent
+    except (OSError, ValueError) as exc:
+        if opened is not None:
+            os.close(opened)
+        if "parent" in locals():
+            os.close(parent)
+        raise SelectionOutputError(
+            "selection.output.parent",
+            "selection output parent cannot be opened safely",
+        ) from exc
+
+
+def _open_existing_selection(parent: int) -> tuple[int, bytes] | None:
+    filename = _OUTPUT_PATH.name
+    try:
+        before = os.stat(filename, dir_fd=parent, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise SelectionOutputError(
+            "selection.output.target",
+            "selection output must be absent or a regular unaliased file",
+        ) from exc
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or stat.S_ISLNK(before.st_mode)
+        or before.st_nlink != 1
+    ):
+        raise SelectionOutputError(
+            "selection.output.target",
+            "selection output must be absent or a regular unaliased file",
+        )
+    flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(filename, flags, dir_fd=parent)
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (before.st_dev, before.st_ino)
+            != (opened.st_dev, opened.st_ino)
+        ):
+            raise OSError("selection output identity changed")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if _stat_signature(opened) != _stat_signature(after) or after.st_nlink != 1:
+            raise OSError("selection output changed during read")
+        return descriptor, b"".join(chunks)
+    except OSError as exc:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise SelectionOutputError(
+            "selection.output.target",
+            "selection output must be absent or a regular unaliased file",
+        ) from exc
+
+
 def write_golden_selection(
     repository_root: Path,
     output_path: Path,
@@ -622,23 +728,50 @@ def write_golden_selection(
     """Write only the approved tracked selection, without following symlinks."""
 
     target = _validated_output(repository_root, output_path)
-    _require_existing_output_source_pins(repository_root)
     if type(content) is not bytes:
         raise SelectionOutputError(
             "selection.output.content",
             "selection output content must be bytes",
         )
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    flags |= getattr(os, "O_NOFOLLOW", 0)
+    parent = _open_selection_output_parent(repository_root)
+    descriptor: int | None = None
     try:
-        descriptor = os.open(target, flags, 0o644)
-        with os.fdopen(descriptor, "wb") as output:
-            output.write(content)
+        existing = _open_existing_selection(parent)
+        if existing is None:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            flags |= getattr(os, "O_CLOEXEC", 0)
+            descriptor = os.open(
+                _OUTPUT_PATH.name,
+                flags,
+                0o644,
+                dir_fd=parent,
+            )
+        else:
+            descriptor, source = existing
+            _require_existing_output_source_pins(source)
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            os.ftruncate(descriptor, 0)
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise OSError("unsafe selection output")
+        offset = 0
+        while offset < len(content):
+            written = os.write(descriptor, content[offset:])
+            if written <= 0:
+                raise OSError("short selection write")
+            offset += written
+    except SelectionOutputError:
+        raise
     except OSError as exc:
         raise SelectionOutputError(
             "selection.output.write",
             "unable to write selection output",
         ) from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent)
     return target
 
 

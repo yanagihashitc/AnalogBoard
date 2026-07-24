@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 import tempfile
 import types
@@ -950,6 +951,32 @@ class GoldenSelectionTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(before, target.read_bytes())
+
+    def test_s_a_17_rejects_hard_linked_output_before_truncate(self) -> None:
+        # Given: The approved output aliases an otherwise out-of-scope file.
+        existing = (SCRIPT_ROOT.parents[1] / OUTPUT_PATH).read_bytes()
+        with tempfile.TemporaryDirectory() as repository_dir:
+            root = Path(repository_dir)
+            target = root / OUTPUT_PATH
+            target.parent.mkdir(parents=True)
+            alias = root / "outside.json"
+            alias.write_bytes(existing)
+            os.link(alias, target)
+
+            # When/Then: The alias is rejected before either name is truncated.
+            self.assert_failure(
+                SelectionOutputError,
+                "selection.output.target",
+                "selection output must be absent or a regular unaliased file",
+                lambda: write_golden_selection(
+                    root,
+                    Path(OUTPUT_PATH),
+                    b'{"replacement":true}\n',
+                ),
+            )
+            self.assertEqual(existing, alias.read_bytes())
+            self.assertEqual(existing, target.read_bytes())
+            self.assertEqual(2, alias.stat().st_nlink)
 
 
 if __name__ == "__main__":

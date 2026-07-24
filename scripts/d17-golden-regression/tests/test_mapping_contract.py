@@ -965,6 +965,42 @@ class MappingContractTests(unittest.TestCase):
             )
             self.assertEqual(drifted, approved_output.read_bytes())
 
+    def test_m1_a_23_generator_rejects_output_parent_replacement(self) -> None:
+        # Given: The approved parent is replaced after validation but before write.
+        with tempfile.TemporaryDirectory() as repository_dir:
+            repository_root = Path(repository_dir)
+            approved_parent = (
+                repository_root / "docs/reference/d17-golden-regression"
+            )
+            approved_parent.mkdir(parents=True)
+            verified_parent = approved_parent.with_name("verified-parent")
+            outside = repository_root / "outside"
+            outside.mkdir()
+
+            def replace_parent(*_args) -> str:
+                approved_parent.rename(verified_parent)
+                approved_parent.symlink_to(outside, target_is_directory=True)
+                return authority_source()
+
+            # When/Then: The stale lexical path cannot redirect the contract write.
+            self.assert_failure(
+                ContractOutputError,
+                "contract.output.parent.changed",
+                "approved contract output parent changed during generation",
+                lambda: generate_mapping_contract(
+                    repository_root=repository_root,
+                    output_path=Path(
+                        "docs/reference/d17-golden-regression/"
+                        "channel-mapping-v1.json"
+                    ),
+                    gcsa_repository=Path("gcsa-read-only"),
+                    commit=PROVENANCE["commit"],
+                    source_path=PROVENANCE["path"],
+                    read_blob=replace_parent,
+                ),
+            )
+            self.assertFalse((outside / "channel-mapping-v1.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
