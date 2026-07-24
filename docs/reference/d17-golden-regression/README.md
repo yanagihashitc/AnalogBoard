@@ -101,6 +101,63 @@ overwrite a drifted or hard-linked fixture. Any source/input/reader identity
 change, unsafe path, decode failure, dtype/shape drift, or payload/locator leak
 is a typed hard failure.
 
+## Candidate regression harness
+
+`scripts/d17-golden-regression/regression_harness.py` compares a future
+Decoder/Writer adapter summary with the exact tracked golden reference. The
+candidate is a product-neutral `analogboard.d17.candidate-summary` v1 object
+with these exact root fields:
+
+- `reference`: this golden fixture's repository-relative path, SHA-256, and
+  byte size;
+- `pair_count`, `channel_count_per_pair`, and ordered `pairs`;
+- for each pair, `density`, `run_id`, `ordinal`, `event_count`, the ordered FL
+  and FH manifest input identities, and 13 ordered channel records;
+- for each channel, physical channel, label, stream/source index, canonical
+  dtype, shape, digest, and the same bounded statistics as the golden.
+
+The candidate does not contain `reader`, `sources`, gcsa environment
+provenance, decoded arrays, or waveform bytes. The stable command accepts one
+candidate document on standard input, reads the fixed tracked golden itself,
+and emits bounded Pass evidence on standard output:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/d17-golden-regression/regression_harness.py compare \
+  < candidate-summary.json
+```
+
+The strict Python document seam used underneath is:
+
+```python
+result = compare_candidate_bytes(candidate_source, golden_reference_bytes)
+evidence = serialize_regression_result(result)
+```
+
+Candidate JSON is capped at 64 KiB, rejects duplicate keys and non-finite
+tokens, and is bounded by depth, node count, and string length before schema
+comparison. The CLI opens the repository's logical golden path without
+following links and verifies its fixed content SHA-256 and size. The Python
+seam likewise accepts only that fixed content identity, so neither path can
+substitute or self-repin a reference. Pass requires all three pair/input
+identities and all 39 channel records to match. Only a sealed result returned
+by that comparison can be serialized. The bounded deterministic evidence
+contains `status=pass`, fixed reference identity, canonical candidate
+digest/size, and the compared counts.
+
+Failures are typed and ordered: schema/payload and fixed identities first;
+then channel cardinality/multiplicity, physical-channel permutation, label,
+stream/source index, dtype, shape, digest, and statistics. Synthetic tests
+permanently exercise swaps, label drift, missing and excess channels,
+duplicate-plus-missing membership, dtype/shape drift, digest/statistics drift,
+identity substitution, and payload/locator attempts. They do not read corpus
+assets or invoke gcsa.
+
+The harness proves that a submitted candidate summary matches this golden. It
+does not by itself prove how the candidate digest was calculated; the Phase 1
+adapter connection and canonical-byte rule are documented in the closeout
+contract rather than attributed to gcsa provenance.
+
 ## Boundaries
 
 - `../gcsa` is a read-only authority and reader dependency.
