@@ -16,6 +16,7 @@ SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = SCRIPT_ROOT.parents[1]
 sys.path.insert(0, str(SCRIPT_ROOT))
 
+import corpus_custody  # noqa: E402
 from corpus_custody import (  # noqa: E402
     CUSTODY_SCHEMA,
     DEFAULT_CUSTODY_PATH,
@@ -291,6 +292,23 @@ class CustodyPolicyTests(unittest.TestCase):
         self.assertIsInstance(message, str)
         self.assertTrue(message)
         self.assertEqual(f"{expected_code}: {message}", str(raised.exception))
+
+    def assert_exact_failure(
+        self,
+        expected_type: type[Exception],
+        expected_code: str,
+        expected_message: str,
+        callback: Any,
+    ) -> None:
+        with self.assertRaises(expected_type) as raised:
+            callback()
+        self.assertIs(expected_type, type(raised.exception))
+        self.assertEqual(expected_code, getattr(raised.exception, "code", None))
+        self.assertEqual(expected_message, getattr(raised.exception, "message", None))
+        self.assertEqual(
+            f"{expected_code}: {expected_message}",
+            str(raised.exception),
+        )
 
     def test_c4_n_01_current_state_validates_without_resolving_authority(self) -> None:
         # Given: The exact authorized current custody state and metadata sources.
@@ -760,6 +778,67 @@ class CustodyPolicyTests(unittest.TestCase):
                     lambda candidate=candidate: load_custody_data(candidate),
                 )
 
+    def test_pr9_cl_a_01_procedure_semantic_lint_reports_missing_authority(self) -> None:
+        # Given: Approved procedure text missing one required heading or policy token.
+        cases = (
+            (
+                PROCEDURE_TEXT.replace("## Stop conditions", "## Other conditions"),
+                "recovery procedure is missing a required section",
+            ),
+            (
+                PROCEDURE_TEXT.replace(
+                    "availability is not restore verification",
+                    "availability cannot establish a restored copy",
+                ),
+                "recovery procedure is missing a required policy statement",
+            ),
+        )
+
+        # When: The independently callable semantic lint checks each mutation.
+        # Then: Each authority omission has its exact stable typed failure.
+        for text, message in cases:
+            with self.subTest(message=message):
+                self.assert_exact_failure(
+                    CustodyProcedureError,
+                    "custody.procedure",
+                    message,
+                    lambda text=text: corpus_custody._lint_procedure_semantics(
+                        text
+                    ),
+                )
+
+    def test_pr9_cl_a_02_procedure_semantic_lint_rejects_command_and_secret(self) -> None:
+        # Given: Approved text with an altered fenced command or secret-like content.
+        cases = (
+            (
+                PROCEDURE_TEXT.replace(
+                    ALLOWED_COMMAND,
+                    f"{ALLOWED_COMMAND} --unexpected",
+                ),
+                (
+                    "recovery procedure may contain only the canonical "
+                    "read-only verifier command"
+                ),
+            ),
+            (
+                f"{PROCEDURE_TEXT}\ntoken=synthetic-placeholder\n",
+                "recovery procedure must not contain secret-like content",
+            ),
+        )
+
+        # When: The independently callable semantic lint checks each mutation.
+        # Then: Command allowlisting and secret detection report exact failures.
+        for text, message in cases:
+            with self.subTest(message=message):
+                self.assert_exact_failure(
+                    CustodyProcedureError,
+                    "custody.procedure",
+                    message,
+                    lambda text=text: corpus_custody._lint_procedure_semantics(
+                        text
+                    ),
+                )
+
     def test_c4_a_13_procedure_identity_sections_tokens_and_commands_fail(self) -> None:
         # Given: Missing/hash-drifted/incomplete or operational procedure variants.
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -813,7 +892,8 @@ class CustodyPolicyTests(unittest.TestCase):
                     serialize_custody(policy),
                 )
 
-                # When/Then: Procedure semantic lint rejects the mutation.
+                # When/Then: The approved whole-document identity rejects the
+                # mutation even though the outer source reference was repinned.
                 self.assert_failure(
                     CustodyProcedureError,
                     "custody.procedure",
@@ -846,8 +926,8 @@ class CustodyPolicyTests(unittest.TestCase):
                         serialize_custody(policy),
                     )
 
-                    # When/Then: Commands and absolute locators outside the
-                    # canonical fenced block fail even after an exact SHA repin.
+                    # When/Then: The approved whole-document identity rejects
+                    # appended operations after the outer source SHA is repinned.
                     self.assert_failure(
                         CustodyProcedureError,
                         "custody.procedure",

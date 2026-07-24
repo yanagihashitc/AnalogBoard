@@ -1305,7 +1305,13 @@ def _validate_capture_containment(
         )
     try:
         run_start = datetime.strptime(run_id, "%y%m%d_%H%M")
-        run_end = run_start + timedelta(seconds=60)
+    except ValueError as error:
+        raise ClockPolicyError(
+            "relationship.run_label.timestamp",
+            f"run label timestamp is invalid: {run_id}",
+        ) from error
+    run_end = run_start + timedelta(seconds=60)
+    try:
         capture_start = datetime.strptime(capture_start_value, CAPTURE_TIME_FORMAT)
         capture_end = datetime.strptime(capture_end_value, CAPTURE_TIME_FORMAT)
     except ValueError as error:
@@ -1699,8 +1705,11 @@ def _load_evidence(path: Path) -> tuple[object, bytes]:
             code="relationship.evidence.json",
             message="relationship evidence must contain valid UTF-8 JSON",
         )
-    except SourceReferenceError as error:
-        raise EvidenceValidationError(error.code, error.message) from error
+    except (RelationshipContractError, SourceReferenceError) as error:
+        raise EvidenceValidationError(
+            "relationship.evidence.json",
+            "relationship evidence must contain valid UTF-8 JSON",
+        ) from error
     validate_relationship_evidence_data(value)
     return value, payload
 

@@ -616,22 +616,7 @@ def _decode_metadata_source(payload: bytes, role: str) -> object:
         ) from error
 
 
-def _validate_procedure(payload: bytes) -> None:
-    try:
-        text = payload.decode("utf-8")
-    except UnicodeError as error:
-        raise CustodyProcedureError(
-            "custody.procedure",
-            "recovery procedure must be valid UTF-8",
-        ) from error
-    if (
-        hashlib.sha256(payload).hexdigest()
-        != APPROVED_RECOVERY_PROCEDURE_SHA256
-    ):
-        raise CustodyProcedureError(
-            "custody.procedure",
-            "recovery procedure must match the exact approved identity",
-        )
+def _lint_procedure_semantics(text: str) -> None:
     folded = re.sub(r"\s+", " ", text.casefold())
     if any(heading not in text for heading in REQUIRED_PROCEDURE_HEADINGS):
         raise CustodyProcedureError(
@@ -658,6 +643,25 @@ def _validate_procedure(payload: bytes) -> None:
             "custody.procedure",
             "recovery procedure must not contain secret-like content",
         )
+
+
+def _validate_procedure(payload: bytes) -> None:
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeError as error:
+        raise CustodyProcedureError(
+            "custody.procedure",
+            "recovery procedure must be valid UTF-8",
+        ) from error
+    if (
+        hashlib.sha256(payload).hexdigest()
+        != APPROVED_RECOVERY_PROCEDURE_SHA256
+    ):
+        raise CustodyProcedureError(
+            "custody.procedure",
+            "recovery procedure must match the exact approved identity",
+        )
+    _lint_procedure_semantics(text)
 
 
 def verify_custody(

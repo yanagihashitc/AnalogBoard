@@ -721,7 +721,7 @@ def _manifest_error(code: str, message: str) -> ManifestValidationError:
 def _validate_manifest_header(
     manifest: object,
     contract: CorpusContract,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], int]:
     if not isinstance(manifest, dict):
         raise _manifest_error("manifest.type", "manifest must be an object")
     unknown_fields = _unknown_fields(manifest, MANIFEST_FIELDS)
@@ -790,11 +790,16 @@ def _validate_manifest_header(
             "manifest.actual_total_bytes.invalid",
             "actual_total_bytes must be a non-negative integer",
         )
+    if actual_total_bytes != contract.expected_total_bytes:
+        raise _manifest_error(
+            "manifest.actual_total_bytes.mismatch",
+            "actual_total_bytes does not match the contract",
+        )
 
     entries = manifest.get("entries")
     if not isinstance(entries, list):
         raise _manifest_error("manifest.entries.type", "entries must be an array")
-    return entries
+    return entries, actual_total_bytes
 
 
 def _validate_manifest_entries(
@@ -880,8 +885,14 @@ def validate_manifest_metadata(
     manifest: object,
 ) -> dict[str, dict[str, Any]]:
     """Validate frozen manifest metadata without reading corpus assets."""
-    entries = _validate_manifest_header(manifest, contract)
-    return _validate_manifest_entries(entries, contract)
+    entries, actual_total_bytes = _validate_manifest_header(manifest, contract)
+    by_path = _validate_manifest_entries(entries, contract)
+    if sum(entry["size_bytes"] for entry in by_path.values()) != actual_total_bytes:
+        raise _manifest_error(
+            "manifest.entry_total_bytes.mismatch",
+            "manifest entry sizes do not match actual_total_bytes",
+        )
+    return by_path
 
 
 def verify_manifest(

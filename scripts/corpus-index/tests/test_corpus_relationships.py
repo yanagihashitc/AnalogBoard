@@ -1161,6 +1161,9 @@ class CorpusRelationshipTests(unittest.TestCase):
                 )
                 if variant == "size":
                     entry["size_bytes"] += 1
+                    fixture.primary_contract["expected_total_bytes"] += 1
+                    fixture.primary_manifest["expected_total_bytes"] += 1
+                    fixture.primary_manifest["actual_total_bytes"] += 1
                     code, message = (
                         "telemetry.size",
                         "telemetry size differs from the primary manifest: "
@@ -1225,6 +1228,39 @@ class CorpusRelationshipTests(unittest.TestCase):
                     ),
                     fixture.build,
                 )
+
+    def test_pr9_cl_a05_impossible_calendar_run_id_is_run_label_error(self) -> None:
+        # Given: A regex-valid run label with an impossible calendar date.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            fixture = SyntheticRelationshipCorpus(Path(temporary_directory))
+            original_run_id = fixture.runs[0]
+            invalid_run_id = "260231_0001"
+            fixture.primary_contract["run_capture_mapping"][0][
+                "run_id"
+            ] = invalid_run_id
+            for entry in fixture.primary_manifest["entries"]:
+                if entry["path"].startswith(original_run_id):
+                    entry["path"] = entry["path"].replace(
+                        original_run_id,
+                        invalid_run_id,
+                        1,
+                    )
+            fixture.primary_manifest["entries"].sort(
+                key=lambda entry: entry["path"]
+            )
+            fixture.relationship_data["telemetry"]["sessions"][0][
+                "ordered_runs"
+            ][0] = invalid_run_id
+            fixture.write_sources()
+
+            # When: Run-label and otherwise-valid capture clocks are parsed.
+            # Then: The invalid calendar is attributed to the run label alone.
+            self.assert_failure(
+                ClockPolicyError,
+                "relationship.run_label.timestamp",
+                f"run label timestamp is invalid: {invalid_run_id}",
+                fixture.build,
+            )
 
     def test_r3_a_09_capture_containment_is_strict_to_one_microsecond(self) -> None:
         # Given: A capture starting 1us late, ending 1us early, or inverted.
@@ -1416,6 +1452,37 @@ class CorpusRelationshipTests(unittest.TestCase):
                         message,
                         lambda evidence=evidence: validate_relationship_evidence_data(evidence),
                     )
+
+    def test_pr9_cl_a04_duplicate_evidence_key_uses_bounded_evidence_error(
+        self,
+    ) -> None:
+        # Given: Relationship evidence JSON with a duplicate non-reflectable key.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_path = Path(temporary_directory) / "relationships.json"
+            duplicated_key = "nonreflected-key"
+            evidence_path.write_text(
+                f'{{"{duplicated_key}":0,"{duplicated_key}":1}}',
+                encoding="utf-8",
+            )
+
+            # When: The strict evidence loader decodes the JSON object.
+            with self.assertRaises(EvidenceValidationError) as raised:
+                _load_evidence(evidence_path)
+
+            # Then: The exact evidence-context error is bounded and key-agnostic.
+            self.assertIs(EvidenceValidationError, type(raised.exception))
+            self.assertEqual(
+                "relationship.evidence.json",
+                raised.exception.code,
+            )
+            self.assertEqual(
+                (
+                    "relationship.evidence.json: "
+                    "relationship evidence must contain valid UTF-8 JSON"
+                ),
+                str(raised.exception),
+            )
+            self.assertNotIn(duplicated_key, str(raised.exception))
 
     def test_relationship_output_is_exact_scoped_atomic_and_outside_assets(self) -> None:
         # Given: A repository and canonical relationship evidence bytes.

@@ -142,6 +142,44 @@ class CorpusIndexContractTests(unittest.TestCase):
             # Then: Frozen schema/count/path metadata validates without opening assets.
             self.assertEqual(set(item["path"] for item in manifest["entries"]), set(entries))
 
+    def test_manifest_metadata_rejects_actual_total_bytes_contract_drift(self) -> None:
+        # Given: Valid manifest metadata whose recorded aggregate is one byte off contract.
+        for delta in (-1, 1):
+            with self.subTest(delta=delta), tempfile.TemporaryDirectory() as temporary_directory:
+                repo_root = Path(temporary_directory)
+                write_small_corpus(repo_root)
+                contract = load_contract_data(small_contract())
+                manifest = build_manifest(repo_root, contract)
+                manifest["actual_total_bytes"] += delta
+
+                # When: The public metadata-only validator checks the frozen aggregate.
+                # Then: A stable typed error rejects either adjacent boundary.
+                self.assert_failure(
+                    ManifestValidationError,
+                    "manifest.actual_total_bytes.mismatch",
+                    "actual_total_bytes does not match the contract",
+                    lambda: validate_manifest_metadata(contract, manifest),
+                )
+
+    def test_manifest_metadata_rejects_entry_size_aggregate_drift(self) -> None:
+        # Given: Valid manifest metadata whose entry-size sum is one byte off its aggregate.
+        for delta in (-1, 1):
+            with self.subTest(delta=delta), tempfile.TemporaryDirectory() as temporary_directory:
+                repo_root = Path(temporary_directory)
+                write_small_corpus(repo_root)
+                contract = load_contract_data(small_contract())
+                manifest = build_manifest(repo_root, contract)
+                manifest["entries"][0]["size_bytes"] += delta
+
+                # When: The public metadata-only validator checks all entry sizes.
+                # Then: A stable typed error rejects either adjacent boundary.
+                self.assert_failure(
+                    ManifestValidationError,
+                    "manifest.entry_total_bytes.mismatch",
+                    "manifest entry sizes do not match actual_total_bytes",
+                    lambda: validate_manifest_metadata(contract, manifest),
+                )
+
     def test_null_contract_is_rejected(self) -> None:
         # Given: A JSON null contract.
         # When: Contract validation is requested.
@@ -625,7 +663,7 @@ class CorpusIndexContractTests(unittest.TestCase):
             )
 
     def test_recorded_size_mismatch_is_recomputed_and_rejected(self) -> None:
-        # Given: A valid manifest whose recorded size is altered.
+        # Given: A manifest with offsetting entry sizes but one altered recorded source size.
         with tempfile.TemporaryDirectory() as temporary_directory:
             repo_root = Path(temporary_directory)
             write_small_corpus(repo_root)
@@ -633,10 +671,13 @@ class CorpusIndexContractTests(unittest.TestCase):
             manifest = build_manifest(repo_root, contract)
             entry = next(item for item in manifest["entries"] if item["kind"] == "bin")
             entry["size_bytes"] += 1
+            next(item for item in manifest["entries"] if item["kind"] == "capture")[
+                "size_bytes"
+            ] -= 1
             path = entry["path"]
 
             # When: The manifest is verified against readable source bytes.
-            # Then: Recomputed size rejects the recorded value exactly.
+            # Then: Recomputed size rejects the first altered source value exactly.
             self.assert_failure(
                 IntegrityMismatchError,
                 "integrity.size_mismatch",

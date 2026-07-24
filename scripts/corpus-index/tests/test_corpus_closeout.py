@@ -285,6 +285,89 @@ class CloseoutTests(unittest.TestCase):
         self.assertEqual(f"{expected_code}: {message}", str(raised.exception))
         self.assertLessEqual(len(str(raised.exception)), 512)
 
+    def assert_exact_failure(
+        self,
+        expected_type: type[Exception],
+        expected_code: str,
+        expected_message: str,
+        callback: object,
+    ) -> None:
+        with self.assertRaises(expected_type) as raised:
+            callback()  # type: ignore[operator]
+        self.assertIs(expected_type, type(raised.exception))
+        self.assertEqual(expected_code, getattr(raised.exception, "code", None))
+        self.assertEqual(expected_message, getattr(raised.exception, "message", None))
+        self.assertEqual(
+            f"{expected_code}: {expected_message}",
+            str(raised.exception),
+        )
+
+    def _align_embedded_source_references(
+        self,
+        repo_root: Path,
+        closeout: dict[str, object],
+    ) -> None:
+        references = closeout["source_references"]
+        assert isinstance(references, dict)
+        source_mappings = {
+            "relationship_contract": {
+                "plan": "plan",
+                "primary_contract": "corpus_contract",
+                "primary_manifest": "corpus_manifest",
+                "usb_manifest": "usb_manifest",
+            },
+            "custody": {
+                "plan": "plan",
+                "corpus_contract": "corpus_contract",
+                "corpus_manifest": "corpus_manifest",
+                "manifest_tool": "manifest_tool",
+                "recovery_procedure": "recovery_procedure",
+            },
+        }
+        for source_role, mappings in source_mappings.items():
+            source = _parsed_source(source_role)
+            source["source_references"] = {
+                embedded_role: copy.deepcopy(references[closeout_role])
+                for embedded_role, closeout_role in mappings.items()
+            }
+            payload = _canonical_json(source)
+            _write(repo_root, SOURCE_PATHS[source_role], payload)
+            source_reference = references[source_role]
+            assert isinstance(source_reference, dict)
+            source_reference["sha256"] = _sha256(payload)
+        _write(
+            repo_root,
+            DEFAULT_CLOSEOUT_PATH,
+            serialize_closeout(closeout),
+        )
+
+    def _rewrite_embedded_source(
+        self,
+        repo_root: Path,
+        closeout: dict[str, object],
+        source_role: str,
+        *,
+        embedded_role: str | None,
+    ) -> None:
+        source_path = repo_root / SOURCE_PATHS[source_role]
+        source = json.loads(source_path.read_text(encoding="utf-8"))
+        if embedded_role is None:
+            source.pop("source_references")
+        else:
+            source["source_references"][embedded_role]["sha256"] = "0" * 64
+        payload = _canonical_json(source)
+        _write(repo_root, SOURCE_PATHS[source_role], payload)
+        references = closeout["source_references"]
+        assert isinstance(references, dict)
+        source_reference = references[source_role]
+        assert isinstance(source_reference, dict)
+        source_reference["sha256"] = _sha256(payload)
+        _write(
+            repo_root,
+            DEFAULT_CLOSEOUT_PATH,
+            serialize_closeout(closeout),
+        )
+
     def _live_patches(self) -> tuple[object, object, object]:
         return (
             patch(
@@ -738,6 +821,68 @@ class CloseoutTests(unittest.TestCase):
                         "closeout.custody.result_mismatch",
                         lambda: verify_closeout(repo_root),
                     )
+
+    def test_pr9_cl_a_03_embedded_reference_drift_fails_at_binding(self) -> None:
+        # Given: A relationship/custody embedded pin drifts while its outer SHA is repinned.
+        cases = (
+            ("relationship_contract", "primary_manifest"),
+            ("custody", "manifest_tool"),
+        )
+        for source_role, embedded_role in cases:
+            with self.subTest(
+                source_role=source_role,
+                embedded_role=embedded_role,
+            ), tempfile.TemporaryDirectory() as temporary_directory:
+                repo_root = Path(temporary_directory)
+                closeout = _fixture(repo_root)
+                self._align_embedded_source_references(repo_root, closeout)
+                self._rewrite_embedded_source(
+                    repo_root,
+                    closeout,
+                    source_role,
+                    embedded_role=embedded_role,
+                )
+
+                # When: Closeout verification checks the independently valid source.
+                # Then: The inner/outer authority mismatch has one exact typed error.
+                self.assert_exact_failure(
+                    CloseoutSourceError,
+                    "closeout.source.binding",
+                    "embedded source reference differs from the closeout pin",
+                    lambda: verify_closeout(repo_root),
+                )
+
+    def test_pr9_cl_a_03_missing_embedded_references_fail_at_binding(self) -> None:
+        # Given: Relationship/custody source references are removed and outer SHA repinned.
+        cases = (
+            (
+                "relationship_contract",
+                "relationship source references are missing",
+            ),
+            ("custody", "custody source references are missing"),
+        )
+        for source_role, message in cases:
+            with self.subTest(
+                source_role=source_role
+            ), tempfile.TemporaryDirectory() as temporary_directory:
+                repo_root = Path(temporary_directory)
+                closeout = _fixture(repo_root)
+                self._align_embedded_source_references(repo_root, closeout)
+                self._rewrite_embedded_source(
+                    repo_root,
+                    closeout,
+                    source_role,
+                    embedded_role=None,
+                )
+
+                # When: Closeout verification inspects the missing inner authority.
+                # Then: Binding reports the exact source-specific missing-reference error.
+                self.assert_exact_failure(
+                    CloseoutSourceError,
+                    "closeout.source.binding",
+                    message,
+                    lambda: verify_closeout(repo_root),
+                )
 
     def test_c5_a_09_usb_overlap_and_historical_source_drift_fail(self) -> None:
         # Given: Drift in each frozen P0-C1-C3 historical source.

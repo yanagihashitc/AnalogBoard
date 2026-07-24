@@ -764,6 +764,7 @@ def _metadata_snapshot(
             )
         decoded[role] = source
 
+    _verify_embedded_bindings(index, decoded)
     try:
         contract = load_contract_data(decoded["corpus_contract"])
         validate_manifest_metadata(contract, decoded["corpus_manifest"])
@@ -777,7 +778,6 @@ def _metadata_snapshot(
             "closeout.dependency.metadata",
             "accepted metadata validation failed",
         ) from error
-    _verify_embedded_bindings(index, decoded)
     custody_ids = [item.get("id") for item in custody.get("open_items", [])]
     if custody_ids != index["open_item_references"]["ids"]:
         raise CloseoutIntegrityError(
