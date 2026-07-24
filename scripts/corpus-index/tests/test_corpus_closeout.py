@@ -188,11 +188,49 @@ def _write(repo_root: Path, relative_path: str, payload: bytes) -> None:
     destination.write_bytes(payload)
 
 
+def _historical_custody_source() -> dict[str, object]:
+    custody = json.loads(
+        (REPOSITORY_ROOT / SOURCE_PATHS["custody"]).read_text("utf-8")
+    )
+    custody["asset_owner"] = {
+        "identity": None,
+        "open_item": "P0-C4-ASSET-OWNER",
+        "verdict": "owner_decision_required",
+    }
+    custody["open_items"] = [
+        {
+            "id": "P0-C4-ASSET-OWNER",
+            "reason": "asset_owner_decision_required",
+            "status": "open",
+        },
+        {
+            "id": "P0-C4-RESTORE-SOURCE",
+            "reason": "restore_source_not_identified",
+            "status": "open",
+        },
+        {
+            "id": "P0-C4-RETENTION",
+            "reason": "retention_policy_decision_required",
+            "status": "open",
+        },
+    ]
+    custody["retention"] = {
+        "open_item": "P0-C4-RETENTION",
+        "policy": None,
+        "verdict": "owner_decision_required",
+    }
+    custody["schema_version"] = 1
+    custody["source_references"]["plan"]["revision"] = "Draft 4.7"
+    return custody
+
+
 def _source_payloads() -> dict[str, bytes]:
-    return {
+    payloads = {
         role: (REPOSITORY_ROOT / path).read_bytes()
         for role, path in SOURCE_PATHS.items()
     }
+    payloads["custody"] = _canonical_json(_historical_custody_source())
+    return payloads
 
 
 def _source_reference(role: str, payload: bytes) -> dict[str, object]:
@@ -261,11 +299,53 @@ def _fixture(repo_root: Path) -> dict[str, object]:
         _write(repo_root, SOURCE_PATHS[role], payload)
     closeout = _closeout(payloads)
     _write(repo_root, DEFAULT_CLOSEOUT_PATH, serialize_closeout(closeout))
+    _align_embedded_source_references(repo_root, closeout)
     return closeout
 
 
 def _parsed_source(role: str) -> dict[str, object]:
+    if role == "custody":
+        return _historical_custody_source()
     return json.loads((REPOSITORY_ROOT / SOURCE_PATHS[role]).read_text("utf-8"))
+
+
+def _align_embedded_source_references(
+    repo_root: Path,
+    closeout: dict[str, object],
+) -> None:
+    references = closeout["source_references"]
+    assert isinstance(references, dict)
+    source_mappings = {
+        "relationship_contract": {
+            "plan": "plan",
+            "primary_contract": "corpus_contract",
+            "primary_manifest": "corpus_manifest",
+            "usb_manifest": "usb_manifest",
+        },
+        "custody": {
+            "plan": "plan",
+            "corpus_contract": "corpus_contract",
+            "corpus_manifest": "corpus_manifest",
+            "manifest_tool": "manifest_tool",
+            "recovery_procedure": "recovery_procedure",
+        },
+    }
+    for source_role, mappings in source_mappings.items():
+        source = _parsed_source(source_role)
+        source["source_references"] = {
+            embedded_role: copy.deepcopy(references[closeout_role])
+            for embedded_role, closeout_role in mappings.items()
+        }
+        payload = _canonical_json(source)
+        _write(repo_root, SOURCE_PATHS[source_role], payload)
+        source_reference = references[source_role]
+        assert isinstance(source_reference, dict)
+        source_reference["sha256"] = _sha256(payload)
+    _write(
+        repo_root,
+        DEFAULT_CLOSEOUT_PATH,
+        serialize_closeout(closeout),
+    )
 
 
 class CloseoutTests(unittest.TestCase):
@@ -307,39 +387,7 @@ class CloseoutTests(unittest.TestCase):
         repo_root: Path,
         closeout: dict[str, object],
     ) -> None:
-        references = closeout["source_references"]
-        assert isinstance(references, dict)
-        source_mappings = {
-            "relationship_contract": {
-                "plan": "plan",
-                "primary_contract": "corpus_contract",
-                "primary_manifest": "corpus_manifest",
-                "usb_manifest": "usb_manifest",
-            },
-            "custody": {
-                "plan": "plan",
-                "corpus_contract": "corpus_contract",
-                "corpus_manifest": "corpus_manifest",
-                "manifest_tool": "manifest_tool",
-                "recovery_procedure": "recovery_procedure",
-            },
-        }
-        for source_role, mappings in source_mappings.items():
-            source = _parsed_source(source_role)
-            source["source_references"] = {
-                embedded_role: copy.deepcopy(references[closeout_role])
-                for embedded_role, closeout_role in mappings.items()
-            }
-            payload = _canonical_json(source)
-            _write(repo_root, SOURCE_PATHS[source_role], payload)
-            source_reference = references[source_role]
-            assert isinstance(source_reference, dict)
-            source_reference["sha256"] = _sha256(payload)
-        _write(
-            repo_root,
-            DEFAULT_CLOSEOUT_PATH,
-            serialize_closeout(closeout),
-        )
+        _align_embedded_source_references(repo_root, closeout)
 
     def _rewrite_embedded_source(
         self,
@@ -680,9 +728,17 @@ class CloseoutTests(unittest.TestCase):
         ] = 2
         invalid_revision = copy.deepcopy(closeout)
         invalid_revision["source_references"]["plan"]["revision"] = "Draft 4.8"
+        invalid_custody_version = copy.deepcopy(closeout)
+        invalid_custody_version["source_references"]["custody"][
+            "schema_version"
+        ] = 2
 
         # When/Then: Unsupported declarations fail before source reads.
-        for candidate in (invalid_schema, invalid_revision):
+        for candidate in (
+            invalid_schema,
+            invalid_revision,
+            invalid_custody_version,
+        ):
             self.assert_failure(
                 CloseoutSourceError,
                 "closeout.source.declaration",

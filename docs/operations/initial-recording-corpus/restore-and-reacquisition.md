@@ -7,9 +7,11 @@ restore from a future reacquisition. It does not authorize either material
 operation. The tracked custody index and its pinned plan, contract, manifest,
 verifier, and this procedure are the metadata authorities for this scope.
 
-Asset owner decision required and retention decision required remain open.
-Neither repository ownership nor authorship identifies the physical asset
-owner. No retention duration, expiry, or deletion disposition may be guessed.
+Asset owner decision resolved: the owner identity is `yanagihashi`, as decided
+on 2026-07-24 by the recorded roadmap authority. Retention decision resolved:
+the policy is `retain-until-superseded`. Expiry remains unset and deletion is
+prohibited until the frozen C-9 corpus and a verified restore source exist and
+the owner explicitly reevaluates the policy.
 
 ## Current custody verdicts
 
@@ -19,9 +21,9 @@ against every entry in the pinned corpus manifest. Restore not performed:
 availability is not restore verification, and no distinct restore source has
 been identified.
 
-The current open decisions are the asset owner, retention policy, and identity
-of a distinct restore source. Resolving any of them requires a separately
-reviewed policy update.
+The restore source remains open and is the only unresolved custody item.
+Resolving it requires a separately reviewed policy update. The owner and
+retention decisions above remain authoritative while restore is unresolved.
 
 ## At-rest boundary
 
@@ -85,7 +87,8 @@ Stop and request owner direction if any of the following occurs:
 - a request attempts to treat current availability as restore verification;
 - a request attempts to treat reacquisition as restore or to replace the
   current corpus;
-- owner or retention authority is needed beyond recording the existing open
-  items.
+- owner or retention authority is needed beyond the recorded resolved
+  decisions.
 
-Retention remains open, so no deletion date or disposition is inferred.
+The retain-until-superseded policy sets no deletion date or disposition:
+expiry remains unset and deletion is prohibited.

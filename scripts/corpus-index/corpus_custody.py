@@ -24,7 +24,7 @@ from corpus_relationships import (
 )
 
 CUSTODY_SCHEMA = "analogboard.phase0.initial-recording-corpus-custody"
-CUSTODY_SCHEMA_VERSION = 1
+SUPPORTED_CUSTODY_SCHEMA_VERSIONS = frozenset({1, 2})
 DEFAULT_CUSTODY_PATH = (
     "docs/reference/initial-recording-corpus/2026-07-17/custody.json"
 )
@@ -40,8 +40,12 @@ RECOVERY_PROCEDURE_PATH = (
     "docs/operations/initial-recording-corpus/restore-and-reacquisition.md"
 )
 APPROVED_RECOVERY_PROCEDURE_SHA256 = (
-    "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261"
+    "75e8bf0c059a4b9afdbd742e56aaa3ac00c71673f36e65da2826383529d661fe"
 )
+APPROVED_RECOVERY_PROCEDURE_SHA256_BY_SCHEMA = {
+    1: "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261",
+    2: APPROVED_RECOVERY_PROCEDURE_SHA256,
+}
 SOURCE_PATHS = {
     "plan": PLAN_PATH,
     "corpus_contract": CONTRACT_PATH,
@@ -70,8 +74,27 @@ JSON_SOURCE_FIELDS = frozenset(
 )
 PLAN_SOURCE_FIELDS = frozenset({"path", "sha256", "revision"})
 FILE_SOURCE_FIELDS = frozenset({"path", "sha256"})
-ASSET_OWNER_FIELDS = frozenset({"verdict", "identity", "open_item"})
-RETENTION_FIELDS = frozenset({"verdict", "policy", "open_item"})
+UNRESOLVED_ASSET_OWNER_FIELDS = frozenset(
+    {"verdict", "identity", "open_item"}
+)
+RESOLVED_ASSET_OWNER_FIELDS = frozenset(
+    {"verdict", "identity", "item_id", "decided_on", "authority"}
+)
+UNRESOLVED_RETENTION_FIELDS = frozenset(
+    {"verdict", "policy", "open_item"}
+)
+RESOLVED_RETENTION_FIELDS = frozenset(
+    {
+        "verdict",
+        "policy",
+        "item_id",
+        "decided_on",
+        "authority",
+        "constraints",
+        "reevaluation_requires",
+    }
+)
+AUTHORITY_FIELDS = frozenset({"document", "anchor"})
 AT_REST_FIELDS = frozenset(
     {
         "state",
@@ -114,6 +137,8 @@ REACQUISITION_FIELDS = frozenset(
     }
 )
 OPEN_ITEM_FIELDS = frozenset({"id", "reason", "status"})
+RESOLVED_ITEM_FIELDS = frozenset({"id", "resolution", "status"})
+RESOLUTION_FIELDS = frozenset({"authority", "decided_on"})
 AVAILABILITY_CHECKS = (
     "source_set_exact",
     "present",
@@ -139,6 +164,19 @@ OPEN_ITEM_VALUES = (
         "open",
     ),
 )
+DECISION_AUTHORITY = {
+    "document": "task_management/260710-cross-repo-execution-roadmap.html",
+    "anchor": "dispatch-owner-decisions-20260724-2",
+}
+RETENTION_CONSTRAINTS = (
+    "expiry_unset",
+    "deletion_prohibited",
+)
+RETENTION_REEVALUATION_REQUIRES = (
+    "c9-frozen-corpus-materialized",
+    "verified-restore-source-established",
+    "owner-explicit-reevaluation",
+)
 PROHIBITED_METADATA_KEYS = frozenset(
     {
         "expected_counts",
@@ -162,10 +200,7 @@ REQUIRED_PROCEDURE_HEADINGS = (
     "## Reacquisition path",
     "## Stop conditions",
 )
-REQUIRED_PROCEDURE_TOKENS = (
-    "owner decision required",
-    "retention decision required",
-    "restore not performed",
+COMMON_REQUIRED_PROCEDURE_TOKENS = (
     "pre-d19 plaintext local-only",
     "git exclusion is not at-rest protection",
     "export is prohibited",
@@ -176,6 +211,34 @@ REQUIRED_PROCEDURE_TOKENS = (
     "separate corpus version",
     "reacquisition is not restore",
 )
+REQUIRED_PROCEDURE_TOKENS_BY_SCHEMA = {
+    1: (
+        "owner decision required",
+        "retention decision required",
+        "restore not performed",
+    ),
+    2: (
+        "asset owner decision resolved",
+        "retention decision resolved",
+        "retain-until-superseded",
+        "expiry remains unset",
+        "deletion is prohibited",
+        "restore source remains open",
+        "only unresolved custody item",
+        "restore not performed",
+    ),
+}
+PROHIBITED_PROCEDURE_TOKENS_BY_SCHEMA = {
+    1: (
+        "asset owner decision resolved",
+        "retention decision resolved",
+    ),
+    2: (
+        "owner decision required",
+        "retention decision required",
+        "retention remains open",
+    ),
+}
 ALLOWED_PROCEDURE_COMMAND = (
     "PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_index.py \\\n"
     "  verify \\\n"
@@ -294,7 +357,10 @@ def _scan_prohibited_metadata(value: object) -> None:
             _scan_prohibited_metadata(child)
 
 
-def _validate_source_references(value: object) -> None:
+def _validate_source_references(
+    value: object,
+    schema_version: int,
+) -> None:
     if not isinstance(value, dict) or set(value) != set(SOURCE_ROLES):
         raise CustodySourceError(
             "custody.source.roles",
@@ -331,11 +397,15 @@ def _validate_source_references(value: object) -> None:
                 "custody.source.sha256",
                 f"source SHA-256 is invalid: {role}",
             )
-        if role == "plan" and source.get("revision") != "Draft 4.7":
-            raise CustodySourceError(
-                "custody.source.revision",
-                "plan revision must be Draft 4.7",
+        if role == "plan":
+            expected_revision = (
+                "Draft 4.7" if schema_version == 1 else "Draft 4.11"
             )
+            if source.get("revision") != expected_revision:
+                raise CustodySourceError(
+                    "custody.source.revision",
+                    f"plan revision must be {expected_revision}",
+                )
         if role == "corpus_contract" and (
             source.get("schema") != CONTRACT_SCHEMA
             or source.get("schema_version") != CONTRACT_SCHEMA_VERSION
@@ -356,10 +426,48 @@ def _validate_source_references(value: object) -> None:
             )
 
 
-def _validate_asset_owner(value: object) -> None:
+def _validate_authority(value: object, *, code: str) -> None:
+    authority = _exact_object(
+        value,
+        AUTHORITY_FIELDS,
+        code=code,
+        name="authority",
+    )
+    if authority != DECISION_AUTHORITY:
+        raise CustodyValidationError(
+            code,
+            "authority must reference the exact owner-decision roadmap anchor",
+        )
+
+
+def _validate_asset_owner(value: object, schema_version: int) -> None:
+    if schema_version == 2:
+        owner = _exact_object(
+            value,
+            RESOLVED_ASSET_OWNER_FIELDS,
+            code="custody.asset_owner",
+            name="asset_owner",
+        )
+        _validate_authority(
+            owner["authority"],
+            code="custody.asset_owner",
+        )
+        expected = {
+            "verdict": "resolved",
+            "identity": "yanagihashi",
+            "item_id": "P0-C4-ASSET-OWNER",
+            "decided_on": "2026-07-24",
+            "authority": DECISION_AUTHORITY,
+        }
+        if owner != expected:
+            raise CustodyValidationError(
+                "custody.asset_owner",
+                "asset owner must match the exact resolved owner decision",
+            )
+        return
     owner = _exact_object(
         value,
-        ASSET_OWNER_FIELDS,
+        UNRESOLVED_ASSET_OWNER_FIELDS,
         code="custody.asset_owner",
         name="asset_owner",
     )
@@ -375,10 +483,38 @@ def _validate_asset_owner(value: object) -> None:
         )
 
 
-def _validate_retention(value: object) -> None:
+def _validate_retention(value: object, schema_version: int) -> None:
+    if schema_version == 2:
+        retention = _exact_object(
+            value,
+            RESOLVED_RETENTION_FIELDS,
+            code="custody.retention",
+            name="retention",
+        )
+        _validate_authority(
+            retention["authority"],
+            code="custody.retention",
+        )
+        expected = {
+            "verdict": "resolved",
+            "policy": "retain-until-superseded",
+            "item_id": "P0-C4-RETENTION",
+            "decided_on": "2026-07-24",
+            "authority": DECISION_AUTHORITY,
+            "constraints": list(RETENTION_CONSTRAINTS),
+            "reevaluation_requires": list(
+                RETENTION_REEVALUATION_REQUIRES
+            ),
+        }
+        if retention != expected:
+            raise CustodyValidationError(
+                "custody.retention",
+                "retention must match the exact resolved no-deletion policy",
+            )
+        return
     retention = _exact_object(
         value,
-        RETENTION_FIELDS,
+        UNRESOLVED_RETENTION_FIELDS,
         code="custody.retention",
         name="retention",
     )
@@ -482,7 +618,7 @@ def _validate_reacquisition(value: object) -> None:
         )
 
 
-def _validate_open_items(value: object) -> None:
+def _validate_open_items_v1(value: object) -> None:
     if not isinstance(value, list):
         raise CustodyValidationError(
             "custody.open_items",
@@ -508,6 +644,62 @@ def _validate_open_items(value: object) -> None:
         )
 
 
+def _resolved_item(item_id: str) -> dict[str, object]:
+    return {
+        "id": item_id,
+        "resolution": {
+            "authority": DECISION_AUTHORITY,
+            "decided_on": "2026-07-24",
+        },
+        "status": "resolved",
+    }
+
+
+def _validate_open_items_v2(value: object) -> None:
+    if not isinstance(value, list) or len(value) != 3:
+        raise CustodyValidationError(
+            "custody.open_items",
+            "open_items must be the exact sorted three-item resolution array",
+        )
+    expected = [
+        _resolved_item("P0-C4-ASSET-OWNER"),
+        {
+            "id": "P0-C4-RESTORE-SOURCE",
+            "reason": "restore_source_not_identified",
+            "status": "open",
+        },
+        _resolved_item("P0-C4-RETENTION"),
+    ]
+    for index, item in enumerate(value):
+        fields = (
+            OPEN_ITEM_FIELDS
+            if index == 1
+            else RESOLVED_ITEM_FIELDS
+        )
+        if not isinstance(item, dict) or set(item) != set(fields):
+            raise CustodyValidationError(
+                "custody.open_items",
+                "open item fields must match their exact open/resolved state",
+            )
+        if index != 1:
+            resolution = item.get("resolution")
+            _exact_object(
+                resolution,
+                RESOLUTION_FIELDS,
+                code="custody.open_items",
+                name="resolution",
+            )
+            _validate_authority(
+                resolution["authority"],
+                code="custody.open_items",
+            )
+    if value != expected:
+        raise CustodyValidationError(
+            "custody.open_items",
+            "open_items must resolve owner and retention while restore stays open",
+        )
+
+
 def load_custody_data(value: object) -> dict[str, Any]:
     _scan_prohibited_metadata(value)
     if not isinstance(value, dict):
@@ -526,10 +718,13 @@ def load_custody_data(value: object) -> dict[str, Any]:
             f"schema must be {CUSTODY_SCHEMA}",
         )
     version = value.get("schema_version")
-    if not _is_int(version) or version != CUSTODY_SCHEMA_VERSION:
+    if (
+        not _is_int(version)
+        or version not in SUPPORTED_CUSTODY_SCHEMA_VERSIONS
+    ):
         raise CustodyValidationError(
             "custody.schema_version",
-            f"schema_version must be {CUSTODY_SCHEMA_VERSION}",
+            "schema_version must be a supported version",
         )
     locator = value.get("canonical_locator")
     if not _normalized_relative_path(locator):
@@ -537,23 +732,31 @@ def load_custody_data(value: object) -> dict[str, Any]:
             "custody.canonical_locator",
             "canonical_locator must be normalized repository-relative metadata",
         )
-    _validate_source_references(value.get("source_references"))
-    _validate_asset_owner(value.get("asset_owner"))
-    _validate_retention(value.get("retention"))
+    _validate_source_references(value.get("source_references"), version)
+    _validate_asset_owner(value.get("asset_owner"), version)
+    _validate_retention(value.get("retention"), version)
     _validate_at_rest(value.get("at_rest"))
     _validate_availability(value.get("availability"))
     _validate_restore(value.get("restore"))
     _validate_reacquisition(value.get("reacquisition"))
-    _validate_open_items(value.get("open_items"))
-    if (
-        value["asset_owner"]["open_item"] != "P0-C4-ASSET-OWNER"
-        or value["retention"]["open_item"] != "P0-C4-RETENTION"
-        or value["restore"]["open_item"] != "P0-C4-RESTORE-SOURCE"
-    ):
-        raise CustodyValidationError(
-            "custody.open_items",
-            "open-item links must match the current unresolved states",
-        )
+    if version == 1:
+        _validate_open_items_v1(value.get("open_items"))
+        if (
+            value["asset_owner"]["open_item"] != "P0-C4-ASSET-OWNER"
+            or value["retention"]["open_item"] != "P0-C4-RETENTION"
+            or value["restore"]["open_item"] != "P0-C4-RESTORE-SOURCE"
+        ):
+            raise CustodyValidationError(
+                "custody.open_items",
+                "open-item links must match the current unresolved states",
+            )
+    else:
+        _validate_open_items_v2(value.get("open_items"))
+        if value["restore"]["open_item"] != "P0-C4-RESTORE-SOURCE":
+            raise CustodyValidationError(
+                "custody.open_items",
+                "restore open-item link must remain unresolved",
+            )
     return value
 
 
@@ -621,17 +824,29 @@ def _decode_metadata_source(payload: bytes, role: str) -> object:
         ) from error
 
 
-def _lint_procedure_semantics(text: str) -> None:
+def _lint_procedure_semantics(text: str, schema_version: int) -> None:
     folded = re.sub(r"\s+", " ", text.casefold())
     if any(heading not in text for heading in REQUIRED_PROCEDURE_HEADINGS):
         raise CustodyProcedureError(
             "custody.procedure",
             "recovery procedure is missing a required section",
         )
-    if any(token not in folded for token in REQUIRED_PROCEDURE_TOKENS):
+    required_tokens = (
+        COMMON_REQUIRED_PROCEDURE_TOKENS
+        + REQUIRED_PROCEDURE_TOKENS_BY_SCHEMA[schema_version]
+    )
+    if any(token not in folded for token in required_tokens):
         raise CustodyProcedureError(
             "custody.procedure",
             "recovery procedure is missing a required policy statement",
+        )
+    if any(
+        token in folded
+        for token in PROHIBITED_PROCEDURE_TOKENS_BY_SCHEMA[schema_version]
+    ):
+        raise CustodyProcedureError(
+            "custody.procedure",
+            "recovery procedure contradicts the custody schema version",
         )
     blocks = list(FENCED_BLOCK_PATTERN.finditer(text))
     if (
@@ -650,7 +865,7 @@ def _lint_procedure_semantics(text: str) -> None:
         )
 
 
-def _validate_procedure(payload: bytes) -> None:
+def _validate_procedure(payload: bytes, schema_version: int) -> None:
     try:
         text = payload.decode("utf-8")
     except UnicodeError as error:
@@ -660,13 +875,13 @@ def _validate_procedure(payload: bytes) -> None:
         ) from error
     if (
         hashlib.sha256(payload).hexdigest()
-        != APPROVED_RECOVERY_PROCEDURE_SHA256
+        != APPROVED_RECOVERY_PROCEDURE_SHA256_BY_SCHEMA[schema_version]
     ):
         raise CustodyProcedureError(
             "custody.procedure",
             "recovery procedure must match the exact approved identity",
         )
-    _lint_procedure_semantics(text)
+    _lint_procedure_semantics(text, schema_version)
 
 
 def verify_custody(
@@ -753,7 +968,10 @@ def verify_custody(
             "custody.locator.mismatch",
             "policy locator must match the contract and manifest",
         )
-    _validate_procedure(payloads["recovery_procedure"])
+    _validate_procedure(
+        payloads["recovery_procedure"],
+        policy["schema_version"],
+    )
     return policy
 
 
