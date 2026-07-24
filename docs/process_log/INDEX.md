@@ -7,6 +7,7 @@
 
 | Date | Feature | Log |
 |---|---|---|
+| 2026-07-24 | P0-M1 D17 golden regression | [log](2026-07-24-p0-m1-golden-regression-log.md) |
 | 2026-07-23 | P0-C4 initial recording corpus index | [log](2026-07-23-p0-c4-corpus-index-log.md) |
 | 2026-07-23 | P0-R1 bounded visualization path (Part 2) | [log](2026-07-23-p0-r1-visualization-log-02.md) |
 | 2026-07-22 | P0-R1 bounded visualization path | [log](2026-07-22-p0-r1-visualization-log.md) |
