@@ -32,13 +32,13 @@ _MAPPING_SHA256 = (
 )
 _MAPPING_SIZE = 1_349
 _SELECTION_SHA256 = (
-    "76ef20a12ff3b0850a25501f13832690e84dd762b25f3500918c0dde6d443023"
+    "30feceee3ea5f054d3ad43528f82c1e0228a0a855f8c2d55cb0b7f2732b42975"
 )
-_SELECTION_SIZE = 1_785
+_SELECTION_SIZE = 1_953
 _REFERENCE_SHA256 = (
-    "581fa28e05d85d4fb6ff0b5157958c1e908326505acf39a3f732b1b720d25095"
+    "3f531bd624ad3ea8b763b7ec82da42f313fbd4976945c6cd1f636fab9636f53f"
 )
-_REFERENCE_SIZE = 13_178
+_REFERENCE_SIZE = 13_281
 _GCSA_COMMIT = "20689a991697217518ec2ff15aaaa2533b169eb0"
 _GCSA_READER_PATH = "src/gcsa/io/binary_reader.py"
 _GCSA_READER_SYMBOL = "BinaryReader"
@@ -54,6 +54,8 @@ _CONTAINER_IMAGE_ID = (
     "sha256:e65e9f8b0ffafef5b5d2b9711c9a341"
     "1649ae80fd036cc79f0febb80b4c0b06e"
 )
+_CONTAINER_IMAGE_ID_ENVIRONMENT_VARIABLE = "P0_M1_CONTAINER_IMAGE_ID"
+_CONTAINER_IMAGE_ID_ATTESTATION_KIND = "operator-environment-attestation"
 _ASSET_LOCATOR = "artifacts/field-session/2026-07-17-characterization"
 _CHANNELS_PER_STREAM = {"FL": 8, "FH": 5}
 _CHANNEL_COUNT = sum(_CHANNELS_PER_STREAM.values())
@@ -332,6 +334,10 @@ def _validate_reader_provenance(provenance: object) -> dict[str, object]:
         "environment": {
             "kind": "container-image",
             "identity": _CONTAINER_IMAGE_ID,
+            "identity_attestation": {
+                "kind": _CONTAINER_IMAGE_ID_ATTESTATION_KIND,
+                "source": _CONTAINER_IMAGE_ID_ENVIRONMENT_VARIABLE,
+            },
             "python_version": "3.10.17",
             "numpy_version": "2.2.6",
             "logical_invocation": (
@@ -1083,6 +1089,8 @@ def _module_source_identity(module: object, expected_sha256: str) -> str:
 
 
 def _container_image_identity(candidate: object) -> str:
+    """Validate the fixed image identity attested through the environment."""
+
     if candidate != _CONTAINER_IMAGE_ID:
         _fail(
             ReaderProvenanceError,
@@ -1122,7 +1130,7 @@ def _live_reader() -> tuple[dict[str, object], Callable[[Path, str], object]]:
             "gcsa reader provenance does not match the fixed P0-M1 pin",
         )
     image_identity = _container_image_identity(
-        os.environ.get("P0_M1_CONTAINER_IMAGE_ID")
+        os.environ.get(_CONTAINER_IMAGE_ID_ENVIRONMENT_VARIABLE)
     )
 
     def decode_entry(path: Path, stream: str) -> object:
@@ -1147,6 +1155,10 @@ def _live_reader() -> tuple[dict[str, object], Callable[[Path, str], object]]:
         "environment": {
             "kind": "container-image",
             "identity": image_identity,
+            "identity_attestation": {
+                "kind": _CONTAINER_IMAGE_ID_ATTESTATION_KIND,
+                "source": _CONTAINER_IMAGE_ID_ENVIRONMENT_VARIABLE,
+            },
             "python_version": sys.version.split()[0],
             "numpy_version": np.__version__,
             "logical_invocation": (

@@ -54,13 +54,13 @@ MAPPING_SHA256 = (
 )
 MAPPING_SIZE = 1_349
 SELECTION_SHA256 = (
-    "76ef20a12ff3b0850a25501f13832690e84dd762b25f3500918c0dde6d443023"
+    "30feceee3ea5f054d3ad43528f82c1e0228a0a855f8c2d55cb0b7f2732b42975"
 )
-SELECTION_SIZE = 1_785
+SELECTION_SIZE = 1_953
 REFERENCE_SHA256 = (
-    "581fa28e05d85d4fb6ff0b5157958c1e908326505acf39a3f732b1b720d25095"
+    "3f531bd624ad3ea8b763b7ec82da42f313fbd4976945c6cd1f636fab9636f53f"
 )
-REFERENCE_SIZE = 13_178
+REFERENCE_SIZE = 13_281
 GCSA_COMMIT = "20689a991697217518ec2ff15aaaa2533b169eb0"
 GCSA_READER_PATH = "src/gcsa/io/binary_reader.py"
 GCSA_READER_SYMBOL = "BinaryReader"
@@ -155,6 +155,10 @@ def valid_reader_provenance() -> dict[str, object]:
         "environment": {
             "kind": "container-image",
             "identity": CONTAINER_IMAGE_ID,
+            "identity_attestation": {
+                "kind": "operator-environment-attestation",
+                "source": "P0_M1_CONTAINER_IMAGE_ID",
+            },
             "python_version": "3.10.17",
             "numpy_version": "2.2.6",
             "logical_invocation": (
@@ -172,6 +176,40 @@ def valid_arrays() -> dict[str, np.ndarray]:
         + np.uint16(101)
     )
     return {"FL": fl, "FH": fh}
+
+
+def distinct_multi_event_arrays() -> dict[str, np.ndarray]:
+    fl = np.empty((2, 8, 2_400), dtype="<u2")
+    fh = np.empty((2, 5, 2_400), dtype="<u2")
+    samples = np.arange(2_400, dtype="<u2")
+    for event_index in range(2):
+        for channel_index in range(8):
+            fl[event_index, channel_index, :] = (
+                event_index * 20_000
+                + channel_index * 2_000
+                + samples
+            )
+        for channel_index in range(5):
+            fh[event_index, channel_index, :] = (
+                40_000
+                + event_index * 10_000
+                + channel_index * 1_000
+                + samples
+            )
+    return {"FL": fl, "FH": fh}
+
+
+def independent_c_order_digest(values: np.ndarray) -> str:
+    digest = hashlib.sha256()
+    for event_index in range(values.shape[0]):
+        for sample_index in range(values.shape[1]):
+            digest.update(
+                int(values[event_index, sample_index]).to_bytes(
+                    2,
+                    byteorder="little",
+                )
+            )
+    return digest.hexdigest()
 
 
 def fake_decoder(
@@ -326,6 +364,58 @@ class GoldenReferenceTests(unittest.TestCase):
         self.assertNotIn(FL_CONTENT, first)
         self.assertNotIn(FH_CONTENT, first)
         self.assertNotIn(str(fixture.root).encode(), first)
+
+    def test_r_n_02b_digests_each_channel_in_c_event_sample_order(self) -> None:
+        # Given: Two events with values unique to every stream and channel.
+        fixture = AssetFixture()
+        self.addCleanup(fixture.close)
+        arrays = distinct_multi_event_arrays()
+
+        # When: The reference projects and digests every mapped channel.
+        reference = self.build(fixture.root, arrays=arrays)
+
+        # Then: Each digest independently matches event-major C order.
+        actual_channels = reference["pairs"][0]["channels"]
+        expected_digests: list[str] = []
+        for mapping_row in valid_mapping():
+            stream = str(mapping_row["stream"])
+            source_index = int(mapping_row["source_index"])
+            values = arrays[stream][:, source_index, :]
+            expected_digest = independent_c_order_digest(values)
+            expected_digests.append(expected_digest)
+            self.assertEqual(
+                expected_digest,
+                actual_channels[len(expected_digests) - 1]["sha256"],
+            )
+            self.assertNotEqual(
+                expected_digest,
+                hashlib.sha256(values.tobytes(order="F")).hexdigest(),
+            )
+            if source_index != 0:
+                self.assertNotEqual(
+                    expected_digest,
+                    independent_c_order_digest(arrays[stream][:, 0, :]),
+                )
+        self.assertEqual(13, len(set(expected_digests)))
+
+    def test_r_n_02c_records_environment_identity_as_attestation(self) -> None:
+        # Given: The fixed image identity supplied by the operator environment.
+        fixture = AssetFixture()
+        self.addCleanup(fixture.close)
+
+        # When: The reference records the pinned reader provenance.
+        reference = self.build(fixture.root)
+
+        # Then: The identity remains fixed without claiming runtime verification.
+        environment = reference["reader"]["environment"]
+        self.assertEqual(CONTAINER_IMAGE_ID, environment["identity"])
+        self.assertEqual(
+            {
+                "kind": "operator-environment-attestation",
+                "source": "P0_M1_CONTAINER_IMAGE_ID",
+            },
+            environment["identity_attestation"],
+        )
 
     def test_r_n_03_uses_the_verified_contract_without_a_local_label_copy(self) -> None:
         # Given: A structurally valid mapping supplied by the verified contract seam.
@@ -506,6 +596,24 @@ class GoldenReferenceTests(unittest.TestCase):
                 lambda value: value["environment"].__setitem__(
                     "identity",
                     "sha256:" + "0" * 64,
+                ),
+            ),
+            (
+                "attestation_kind",
+                lambda value: value["environment"][
+                    "identity_attestation"
+                ].__setitem__("kind", "runtime-inspection"),
+            ),
+            (
+                "attestation_source",
+                lambda value: value["environment"][
+                    "identity_attestation"
+                ].__setitem__("source", "UNPINNED_IMAGE_ID"),
+            ),
+            (
+                "missing_attestation",
+                lambda value: value["environment"].pop(
+                    "identity_attestation"
                 ),
             ),
             (

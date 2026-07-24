@@ -8,11 +8,13 @@ import sys
 import unittest
 from pathlib import Path
 from typing import Callable
+from unittest import mock
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = SCRIPT_ROOT.parents[1]
 sys.path.insert(0, str(SCRIPT_ROOT))
 
+import regression_harness as regression_harness_module  # noqa: E402
 from regression_harness import (  # noqa: E402
     CandidateCardinalityError,
     CandidateDtypeError,
@@ -186,6 +188,50 @@ class RegressionHarnessTests(unittest.TestCase):
         self.assertEqual(3, result["pair_count"])
         self.assertEqual(13, result["channel_count_per_pair"])
         self.assertEqual(39, result["compared_channel_count"])
+
+    def test_h_a_13_rejects_missing_or_excess_pairs(self) -> None:
+        # Given: Candidate summaries one pair below and above the exact boundary.
+        missing = valid_candidate()
+        missing["pairs"].pop()
+        missing["pair_count"] = 2
+        excess = valid_candidate()
+        excess["pairs"].append(copy.deepcopy(excess["pairs"][-1]))
+        excess["pair_count"] = 4
+
+        for case_name, candidate in (("missing", missing), ("excess", excess)):
+            with self.subTest(case=case_name):
+                # When/Then: Partial or excess pair sets fail through one typed gate.
+                self.assert_failure(
+                    CandidateCardinalityError,
+                    "candidate.pair_count.invalid",
+                    "candidate must contain exactly 3 ordered pairs",
+                    lambda candidate=candidate: compare_candidate_to_golden(
+                        candidate,
+                        golden_source_bytes(),
+                    ),
+                )
+
+    def test_h_a_14_rejects_incomplete_actual_comparison(self) -> None:
+        # Given: The primary cardinality gate is mutation-bypassed to two pairs.
+        candidate = valid_candidate()
+        golden = json.loads(golden_source_bytes())
+        incomplete = (candidate["pairs"][:2], golden["pairs"][:2])
+
+        # When/Then: Actual loop counters prevent fabricated 3-pair Pass evidence.
+        with mock.patch.object(
+            regression_harness_module,
+            "_require_fixed_cardinality",
+            return_value=incomplete,
+        ):
+            self.assert_failure(
+                CandidateCardinalityError,
+                "candidate.comparison.incomplete",
+                "candidate comparison did not cover exactly 3 pairs and 39 channels",
+                lambda: compare_candidate_to_golden(
+                    candidate,
+                    golden_source_bytes(),
+                ),
+            )
 
     def test_h_a_01_channel_swap_is_typed_permutation_failure(self) -> None:
         # Given: Two complete adjacent channel records are swapped.

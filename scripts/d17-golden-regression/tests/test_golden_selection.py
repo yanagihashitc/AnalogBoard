@@ -4,6 +4,7 @@ import hashlib
 import json
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from typing import Callable
@@ -48,6 +49,7 @@ MANIFEST_PATH = (
 CONTRACT_PATH = (
     "docs/reference/initial-recording-corpus/2026-07-17/contract.json"
 )
+CORPUS_INDEX_PATH = "scripts/corpus-index/corpus_index.py"
 OUTPUT_PATH = (
     "docs/reference/d17-golden-regression/golden-inputs-v1.json"
 )
@@ -59,6 +61,10 @@ EXPECTED_CONTRACT_SHA256 = (
     "825503ad2cb84a6262a2b2a6c88e661973a0fba4a37f77be6d04dc451b7c51e6"
 )
 EXPECTED_CONTRACT_SIZE = 1_489
+EXPECTED_CORPUS_INDEX_SHA256 = (
+    "d6589cdf99c733f1eea8455fcb4cdfa1c3f4289aa9662375c7382769648d87f7"
+)
+EXPECTED_CORPUS_INDEX_SIZE = 47_861
 
 
 def manifest_entry(kind: str, path: str, size_bytes: int = 1) -> dict[str, object]:
@@ -260,6 +266,52 @@ class GoldenSelectionTests(unittest.TestCase):
         )
         self.assertEqual(MANIFEST_PATH, value["sources"]["manifest"]["path"])
         self.assertEqual(CONTRACT_PATH, value["sources"]["corpus_contract"]["path"])
+        self.assertEqual(
+            {
+                "path": CORPUS_INDEX_PATH,
+                "sha256": EXPECTED_CORPUS_INDEX_SHA256,
+                "size_bytes": EXPECTED_CORPUS_INDEX_SIZE,
+            },
+            value["sources"]["corpus_index_validator"],
+        )
+
+    def test_s_n_03_manifest_entry_insertion_does_not_choose_a_later_run(
+        self,
+    ) -> None:
+        # Given: Canonical manifest entries inserted with later run IDs first.
+        contract = types.SimpleNamespace(
+            run_capture_mapping=[
+                types.SimpleNamespace(density=density, run_id=run_id)
+                for density, run_id in reversed(DENSITY_RUNS)
+            ]
+        )
+        canonical_entries: dict[str, dict[str, object]] = {}
+        for _, run_id in reversed(DENSITY_RUNS):
+            canonical_entries[f"{run_id}_fl_1.bin"] = manifest_entry(
+                "bin",
+                f"{run_id}_fl_1.bin",
+            )
+            canonical_entries[f"{run_id}_fh_1.bin"] = manifest_entry(
+                "bin",
+                f"{run_id}_fh_1.bin",
+            )
+
+        # When: Selection consumes the non-lexicographic insertion order.
+        with mock.patch.object(
+            golden_selection_module,
+            "_canonical_metadata",
+            return_value=(contract, canonical_entries),
+        ):
+            selection = select_golden_inputs({}, {})
+
+        # Then: The lexicographically first run is still selected per density.
+        self.assertEqual(
+            list(SELECTED_RUNS),
+            [
+                (pair["density"], pair["run_id"])
+                for pair in selection["pairs"]
+            ],
+        )
 
     def test_s_b_01_exact_three_pairs_and_six_entries_are_accepted(self) -> None:
         # Given: Exactly one complete FL/FH pair for each selected run.
@@ -380,6 +432,11 @@ class GoldenSelectionTests(unittest.TestCase):
                         "_read_regular_beneath_root",
                         return_value=source,
                     ),
+                    mock.patch.object(
+                        golden_selection_module,
+                        "_matches_source_pin",
+                        return_value=True,
+                    ),
                 ):
                     self.assert_failure(
                         SelectionSchemaError,
@@ -387,6 +444,59 @@ class GoldenSelectionTests(unittest.TestCase):
                         "unable to load the canonical P0-C4 metadata validator",
                         golden_selection_module._load_corpus_index_module,
                     )
+
+    def test_s_a_21_rejects_unpinned_validator_before_compile(self) -> None:
+        # Given: The tracked validator bytes differ from their exact source pin.
+        compile_spy = mock.Mock()
+
+        # When/Then: Loading fails typed before compile or exec can run.
+        with (
+            mock.patch.object(
+                golden_selection_module,
+                "_CORPUS_INDEX_MODULE",
+                None,
+            ),
+            mock.patch.object(
+                golden_selection_module,
+                "_read_regular_beneath_root",
+                return_value=b"# validator drift\n",
+            ),
+            mock.patch("builtins.compile", compile_spy),
+        ):
+            self.assert_failure(
+                SelectionSchemaError,
+                "selection.schema.validator",
+                "unable to load the canonical P0-C4 metadata validator",
+                golden_selection_module._load_corpus_index_module,
+            )
+        compile_spy.assert_not_called()
+
+    def test_s_a_22_normalizes_validator_exception_without_code(self) -> None:
+        # Given: A validator exception subclass whose instances have no code.
+        class UntypedCorpusIndexError(Exception):
+            pass
+
+        def fail_contract(_value: object) -> object:
+            raise UntypedCorpusIndexError("untrusted validator detail")
+
+        validator = types.SimpleNamespace(
+            CorpusIndexError=UntypedCorpusIndexError,
+            load_contract_data=fail_contract,
+            validate_manifest_metadata=lambda _contract, _manifest: {},
+        )
+
+        # When/Then: The wrapper preserves a stable typed schema failure.
+        with mock.patch.object(
+            golden_selection_module,
+            "_CORPUS_INDEX_MODULE",
+            validator,
+        ):
+            self.assert_failure(
+                SelectionSchemaError,
+                "selection.schema.invalid",
+                "P0-C4 metadata validation failed (validator.error.untyped)",
+                lambda: select_golden_inputs(valid_manifest(), valid_contract()),
+            )
 
     def test_s_a_03_requires_exactly_low_mid_high(self) -> None:
         # Given: A contract missing one required density.
@@ -701,6 +811,12 @@ class GoldenSelectionTests(unittest.TestCase):
         self.assertEqual(
             EXPECTED_CONTRACT_SHA256,
             hashlib.sha256(contract_bytes).hexdigest(),
+        )
+        validator_bytes = (repository_root / CORPUS_INDEX_PATH).read_bytes()
+        self.assertEqual(EXPECTED_CORPUS_INDEX_SIZE, len(validator_bytes))
+        self.assertEqual(
+            EXPECTED_CORPUS_INDEX_SHA256,
+            hashlib.sha256(validator_bytes).hexdigest(),
         )
         self.assert_failure(
             SelectionSourceError,

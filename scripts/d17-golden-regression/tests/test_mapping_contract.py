@@ -85,24 +85,22 @@ def authority_source(
     fh_channels: tuple[tuple[str, object], ...] = FH_CHANNELS,
     include_fl_map: bool = True,
     include_fh_map: bool = True,
+    include_fl_names: bool = True,
+    include_fh_names: bool = True,
     include_all_names: bool = True,
+    fl_names_expression: str = "tuple(FL_CHANNEL_MAP.keys())",
+    fh_names_expression: str = "tuple(FH_CHANNEL_MAP.keys())",
     all_names_expression: str = "FL_CHANNEL_NAMES + FH_CHANNEL_NAMES",
 ) -> str:
     lines: list[str] = []
     if include_fl_map:
-        lines.extend(
-            (
-                f"FL_CHANNEL_MAP = {dict(fl_channels)!r}",
-                "FL_CHANNEL_NAMES = tuple(FL_CHANNEL_MAP.keys())",
-            )
-        )
+        lines.append(f"FL_CHANNEL_MAP = {dict(fl_channels)!r}")
+    if include_fl_names:
+        lines.append(f"FL_CHANNEL_NAMES = {fl_names_expression}")
     if include_fh_map:
-        lines.extend(
-            (
-                f"FH_CHANNEL_MAP = {dict(fh_channels)!r}",
-                "FH_CHANNEL_NAMES = tuple(FH_CHANNEL_MAP.keys())",
-            )
-        )
+        lines.append(f"FH_CHANNEL_MAP = {dict(fh_channels)!r}")
+    if include_fh_names:
+        lines.append(f"FH_CHANNEL_NAMES = {fh_names_expression}")
     if include_all_names:
         lines.append(f"ALL_CHANNEL_NAMES = {all_names_expression}")
     return "\n".join(lines) + "\n"
@@ -231,7 +229,8 @@ class MappingContractTests(unittest.TestCase):
                     "authority.symbol.missing",
                     (
                         "required authority symbols are missing: "
-                        "FL_CHANNEL_MAP, FH_CHANNEL_MAP, ALL_CHANNEL_NAMES"
+                        "FL_CHANNEL_MAP, FH_CHANNEL_MAP, FL_CHANNEL_NAMES, "
+                        "FH_CHANNEL_NAMES, ALL_CHANNEL_NAMES"
                     ),
                     lambda source=source: derive_mapping_from_source(source),
                 )
@@ -248,6 +247,20 @@ class MappingContractTests(unittest.TestCase):
                 "required authority symbol is missing: FH_CHANNEL_MAP",
             ),
             (
+                authority_source(
+                    include_fl_names=False,
+                    all_names_expression=repr(EXPECTED_LABELS),
+                ),
+                "required authority symbol is missing: FL_CHANNEL_NAMES",
+            ),
+            (
+                authority_source(
+                    include_fh_names=False,
+                    all_names_expression=repr(EXPECTED_LABELS),
+                ),
+                "required authority symbol is missing: FH_CHANNEL_NAMES",
+            ),
+            (
                 authority_source(include_all_names=False),
                 "required authority symbol is missing: ALL_CHANNEL_NAMES",
             ),
@@ -262,6 +275,79 @@ class MappingContractTests(unittest.TestCase):
                     expected_message,
                     lambda source=source: derive_mapping_from_source(source),
                 )
+
+    def test_m1_a_18_map_key_order_must_match_source_index_order(self) -> None:
+        # Given: The frozen FL labels and indices with only map insertion order drift.
+        drifted_fl = (FL_CHANNELS[1], FL_CHANNELS[0], *FL_CHANNELS[2:])
+        source = authority_source(fl_channels=drifted_fl)
+
+        # When: Mapping derivation validates key order against source indices.
+        # Then: A typed index-order failure rejects silent index-based reordering.
+        self.assert_failure(
+            AuthorityIndexError,
+            "authority.index.order",
+            "FL_CHANNEL_MAP key order must match its contiguous source indices",
+            lambda: derive_mapping_from_source(source),
+        )
+
+    def test_m1_a_19_stream_label_only_swap_requires_decision(self) -> None:
+        # Given: Thirteen correct labels with FL6 and fsGMI assigned to opposite streams.
+        swapped_fl = (*FL_CHANNELS[:-1], ("fsGMI", FL_CHANNELS[-1][1]))
+        swapped_fh = (("FL6", FH_CHANNELS[0][1]), *FH_CHANNELS[1:])
+        source = authority_source(
+            fl_channels=swapped_fl,
+            fh_channels=swapped_fh,
+        )
+
+        # When: Mapping derivation validates the frozen per-stream label groups.
+        # Then: A typed decision-required failure rejects the label-only seam drift.
+        self.assert_failure(
+            ContractDecisionRequiredError,
+            "mapping.stream_labels.decision_required",
+            (
+                "derived FL/FH channel groups do not match the frozen "
+                "D17 stream mapping"
+            ),
+            lambda: derive_mapping_from_source(source),
+        )
+
+    def test_m1_a_20_fl_channel_names_must_match_fl_map_order(self) -> None:
+        # Given: A valid FL map but an explicitly swapped FL_CHANNEL_NAMES tuple.
+        drifted_names = (FL_CHANNELS[1][0], FL_CHANNELS[0][0]) + tuple(
+            label for label, _ in FL_CHANNELS[2:]
+        )
+        source = authority_source(
+            fl_names_expression=repr(drifted_names),
+            all_names_expression=repr(EXPECTED_LABELS),
+        )
+
+        # When: Mapping derivation validates the provenance-listed FL names authority.
+        # Then: A typed order failure rejects disagreement with FL_CHANNEL_MAP.
+        self.assert_failure(
+            AuthorityOrderError,
+            "authority.order.mismatch",
+            "FL_CHANNEL_NAMES order does not match FL_CHANNEL_MAP",
+            lambda: derive_mapping_from_source(source),
+        )
+
+    def test_m1_a_21_fh_channel_names_must_match_fh_map_order(self) -> None:
+        # Given: A valid FH map but an explicitly swapped FH_CHANNEL_NAMES tuple.
+        drifted_names = (FH_CHANNELS[1][0], FH_CHANNELS[0][0]) + tuple(
+            label for label, _ in FH_CHANNELS[2:]
+        )
+        source = authority_source(
+            fh_names_expression=repr(drifted_names),
+            all_names_expression=repr(EXPECTED_LABELS),
+        )
+
+        # When: Mapping derivation validates the provenance-listed FH names authority.
+        # Then: A typed order failure rejects disagreement with FH_CHANNEL_MAP.
+        self.assert_failure(
+            AuthorityOrderError,
+            "authority.order.mismatch",
+            "FH_CHANNEL_NAMES order does not match FH_CHANNEL_MAP",
+            lambda: derive_mapping_from_source(source),
+        )
 
     def test_m1_a_04_d17_label_set_drift_requires_decision(self) -> None:
         # Given: Thirteen valid indices whose FL label set substitutes FL7 for FL6.
@@ -801,6 +887,83 @@ class MappingContractTests(unittest.TestCase):
                     ),
                 ),
             )
+
+    def test_m1_n_05_generator_accepts_identical_existing_output_without_write(
+        self,
+    ) -> None:
+        # Given: A generated frozen contract already exists with byte-identical content.
+        with tempfile.TemporaryDirectory() as repository_dir:
+            repository_root = Path(repository_dir)
+            approved_parent = (
+                repository_root / "docs/reference/d17-golden-regression"
+            )
+            approved_parent.mkdir(parents=True)
+            output_path = Path(
+                "docs/reference/d17-golden-regression/channel-mapping-v1.json"
+            )
+            approved_output = generate_mapping_contract(
+                repository_root=repository_root,
+                output_path=output_path,
+                gcsa_repository=Path("gcsa-read-only"),
+                commit=PROVENANCE["commit"],
+                source_path=PROVENANCE["path"],
+                read_blob=lambda *_: authority_source(),
+            )
+            before = approved_output.read_bytes()
+
+            # When: The same frozen contract is generated again.
+            regenerated = generate_mapping_contract(
+                repository_root=repository_root,
+                output_path=output_path,
+                gcsa_repository=Path("gcsa-read-only"),
+                commit=PROVENANCE["commit"],
+                source_path=PROVENANCE["path"],
+                read_blob=lambda *_: authority_source(),
+                write_bytes=lambda *_: self.fail(
+                    "identical frozen output must not be rewritten"
+                ),
+            )
+
+            # Then: Generation succeeds as a byte-preserving no-op.
+            self.assertEqual(approved_output, regenerated)
+            self.assertEqual(before, regenerated.read_bytes())
+
+    def test_m1_a_22_generator_rejects_existing_output_drift_without_write(
+        self,
+    ) -> None:
+        # Given: The approved regular output exists with drifted frozen bytes.
+        with tempfile.TemporaryDirectory() as repository_dir:
+            repository_root = Path(repository_dir)
+            approved_parent = (
+                repository_root / "docs/reference/d17-golden-regression"
+            )
+            approved_parent.mkdir(parents=True)
+            approved_output = approved_parent / "channel-mapping-v1.json"
+            drifted = b"drifted-frozen-contract\n"
+            approved_output.write_bytes(drifted)
+
+            # When: Generation would otherwise replace the existing output.
+            # Then: A typed mismatch fails closed and preserves the frozen bytes.
+            self.assert_failure(
+                ContractOutputError,
+                "contract.output.mismatch",
+                "existing contract output differs from generated content",
+                lambda: generate_mapping_contract(
+                    repository_root=repository_root,
+                    output_path=Path(
+                        "docs/reference/d17-golden-regression/"
+                        "channel-mapping-v1.json"
+                    ),
+                    gcsa_repository=Path("gcsa-read-only"),
+                    commit=PROVENANCE["commit"],
+                    source_path=PROVENANCE["path"],
+                    read_blob=lambda *_: authority_source(),
+                    write_bytes=lambda *_: self.fail(
+                        "drifted frozen output must not be rewritten"
+                    ),
+                ),
+            )
+            self.assertEqual(drifted, approved_output.read_bytes())
 
 
 if __name__ == "__main__":

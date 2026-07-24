@@ -17,6 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import closeout as closeout_module  # noqa: E402
 from closeout import (  # noqa: E402
     ACCEPTANCE_CONDITIONS,
     DEFAULT_CLOSEOUT_PATH,
@@ -135,6 +136,32 @@ class CloseoutPositiveTests(unittest.TestCase):
         )
         self.assertEqual(39, closeout["regression_evidence"]["channel_records"])
         self.assertEqual(3, closeout["regression_evidence"]["pair_count"])
+        self.assertIn("corpus_index_validator", closeout["source_references"])
+        self.assertIn("closeout_tests", closeout["source_references"])
+
+    def test_c_n_05_corpus_counts_come_from_validated_selection(self) -> None:
+        # Given: Selection validation returns a distinct, already-verified summary.
+        derived = {
+            "canonical_contract_role": "p0_c4_contract",
+            "canonical_manifest_role": "p0_c4_manifest",
+            "p0_c4_closeout_role": "p0_c4_closeout",
+            "selected_asset_bytes": 123,
+            "selected_entry_count": 4,
+            "selected_pair_count": 2,
+            "selection_role": "golden_inputs",
+            "verdict": "verified",
+        }
+
+        # When: The closeout is built after semantic source validation.
+        with mock.patch.object(
+            closeout_module,
+            "_validate_selection",
+            return_value=derived,
+        ):
+            closeout = build_closeout(REPO_ROOT)
+
+        # Then: Evidence reflects the validated result, not literal counters.
+        self.assertEqual(derived, closeout["corpus_consistency"])
 
     def test_c_n_04_closeout_is_payload_free_and_locator_free(self) -> None:
         payload = serialize_closeout(build_closeout(REPO_ROOT)).decode("ascii")
@@ -276,6 +303,22 @@ class CloseoutSourceFailureTests(unittest.TestCase):
                 lambda: build_closeout(repo_root),
             )
 
+    def test_c_a_02_same_size_source_content_drift_fails_sha256(self) -> None:
+        # Given: One pinned source changes content without changing byte size.
+        with _fixture() as temporary:
+            repo_root = Path(temporary)
+            declaration = FIXED_SOURCE_DECLARATIONS["channel_mapping"]
+            path = repo_root / declaration.path
+            payload = bytearray(path.read_bytes())
+            payload[0] ^= 1
+            path.write_bytes(payload)
+
+            # When/Then: The SHA branch, not the size branch, rejects the drift.
+            self.assert_code(
+                "closeout.source.sha256_mismatch",
+                lambda: build_closeout(repo_root),
+            )
+
     def test_c_a_05_profile_git_blob_drift_fails_even_if_sha_is_redeclared(self) -> None:
         with _fixture() as temporary:
             repo_root = Path(temporary)
@@ -341,6 +384,94 @@ class CloseoutSemanticFailureTests(unittest.TestCase):
                 lambda: build_closeout(repo_root, declarations),
             )
 
+    def test_c_a_04_reference_pair_and_input_identity_match_selection(self) -> None:
+        # Given: Reference pair or input identity drifts from the pinned selection.
+        mutations = (
+            lambda value: value["pairs"][0].update({"run_id": "000000_0000"}),
+            lambda value: value["pairs"][0]["inputs"][0].update(
+                {"sha256": "0" * 64}
+            ),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), _fixture() as temporary:
+                repo_root = Path(temporary)
+                declarations = _rewrite_json(
+                    repo_root,
+                    "golden_reference",
+                    mutation,
+                )
+
+                # When/Then: A coherently re-pinned reference still fails the join.
+                self.assert_code(
+                    "closeout.reference",
+                    lambda: build_closeout(repo_root, declarations),
+                )
+
+    def test_c_a_04_reference_reader_provenance_is_exact(self) -> None:
+        # Given: A coherently re-pinned reference names another reader commit.
+        with _fixture() as temporary:
+            repo_root = Path(temporary)
+            declarations = _rewrite_json(
+                repo_root,
+                "golden_reference",
+                lambda value: value["reader"].update({"commit": "0" * 40}),
+            )
+
+            # When/Then: The closeout refuses unearned reader provenance.
+            self.assert_code(
+                "closeout.reference",
+                lambda: build_closeout(repo_root, declarations),
+            )
+
+    def test_c_a_04_reference_digest_statistics_and_events_are_required(self) -> None:
+        # Given: Required reference evidence is absent, malformed, or incoherent.
+        mutations = (
+            lambda value: value["pairs"][0]["channels"][0].pop("sha256"),
+            lambda value: value["pairs"][0]["channels"][0].pop("statistics"),
+            lambda value: value["pairs"][0]["channels"][0].update(
+                {"sha256": "not-a-sha"}
+            ),
+            lambda value: value["pairs"][0].update({"event_count": 7}),
+            lambda value: value["pairs"][0]["channels"][0]["statistics"].update(
+                {"element_count": 1}
+            ),
+            lambda value: value["pairs"][0]["channels"][0]["statistics"].update(
+                {"sum": -1}
+            ),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), _fixture() as temporary:
+                repo_root = Path(temporary)
+                declarations = _rewrite_json(
+                    repo_root,
+                    "golden_reference",
+                    mutation,
+                )
+
+                # When/Then: Closeout cannot publish all-channel verified evidence.
+                self.assert_code(
+                    "closeout.reference",
+                    lambda: build_closeout(repo_root, declarations),
+                )
+
+    def test_c_a_04_reference_reader_attestation_is_exact(self) -> None:
+        # Given: The environment identity is no longer tied to its attestation.
+        with _fixture() as temporary:
+            repo_root = Path(temporary)
+            declarations = _rewrite_json(
+                repo_root,
+                "golden_reference",
+                lambda value: value["reader"]["environment"].pop(
+                    "identity_attestation"
+                ),
+            )
+
+            # When/Then: A coherently re-pinned reference still fails closed.
+            self.assert_code(
+                "closeout.reference",
+                lambda: build_closeout(repo_root, declarations),
+            )
+
     def test_c_a_05_selection_manifest_pin_must_match_p0_c4_manifest(self) -> None:
         with _fixture() as temporary:
             repo_root = Path(temporary)
@@ -348,6 +479,22 @@ class CloseoutSemanticFailureTests(unittest.TestCase):
                 repo_root,
                 "golden_inputs",
                 lambda value: value["sources"]["manifest"].update(
+                    {"sha256": "0" * 64}
+                ),
+            )
+
+            self.assert_code(
+                "closeout.corpus_binding",
+                lambda: build_closeout(repo_root, declarations),
+            )
+
+    def test_c_a_05_selection_validator_pin_must_match_source_role(self) -> None:
+        with _fixture() as temporary:
+            repo_root = Path(temporary)
+            declarations = _rewrite_json(
+                repo_root,
+                "golden_inputs",
+                lambda value: value["sources"]["corpus_index_validator"].update(
                     {"sha256": "0" * 64}
                 ),
             )

@@ -94,7 +94,7 @@ remain process-local and are never serialized.
 
 The live result contains three pairs and 39 records, with every channel shaped
 `[100, 2400]`. Two complete regenerations were byte-identical at SHA-256
-`581fa28e05d85d4fb6ff0b5157958c1e908326505acf39a3f732b1b720d25095`.
+`3f531bd624ad3ea8b763b7ec82da42f313fbd4976945c6cd1f636fab9636f53f`.
 Reader environment versions are stored in the fixture as non-host-specific
 provenance. The generator also pins this output identity and refuses to
 overwrite a drifted or hard-linked fixture. Any source/input/reader identity

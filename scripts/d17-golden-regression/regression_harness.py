@@ -17,9 +17,9 @@ _GOLDEN_REFERENCE_PATH = (
     "docs/reference/d17-golden-regression/golden-reference-v1.json"
 )
 _GOLDEN_REFERENCE_SHA256 = (
-    "581fa28e05d85d4fb6ff0b5157958c1e908326505acf39a3f732b1b720d25095"
+    "3f531bd624ad3ea8b763b7ec82da42f313fbd4976945c6cd1f636fab9636f53f"
 )
-_GOLDEN_REFERENCE_SIZE = 13_178
+_GOLDEN_REFERENCE_SIZE = 13_281
 _PAIR_COUNT = 3
 _CHANNEL_COUNT_PER_PAIR = 13
 _MAX_CANDIDATE_DEPTH = 32
@@ -827,6 +827,8 @@ def compare_candidate_to_golden(
         normalized_candidate,
         golden,
     )
+    compared_pair_count = 0
+    compared_channel_count = 0
     for pair_index, (candidate_pair, golden_pair) in enumerate(
         zip(candidate_pairs, golden_pairs)
     ):
@@ -853,6 +855,18 @@ def compare_candidate_to_golden(
                 candidate_channel,
                 golden_channel,
             )
+            compared_channel_count += 1
+        compared_pair_count += 1
+
+    if (
+        compared_pair_count != _PAIR_COUNT
+        or compared_channel_count != _PAIR_COUNT * _CHANNEL_COUNT_PER_PAIR
+    ):
+        _fail(
+            CandidateCardinalityError,
+            "candidate.comparison.incomplete",
+            "candidate comparison did not cover exactly 3 pairs and 39 channels",
+        )
 
     candidate_source = _canonical_candidate_bytes(normalized_candidate)
     result = {
@@ -864,9 +878,9 @@ def compare_candidate_to_golden(
             "sha256": hashlib.sha256(candidate_source).hexdigest(),
             "size_bytes": len(candidate_source),
         },
-        "pair_count": _PAIR_COUNT,
+        "pair_count": compared_pair_count,
         "channel_count_per_pair": _CHANNEL_COUNT_PER_PAIR,
-        "compared_channel_count": _PAIR_COUNT * _CHANNEL_COUNT_PER_PAIR,
+        "compared_channel_count": compared_channel_count,
     }
     return _VerifiedRegressionResult(result, _VERIFIED_RESULT_TOKEN)
 

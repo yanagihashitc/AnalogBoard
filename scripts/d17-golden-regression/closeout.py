@@ -89,57 +89,67 @@ FIXED_SOURCE_DECLARATIONS: dict[str, SourceDeclaration] = {
     ),
     "mapping_tool": SourceDeclaration(
         path="scripts/d17-golden-regression/mapping_contract.py",
-        sha256="60380cdf30db2ad008ddd4fc03a01daac140fa77d412da3f3f5ca6927b73c735",
-        size_bytes=21_311,
+        sha256="912fee15ca24a095f64bff68fa73c8411823b14326282717b57eed09d7ebf38c",
+        size_bytes=22_642,
     ),
     "mapping_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_mapping_contract.py",
-        sha256="c512d446da79531252f07395ce8f6d82aaebbc62b571bb4483cb1d7a4e64679f",
-        size_bytes=33_971,
+        sha256="a482ffbb3ed86e25597fd1f51f89bf84560fd28d6fa38d7c788436bcd389b8bc",
+        size_bytes=41_540,
     ),
     "golden_inputs": SourceDeclaration(
         path="docs/reference/d17-golden-regression/golden-inputs-v1.json",
-        sha256="76ef20a12ff3b0850a25501f13832690e84dd762b25f3500918c0dde6d443023",
-        size_bytes=1_785,
+        sha256="30feceee3ea5f054d3ad43528f82c1e0228a0a855f8c2d55cb0b7f2732b42975",
+        size_bytes=1_953,
         schema="analogboard.d17.golden-input-selection",
         schema_version=1,
     ),
+    "corpus_index_validator": SourceDeclaration(
+        path="scripts/corpus-index/corpus_index.py",
+        sha256="d6589cdf99c733f1eea8455fcb4cdfa1c3f4289aa9662375c7382769648d87f7",
+        size_bytes=47_861,
+    ),
     "selection_tool": SourceDeclaration(
         path="scripts/d17-golden-regression/golden_selection.py",
-        sha256="317bce7cfcf3c0a7926ef244089ec256b79d30e656b26198f0182274ea38df8e",
-        size_bytes=22_278,
+        sha256="f597356e23d422a1c98aec6d992d7eab69e46366bdc3b9b1cf4728c05c80e90f",
+        size_bytes=23_076,
     ),
     "selection_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_golden_selection.py",
-        sha256="b575651994c5ef24dab5eb1e6b16719a703042a7f5c78d0923db1d99f0219596",
-        size_bytes=32_139,
+        sha256="0207640732a364e5d8d0e42d4f1d658dbb6a4d2221493a6fb21c4f9115f94d83",
+        size_bytes=36_584,
     ),
     "golden_reference": SourceDeclaration(
         path="docs/reference/d17-golden-regression/golden-reference-v1.json",
-        sha256="581fa28e05d85d4fb6ff0b5157958c1e908326505acf39a3f732b1b720d25095",
-        size_bytes=13_178,
+        sha256="3f531bd624ad3ea8b763b7ec82da42f313fbd4976945c6cd1f636fab9636f53f",
+        size_bytes=13_281,
         schema="analogboard.d17.golden-reference",
         schema_version=1,
     ),
     "reference_tool": SourceDeclaration(
         path="scripts/d17-golden-regression/golden_reference.py",
-        sha256="99422d66061a851a9f77b8d07cf619c29a67dd4d2f23664fa97bbdcb349c06d8",
-        size_bytes=39_633,
+        sha256="cb475a216bbab2880527990536d4b7a5a2b042e36d6f58d5c6f5d51786c3e7d6",
+        size_bytes=40_236,
     ),
     "reference_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_golden_reference.py",
-        sha256="2c6bd43c15d06c65d2c5b47baf56f05cdd7d5d98fa309cbd1929d3d922085161",
-        size_bytes=37_296,
+        sha256="3c2b685a3486e5c1d50030cea70a493c315def43d7b16f63f710ab626d1360c7",
+        size_bytes=41_450,
     ),
     "regression_harness": SourceDeclaration(
         path="scripts/d17-golden-regression/regression_harness.py",
-        sha256="0592c125081a088585be792d192160383552f65c630cb0d293a7ad509e00630b",
-        size_bytes=33_962,
+        sha256="faadda0ad5da03b48a8a3251efdf9d3a9070c6218f28328e6ca6679fe9dbc914",
+        size_bytes=34_415,
     ),
     "regression_tests": SourceDeclaration(
         path="scripts/d17-golden-regression/tests/test_regression_harness.py",
-        sha256="98b6004fecbd3734c7c931d70abbb50fd30aace4c0152b428e46126adf9306d8",
-        size_bytes=39_047,
+        sha256="097b505e48f9d1e7b3113fa32fead103337c24ffbb289e6a1a174b33b6c40a82",
+        size_bytes=41_076,
+    ),
+    "closeout_tests": SourceDeclaration(
+        path="scripts/d17-golden-regression/tests/test_closeout.py",
+        sha256="1179f5c0a2f6c067d93a6ae8320257f642a1667c09302f986ccef8d3954c3ce3",
+        size_bytes=23_394,
     ),
     "phase1_contract": SourceDeclaration(
         path="docs/reference/d17-golden-regression/phase1-connection-v1.md",
@@ -173,6 +183,7 @@ ACCEPTANCE_CONDITIONS = (
             "p0_c4_manifest",
             "p0_c4_closeout",
             "golden_inputs",
+            "corpus_index_validator",
             "selection_tool",
             "selection_tests",
         ),
@@ -196,6 +207,7 @@ ACCEPTANCE_CONDITIONS = (
             "p0_c4_closeout",
             "refactor_profile",
             "review_profile",
+            "closeout_tests",
         ),
     ),
 )
@@ -231,7 +243,11 @@ AUTHORITY_DAG = [
     },
     {
         "consumer": "golden_inputs",
-        "inputs": ["p0_c4_contract", "p0_c4_manifest", "channel_mapping"],
+        "inputs": [
+            "p0_c4_contract",
+            "p0_c4_manifest",
+            "corpus_index_validator",
+        ],
     },
     {
         "consumer": "golden_reference",
@@ -276,7 +292,7 @@ REGRESSION_EVIDENCE = {
 }
 
 
-CORPUS_CONSISTENCY = {
+FROZEN_CORPUS_CONSISTENCY = {
     "canonical_contract_role": "p0_c4_contract",
     "canonical_manifest_role": "p0_c4_manifest",
     "p0_c4_closeout_role": "p0_c4_closeout",
@@ -517,6 +533,7 @@ def _validate_declarations(
 def _validate_closeout(
     value: object,
     declarations: Mapping[str, SourceDeclaration],
+    expected_corpus_consistency: Mapping[str, object] = FROZEN_CORPUS_CONSISTENCY,
 ) -> dict[str, Any]:
     _validate_tree(value)
     if not isinstance(value, dict):
@@ -535,7 +552,7 @@ def _validate_closeout(
         _fail("closeout.authority_dag", "closeout authority DAG differs")
     if value["regression_evidence"] != REGRESSION_EVIDENCE:
         _fail("closeout.regression", "closeout regression evidence differs")
-    if value["corpus_consistency"] != CORPUS_CONSISTENCY:
+    if value["corpus_consistency"] != expected_corpus_consistency:
         _fail("closeout.corpus", "closeout corpus consistency evidence differs")
     if value["boundaries"] != BOUNDARIES:
         _fail("closeout.boundaries", "closeout boundaries differ")
@@ -812,7 +829,7 @@ def _validate_selection(
     value: Mapping[str, Any],
     declarations: Mapping[str, SourceDeclaration],
     manifest_value: Mapping[str, Any],
-) -> None:
+) -> dict[str, object]:
     pairs = value.get("pairs")
     if (
         value.get("pair_count") != 3
@@ -835,16 +852,35 @@ def _validate_selection(
             "FH",
         ]:
             _fail("closeout.selection", "golden selection stream order differs")
+        if any(not isinstance(entry, dict) for entry in inputs):
+            _fail("closeout.selection", "golden selection entry is invalid")
         entries.extend(inputs)
-    if sum(entry.get("size_bytes", -1) for entry in entries) != 18_720_000:
-        _fail("closeout.selection", "golden selection byte total differs")
+    selected_asset_bytes = 0
+    for entry in entries:
+        size_bytes = entry.get("size_bytes")
+        if type(size_bytes) is not int or size_bytes <= 0:
+            _fail("closeout.selection", "golden selection byte total differs")
+        selected_asset_bytes += size_bytes
     sources = value.get("sources")
     manifest = sources.get("manifest") if isinstance(sources, dict) else None
     contract = sources.get("corpus_contract") if isinstance(sources, dict) else None
+    validator = (
+        sources.get("corpus_index_validator")
+        if isinstance(sources, dict)
+        else None
+    )
+    if not isinstance(sources, dict) or set(sources) != {
+        "manifest",
+        "corpus_contract",
+        "corpus_index_validator",
+    }:
+        _fail("closeout.corpus_binding", "selection source roles differ")
     if manifest != _identity_reference(declarations["p0_c4_manifest"]):
         _fail("closeout.corpus_binding", "selection manifest binding differs")
     if contract != _identity_reference(declarations["p0_c4_contract"]):
         _fail("closeout.corpus_binding", "selection contract binding differs")
+    if validator != _identity_reference(declarations["corpus_index_validator"]):
+        _fail("closeout.corpus_binding", "selection validator binding differs")
     manifest_entries = manifest_value.get("entries")
     if (
         value.get("asset_locator") != manifest_value.get("source_locator")
@@ -871,12 +907,23 @@ def _validate_selection(
                 "closeout.corpus_binding",
                 "selected identity differs from its P0-C4 manifest row",
             )
+    return {
+        "canonical_contract_role": "p0_c4_contract",
+        "canonical_manifest_role": "p0_c4_manifest",
+        "p0_c4_closeout_role": "p0_c4_closeout",
+        "selected_asset_bytes": selected_asset_bytes,
+        "selected_entry_count": len(entries),
+        "selected_pair_count": len(pairs),
+        "selection_role": "golden_inputs",
+        "verdict": "verified",
+    }
 
 
 def _validate_reference(
     value: Mapping[str, Any],
     declarations: Mapping[str, SourceDeclaration],
     mapping: Mapping[str, Any],
+    selection: Mapping[str, Any],
 ) -> None:
     pairs = value.get("pairs")
     if (
@@ -887,39 +934,115 @@ def _validate_reference(
     ):
         _fail("closeout.reference", "golden reference cardinality differs")
     expected_mapping = mapping["mapping"]
+    selected_pairs = selection.get("pairs")
+    if not isinstance(selected_pairs, list) or len(selected_pairs) != 3:
+        _fail("closeout.reference", "golden reference selection join is invalid")
     channel_records = 0
-    for pair in pairs:
+    for pair, selected_pair in zip(pairs, selected_pairs, strict=True):
         if not isinstance(pair, dict) or not isinstance(pair.get("channels"), list):
             _fail("closeout.reference", "golden reference pair is invalid")
+        if not isinstance(selected_pair, dict):
+            _fail("closeout.reference", "golden reference selection join is invalid")
+        if (
+            pair.get("density") != selected_pair.get("density")
+            or pair.get("run_id") != selected_pair.get("run_id")
+            or pair.get("ordinal") != selected_pair.get("ordinal")
+            or pair.get("inputs") != selected_pair.get("entries")
+            or type(pair.get("event_count")) is not int
+            or pair.get("event_count") != 100
+        ):
+            _fail("closeout.reference", "golden reference pair join differs")
+        event_count = pair["event_count"]
         channels = pair["channels"]
         if len(channels) != 13:
             _fail("closeout.reference", "golden reference channel count differs")
         for expected, channel in zip(expected_mapping, channels, strict=True):
             channel_records += 1
+            statistics = channel.get("statistics") if isinstance(channel, dict) else None
+            shape = channel.get("shape") if isinstance(channel, dict) else None
             if (
                 not isinstance(channel, dict)
+                or set(channel)
+                != {
+                    "physical_channel",
+                    "label",
+                    "stream",
+                    "source_index",
+                    "dtype",
+                    "shape",
+                    "sha256",
+                    "statistics",
+                }
                 or channel.get("physical_channel")
                 != expected.get("physical_channel")
                 or channel.get("label") != expected.get("label")
                 or channel.get("stream") != expected.get("stream")
                 or channel.get("source_index") != expected.get("source_index")
                 or channel.get("dtype") != "<u2"
-                or channel.get("shape") != [100, 2400]
+                or shape != [event_count, 2400]
+                or not isinstance(channel.get("sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", channel["sha256"]) is None
             ):
                 _fail("closeout.reference", "golden reference representation differs")
+            element_count = event_count * 2_400
+            if (
+                not isinstance(statistics, dict)
+                or set(statistics)
+                != {"element_count", "min", "max", "sum", "nonzero_count"}
+                or any(type(item) is not int for item in statistics.values())
+                or statistics["element_count"] != element_count
+                or not 0 <= statistics["min"] <= statistics["max"] <= 65_535
+                or not 0 <= statistics["nonzero_count"] <= element_count
+                or not (
+                    statistics["min"] * element_count
+                    <= statistics["sum"]
+                    <= statistics["max"] * element_count
+                )
+            ):
+                _fail("closeout.reference", "golden reference statistics differ")
     if channel_records != 39:
         _fail("closeout.reference", "golden reference record count differs")
-    sources = value.get("sources")
-    if not isinstance(sources, dict):
-        _fail("closeout.reference", "golden reference source bindings are absent")
-    if sources.get("channel_mapping") != _identity_reference(
-        declarations["channel_mapping"]
-    ):
-        _fail("closeout.reference", "golden reference mapping binding differs")
-    if sources.get("golden_inputs") != _identity_reference(
-        declarations["golden_inputs"]
-    ):
-        _fail("closeout.reference", "golden reference input binding differs")
+    expected_sources = {
+        "channel_mapping": _identity_reference(declarations["channel_mapping"]),
+        "golden_inputs": _identity_reference(declarations["golden_inputs"]),
+    }
+    if value.get("sources") != expected_sources:
+        _fail("closeout.reference", "golden reference source bindings differ")
+    expected_reader = {
+        "commit": GCSA_COMMIT,
+        "environment": {
+            "identity": (
+                "sha256:e65e9f8b0ffafef5b5d2b9711c9a341"
+                "1649ae80fd036cc79f0febb80b4c0b06e"
+            ),
+            "identity_attestation": {
+                "kind": "operator-environment-attestation",
+                "source": "P0_M1_CONTAINER_IMAGE_ID",
+            },
+            "kind": "container-image",
+            "logical_invocation": (
+                "golden_reference.py generate --asset-root <fixed-custody-root>"
+            ),
+            "numpy_version": "2.2.6",
+            "python_version": "3.10.17",
+        },
+        "invocation": "BinaryReader(version='v1')",
+        "parser": {
+            "path": "src/gcsa/io/parsers/v1.py",
+            "sha256": (
+                "5035b9147ec42c2381cc2fd45a1f83a9f251edece7b21c4dd099f2da315a2964"
+            ),
+        },
+        "path": "src/gcsa/io/binary_reader.py",
+        "reader_source_sha256": (
+            "620ab899b0fb75f75da0a1c8b5722a2f02212726910aea5115401506f8eb4254"
+        ),
+        "repository": "gcsa",
+        "symbol": "BinaryReader",
+        "version": "v1",
+    }
+    if value.get("reader") != expected_reader:
+        _fail("closeout.reference", "golden reference reader provenance differs")
 
 
 def _validate_corpus_sources(
@@ -986,6 +1109,7 @@ def _validate_plan_and_contract(payloads: Mapping[str, bytes]) -> None:
 
 def _build_value(
     declarations: Mapping[str, SourceDeclaration],
+    corpus_consistency: Mapping[str, object],
 ) -> dict[str, object]:
     return {
         "acceptance_conditions": [
@@ -998,7 +1122,7 @@ def _build_value(
         ],
         "authority_dag": AUTHORITY_DAG,
         "boundaries": BOUNDARIES,
-        "corpus_consistency": CORPUS_CONSISTENCY,
+        "corpus_consistency": dict(corpus_consistency),
         "manual_gate": MANUAL_GATE,
         "regression_evidence": REGRESSION_EVIDENCE,
         "schema": CLOSEOUT_SCHEMA,
@@ -1046,7 +1170,7 @@ def build_closeout(
         _require_schema(role, value, source_declarations[role])
 
     _validate_mapping(json_sources["channel_mapping"])
-    _validate_selection(
+    corpus_consistency = _validate_selection(
         json_sources["golden_inputs"],
         source_declarations,
         json_sources["p0_c4_manifest"],
@@ -1055,6 +1179,7 @@ def build_closeout(
         json_sources["golden_reference"],
         source_declarations,
         json_sources["channel_mapping"],
+        json_sources["golden_inputs"],
     )
     _validate_corpus_sources(
         json_sources["p0_c4_contract"],
@@ -1064,8 +1189,9 @@ def build_closeout(
     )
     _validate_plan_and_contract(payloads)
     return _validate_closeout(
-        _build_value(source_declarations),
+        _build_value(source_declarations, corpus_consistency),
         source_declarations,
+        corpus_consistency,
     )
 
 

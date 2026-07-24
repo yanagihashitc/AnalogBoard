@@ -63,6 +63,13 @@ _SOURCE_PINS = MappingProxyType(
             ),
             size_bytes=1_489,
         ),
+        "corpus_index_validator": _SourceIdentityPin(
+            path=_CORPUS_INDEX_PATH,
+            sha256=(
+                "d6589cdf99c733f1eea8455fcb4cdfa1c3f4289aa9662375c7382769648d87f7"
+            ),
+            size_bytes=47_861,
+        ),
     }
 )
 _CORPUS_INDEX_MODULE: types.ModuleType | None = None
@@ -297,16 +304,20 @@ def require_pinned_source_identities(
         "corpus_contract": contract_bytes,
     }
     for source_name, content in sources.items():
-        pin = _SOURCE_PINS[source_name]
-        if (
-            type(content) is not bytes
-            or len(content) != pin.size_bytes
-            or hashlib.sha256(content).hexdigest() != pin.sha256
-        ):
+        if not _matches_source_pin(source_name, content):
             raise SelectionSourceError(
                 "selection.source.identity_mismatch",
                 "fixed tracked P0-C4 metadata source identity does not match its pin",
             )
+
+
+def _matches_source_pin(source_name: str, content: object) -> bool:
+    pin = _SOURCE_PINS[source_name]
+    return (
+        type(content) is bytes
+        and len(content) == pin.size_bytes
+        and hashlib.sha256(content).hexdigest() == pin.sha256
+    )
 
 
 def _load_corpus_index_module() -> types.ModuleType:
@@ -320,6 +331,8 @@ def _load_corpus_index_module() -> types.ModuleType:
             _CORPUS_INDEX_PATH,
             allowed_paths=frozenset({_CORPUS_INDEX_PATH}),
         )
+        if not _matches_source_pin("corpus_index_validator", source):
+            raise TypeError("validator source identity mismatch")
         module_name = "_analogboard_p0_c4_corpus_index"
         module = types.ModuleType(module_name)
         module.__file__ = _CORPUS_INDEX_PATH.as_posix()
@@ -356,9 +369,12 @@ def _canonical_metadata(
         canonical_contract = module.load_contract_data(contract)
         entries = module.validate_manifest_metadata(canonical_contract, manifest)
     except module.CorpusIndexError as exc:
+        validator_code = getattr(exc, "code", None)
+        if not isinstance(validator_code, str) or not validator_code:
+            validator_code = "validator.error.untyped"
         raise SelectionSchemaError(
             "selection.schema.invalid",
-            f"P0-C4 metadata validation failed ({exc.code})",
+            f"P0-C4 metadata validation failed ({validator_code})",
         ) from exc
     if canonical_contract.canonical_locator != _EXPECTED_LOCATOR:
         raise SelectionSchemaError(
@@ -476,6 +492,9 @@ def serialize_golden_selection(
         "sources": {
             "manifest": _source_identity(_MANIFEST_PATH, manifest_bytes),
             "corpus_contract": _source_identity(_CONTRACT_PATH, contract_bytes),
+            "corpus_index_validator": _expected_output_sources()[
+                "corpus_index_validator"
+            ],
         },
         "pair_count": selection["pair_count"],
         "entry_count": selection["entry_count"],

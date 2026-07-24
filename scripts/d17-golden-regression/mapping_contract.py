@@ -15,11 +15,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-_REQUIRED_SYMBOLS = (
-    "FL_CHANNEL_MAP",
-    "FH_CHANNEL_MAP",
-    "ALL_CHANNEL_NAMES",
-)
 _AUTHORITY_SYMBOLS = (
     "FL_CHANNEL_MAP",
     "FH_CHANNEL_MAP",
@@ -27,6 +22,7 @@ _AUTHORITY_SYMBOLS = (
     "FH_CHANNEL_NAMES",
     "ALL_CHANNEL_NAMES",
 )
+_REQUIRED_SYMBOLS = _AUTHORITY_SYMBOLS
 _FL_LABELS = ("FSC", "SSC", "FL1", "FL2", "FL3", "FL4", "FL5", "FL6")
 _FH_LABELS = ("fsGMI", "ssGMI", "flGMI", "dGMI", "bfGMI")
 _D17_LABELS = _FL_LABELS + _FH_LABELS
@@ -289,6 +285,23 @@ def _validate_channel_map(value: object, symbol: str) -> dict[str, int]:
     return channel_map
 
 
+def _validate_channel_names(
+    value: object,
+    symbol: str,
+    channel_map: Mapping[str, int],
+    channel_map_symbol: str,
+) -> tuple[str, ...]:
+    if type(value) is not tuple:
+        raise _source_error(f"{symbol} must be a tuple")
+    expected = tuple(channel_map)
+    if value != expected:
+        raise AuthorityOrderError(
+            "authority.order.mismatch",
+            f"{symbol} order does not match {channel_map_symbol}",
+        )
+    return value
+
+
 def _require_d17_labels(fl_labels: Sequence[str], fh_labels: Sequence[str]) -> None:
     combined = tuple(fl_labels) + tuple(fh_labels)
     if len(combined) != 13:
@@ -342,6 +355,18 @@ def derive_mapping_from_source(source: object) -> list[dict[str, object]]:
     fh_map = _validate_channel_map(
         evaluator.resolve("FH_CHANNEL_MAP"), "FH_CHANNEL_MAP"
     )
+    fl_names = _validate_channel_names(
+        evaluator.resolve("FL_CHANNEL_NAMES"),
+        "FL_CHANNEL_NAMES",
+        fl_map,
+        "FL_CHANNEL_MAP",
+    )
+    fh_names = _validate_channel_names(
+        evaluator.resolve("FH_CHANNEL_NAMES"),
+        "FH_CHANNEL_NAMES",
+        fh_map,
+        "FH_CHANNEL_MAP",
+    )
     fl_labels = tuple(fl_map)
     fh_labels = tuple(fh_map)
     _require_d17_labels(fl_labels, fh_labels)
@@ -349,7 +374,7 @@ def derive_mapping_from_source(source: object) -> list[dict[str, object]]:
     all_names = evaluator.resolve("ALL_CHANNEL_NAMES")
     if type(all_names) is not tuple:
         raise _source_error("ALL_CHANNEL_NAMES must be a tuple")
-    if all_names != fl_labels + fh_labels:
+    if all_names != fl_names + fh_names:
         raise AuthorityOrderError(
             "authority.order.mismatch",
             "ALL_CHANNEL_NAMES order does not match FL_CHANNEL_MAP + FH_CHANNEL_MAP",
@@ -578,6 +603,22 @@ def generate_mapping_contract(
         "symbols": list(_AUTHORITY_SYMBOLS),
     }
     content = serialize_mapping_contract(mapping, provenance)
+    try:
+        existing_content = approved_output.read_bytes()
+    except FileNotFoundError:
+        existing_content = None
+    except OSError as exc:
+        raise ContractOutputError(
+            "contract.output.read",
+            "unable to read existing approved contract output",
+        ) from exc
+    if existing_content is not None:
+        if existing_content != content:
+            raise ContractOutputError(
+                "contract.output.mismatch",
+                "existing contract output differs from generated content",
+            )
+        return approved_output
     try:
         write_bytes(approved_output, content)
     except OSError as exc:
