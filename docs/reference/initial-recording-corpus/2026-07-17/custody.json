@@ -1,0 +1,99 @@
+{
+  "asset_owner": {
+    "identity": null,
+    "open_item": "P0-C4-ASSET-OWNER",
+    "verdict": "owner_decision_required"
+  },
+  "at_rest": {
+    "authorized_location": "asset-retaining-machine",
+    "d19_protection": "not_applied",
+    "decision_date": "2026-07-20",
+    "decision_source": "plan",
+    "export": "prohibited",
+    "git_exclusion": "not_at_rest_protection",
+    "reacquisition_performed": false,
+    "relocation_performed": false,
+    "reprotection_performed": false,
+    "state": "pre_d19_plaintext_local_only"
+  },
+  "availability": {
+    "checks": [
+      "source_set_exact",
+      "present",
+      "regular_file",
+      "readable",
+      "size_bytes",
+      "sha256"
+    ],
+    "restore_inferred": false,
+    "result": "all_verified",
+    "scope": "all_manifest_entries",
+    "source": "corpus_manifest",
+    "verdict": "verified"
+  },
+  "canonical_locator": "artifacts/field-session/2026-07-17-characterization",
+  "open_items": [
+    {
+      "id": "P0-C4-ASSET-OWNER",
+      "reason": "asset_owner_decision_required",
+      "status": "open"
+    },
+    {
+      "id": "P0-C4-RESTORE-SOURCE",
+      "reason": "restore_source_not_identified",
+      "status": "open"
+    },
+    {
+      "id": "P0-C4-RETENTION",
+      "reason": "retention_policy_decision_required",
+      "status": "open"
+    }
+  ],
+  "reacquisition": {
+    "current_corpus_replaced": false,
+    "result_scope": "new_corpus_version",
+    "same_sha256_required": false,
+    "verdict": "out_of_scope_not_performed"
+  },
+  "restore": {
+    "open_item": "P0-C4-RESTORE-SOURCE",
+    "source_identity": null,
+    "source_status": "not_identified",
+    "verdict": "not_performed",
+    "verification": null
+  },
+  "retention": {
+    "open_item": "P0-C4-RETENTION",
+    "policy": null,
+    "verdict": "owner_decision_required"
+  },
+  "schema": "analogboard.phase0.initial-recording-corpus-custody",
+  "schema_version": 1,
+  "source_references": {
+    "corpus_contract": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/contract.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-contract",
+      "schema_version": 1,
+      "sha256": "825503ad2cb84a6262a2b2a6c88e661973a0fba4a37f77be6d04dc451b7c51e6"
+    },
+    "corpus_manifest": {
+      "path": "docs/reference/initial-recording-corpus/2026-07-17/manifest.json",
+      "schema": "analogboard.phase0.initial-recording-corpus-manifest",
+      "schema_version": 1,
+      "sha256": "f51fc2759598dba71bfc51ede5d9128e63ab90a5dd70dd31e3c02bb015e56002"
+    },
+    "manifest_tool": {
+      "path": "scripts/corpus-index/corpus_index.py",
+      "sha256": "d6589cdf99c733f1eea8455fcb4cdfa1c3f4289aa9662375c7382769648d87f7"
+    },
+    "plan": {
+      "path": "docs/plans/260710-analogboard-rebuild-plan.html",
+      "revision": "Draft 4.7",
+      "sha256": "d0c927375efdb491159e4980e8b57f62210de7b4bc8b15db43a63c7acee36b66"
+    },
+    "recovery_procedure": {
+      "path": "docs/operations/initial-recording-corpus/restore-and-reacquisition.md",
+      "sha256": "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261"
+    }
+  }
+}
