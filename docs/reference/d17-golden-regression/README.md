@@ -155,14 +155,54 @@ assets or invoke gcsa.
 
 The harness proves that a submitted candidate summary matches this golden. It
 does not by itself prove how the candidate digest was calculated; the Phase 1
-adapter connection and canonical-byte rule are documented in the closeout
-contract rather than attributed to gcsa provenance.
+adapter connection and canonical-byte rule are documented in the Phase 1
+connection contract rather than attributed to gcsa provenance.
+
+## Phase 1 connection
+
+The tracked [Phase 1 connection contract](phase1-connection-v1.md) fixes the
+future product-adapter handoff without implementing it. The adapter verifies
+the same three manifest-pinned pairs, uses the tracked mapping rows to select
+all 13 channels, rejects representation drift, and hashes canonical
+little-endian `<u2>` C-order bytes. It then supplies the strict candidate
+summary to the stdin command above. Exit 0 and a Pass result are accepted only
+when all 39 channel mapping, dtype, shape, digest, and statistics records
+match.
+
+The submitted candidate digest is summary identity rather than producer
+attestation. Product-owned adapter tests and Tier 1/2 integration are therefore
+explicit Phase 1 work and are not claimed by P0-M1.
+
+## Bounded closeout
+
+The tracked [closeout evidence](closeout-v1.json) is built and verified from
+the exact plan, P0-C4 corpus contract/manifest/closeout, D17 contracts and
+fixtures, harness/tests, Phase 1 contract, and checkpoint profiles:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/d17-golden-regression/closeout.py generate
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  scripts/d17-golden-regression/closeout.py verify
+```
+
+The generator reads only repository-local metadata and source files; it does
+not open corpus assets or gcsa. Every source has a fixed path, SHA-256, and
+byte size, and the two profiles also have their goal-pinned Git blob identity.
+It semantically joins the three selected pairs back to the P0-C4 manifest
+identity, requires 13 mapping rows and 39 `<u2>` reference records, records all
+seven mandatory mutation cases, and binds the six frozen P0-M1 acceptance
+conditions to bounded evidence roles. An existing drifted, linked, or unsafe
+output is not overwritten.
+
+The closeout remains `gate_ready`: it does not declare completion. Human merge
+and central live verification are still required.
 
 ## Boundaries
 
 - `../gcsa` is a read-only authority and reader dependency.
-- `artifacts/` is read-only and may be accessed only by later, pinned decode
-  and integrity-verification steps.
+- `artifacts/` is read-only; P0-M1 access was limited to the six pinned Batch 3
+  decode and integrity-verification inputs.
 - Selected assets inherit the P0-C4 pre-D19 plaintext, local-only, no-export
   custody boundary.
 - Tracked contracts and fixtures are payload-free: no decoded waveform array,

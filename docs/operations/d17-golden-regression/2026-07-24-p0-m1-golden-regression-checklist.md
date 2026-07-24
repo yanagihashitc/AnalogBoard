@@ -10,7 +10,7 @@ Created: 2026-07-24
 - [x] Batch 2: bounded golden-input selection and manifest identity pins
 - [x] Batch 3: payload-free gcsa reference output and byte determinism
 - [x] Batch 4: typed candidate regression harness and synthetic negatives
-- [ ] Batch 5: Phase 1 connection contract and closeout evidence
+- [x] Batch 5: Phase 1 connection contract and closeout evidence
 - [ ] Phase checkpoint: all six acceptance conditions proven and one PR created
 
 The non-binding recommended split is retained because it preserves the fixed
@@ -20,13 +20,13 @@ fail-closed, and deterministic behavior.
 
 ## Acceptance evidence
 
-- [ ] Exactly 13 CH1–CH13 entries are derived from pinned gcsa authority
-- [ ] gcsa commit, path, and symbol provenance are tracked
-- [ ] Bounded golden inputs are pinned by canonical manifest identity
-- [ ] Per-channel reference digests and bounded statistics are payload-free
-- [ ] Identical pinned input regenerates byte-identical tracked output
-- [ ] Permutation, label, missing, extra, dtype, shape, and value drift fail typed
-- [ ] Phase 1 candidate interface and all-channel acceptance rule are documented
-- [ ] gcsa/assets remain read-only and no extra hardware run is performed
+- [x] Exactly 13 CH1–CH13 entries are derived from pinned gcsa authority
+- [x] gcsa commit, path, and symbol provenance are tracked
+- [x] Bounded golden inputs are pinned by canonical manifest identity
+- [x] Per-channel reference digests and bounded statistics are payload-free
+- [x] Identical pinned input regenerates byte-identical tracked output
+- [x] Permutation, label, missing, extra, dtype, shape, and value drift fail typed
+- [x] Phase 1 candidate interface and all-channel acceptance rule are documented
+- [x] gcsa/assets remain read-only and no extra hardware run is performed
 - [ ] Focused tests, repository safety checks, and phase verification pass
 - [ ] Process log and checklist are archived after the phase PR is created
