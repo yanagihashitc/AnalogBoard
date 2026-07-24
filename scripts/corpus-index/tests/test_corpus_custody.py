@@ -87,6 +87,45 @@ ALLOWED_COMMAND = """PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corp
   verify \\
   --manifest docs/reference/initial-recording-corpus/2026-07-17/manifest.json"""
 PROCEDURE_TEXT = (REPOSITORY_ROOT / PROCEDURE_PATH).read_text(encoding="utf-8")
+_PROCEDURE_V2_TO_V1_REPLACEMENTS = (
+    (
+        """Asset owner decision resolved: the owner identity is `yanagihashi`, as decided
+on 2026-07-24 by the recorded roadmap authority. Retention decision resolved:
+the policy is `retain-until-superseded`. Expiry remains unset and deletion is
+prohibited until the frozen C-9 corpus and a verified restore source exist and
+the owner explicitly reevaluates the policy.""",
+        """Asset owner decision required and retention decision required remain open.
+Neither repository ownership nor authorship identifies the physical asset
+owner. No retention duration, expiry, or deletion disposition may be guessed.""",
+    ),
+    (
+        """The restore source remains open and is the only unresolved custody item.
+Resolving it requires a separately reviewed policy update. The owner and
+retention decisions above remain authoritative while restore is unresolved.""",
+        """The current open decisions are the asset owner, retention policy, and identity
+of a distinct restore source. Resolving any of them requires a separately
+reviewed policy update.""",
+    ),
+    (
+        """- owner or retention authority is needed beyond the recorded resolved
+  decisions.""",
+        """- owner or retention authority is needed beyond recording the existing open
+  items.""",
+    ),
+    (
+        """The retain-until-superseded policy sets no deletion date or disposition:
+expiry remains unset and deletion is prohibited.""",
+        "Retention remains open, so no deletion date or disposition is inferred.",
+    ),
+)
+UNRESOLVED_PROCEDURE_TEXT = PROCEDURE_TEXT
+for _resolved_text, _unresolved_text in _PROCEDURE_V2_TO_V1_REPLACEMENTS:
+    if _resolved_text not in UNRESOLVED_PROCEDURE_TEXT:
+        raise RuntimeError("canonical v2 recovery procedure text has drifted")
+    UNRESOLVED_PROCEDURE_TEXT = UNRESOLVED_PROCEDURE_TEXT.replace(
+        _resolved_text,
+        _unresolved_text,
+    )
 
 
 def _canonical_json(value: object) -> bytes:
@@ -281,7 +320,7 @@ def _fixture(repo_root: Path) -> dict[str, Any]:
         CONTRACT_PATH: _canonical_json(_contract()),
         MANIFEST_PATH: _canonical_json(_manifest()),
         TOOL_PATH: b"# synthetic manifest verifier\n",
-        PROCEDURE_PATH: PROCEDURE_TEXT.encode("utf-8"),
+        PROCEDURE_PATH: UNRESOLVED_PROCEDURE_TEXT.encode("utf-8"),
     }
     for path, payload in source_payloads.items():
         _write(repo_root, path, payload)
@@ -492,6 +531,135 @@ class CustodyPolicyTests(unittest.TestCase):
             self.assertEqual(first, second)
             self.assertEqual(2, json.loads(first)["schema_version"])
             self.assertEqual(policy, load_custody_data(json.loads(first)))
+
+    def test_p11_cl_a_01_resolved_policy_rejects_unresolved_procedure(self) -> None:
+        # Given: A valid v2 policy whose procedure still declares owner and
+        # retention unresolved.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            policy = _resolved_fixture(repo_root)
+            unresolved_payload = UNRESOLVED_PROCEDURE_TEXT.encode("utf-8")
+            _write(repo_root, PROCEDURE_PATH, unresolved_payload)
+            policy["source_references"]["recovery_procedure"][
+                "sha256"
+            ] = _sha256(unresolved_payload)
+            _write(
+                repo_root,
+                DEFAULT_CUSTODY_PATH,
+                serialize_custody(policy),
+            )
+
+            # When/Then: The schema-specific procedure contract fails closed.
+            self.assert_failure(
+                CustodyProcedureError,
+                "custody.procedure",
+                lambda: verify_custody(repo_root),
+            )
+
+    def test_p11_cl_a_02_unresolved_policy_rejects_resolved_procedure(self) -> None:
+        # Given: A valid v1 policy whose procedure declares owner and retention
+        # resolved.
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo_root = Path(temporary_directory)
+            policy = _fixture(repo_root)
+            resolved_payload = PROCEDURE_TEXT.encode("utf-8")
+            _write(repo_root, PROCEDURE_PATH, resolved_payload)
+            policy["source_references"]["recovery_procedure"][
+                "sha256"
+            ] = _sha256(resolved_payload)
+            _write(
+                repo_root,
+                DEFAULT_CUSTODY_PATH,
+                serialize_custody(policy),
+            )
+
+            # When/Then: The schema-specific procedure contract fails closed.
+            self.assert_failure(
+                CustodyProcedureError,
+                "custody.procedure",
+                lambda: verify_custody(repo_root),
+            )
+
+    def test_p11_cl_n_03_procedure_semantics_match_each_schema(self) -> None:
+        # Given: The approved unresolved v1 and resolved v2 procedure texts.
+        self.assertEqual(
+            "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261",
+            _sha256(UNRESOLVED_PROCEDURE_TEXT.encode("utf-8")),
+        )
+
+        # When: Each procedure is linted against its matching schema.
+        corpus_custody._lint_procedure_semantics(
+            UNRESOLVED_PROCEDURE_TEXT,
+            1,
+        )
+        corpus_custody._lint_procedure_semantics(PROCEDURE_TEXT, 2)
+
+        # Then: Both versioned procedure contracts are accepted.
+
+    def test_p11_cl_a_04_procedure_semantics_reject_decision_tampering(self) -> None:
+        # Given: Resolved v2 text with a required decision removed or contradicted.
+        cases = (
+            (
+                "retention policy",
+                PROCEDURE_TEXT.replace("retain-until-superseded", "indefinite"),
+                "recovery procedure is missing a required policy statement",
+            ),
+            (
+                "deletion constraint",
+                PROCEDURE_TEXT.replace(
+                    "deletion is\nprohibited",
+                    "deletion is\nundecided",
+                ).replace("deletion is prohibited", "deletion is undecided"),
+                "recovery procedure is missing a required policy statement",
+            ),
+            (
+                "restore open",
+                PROCEDURE_TEXT.replace(
+                    "The restore source remains open",
+                    "The restore source decision is resolved",
+                ),
+                "recovery procedure is missing a required policy statement",
+            ),
+            (
+                "unresolved contradiction",
+                (
+                    f"{PROCEDURE_TEXT}\nOwner decision required and "
+                    "retention decision required. Retention remains open.\n"
+                ),
+                "recovery procedure contradicts the custody schema version",
+            ),
+        )
+
+        # When/Then: Every resolved-state omission or contradiction fails closed.
+        for name, text, message in cases:
+            with self.subTest(name=name):
+                self.assert_exact_failure(
+                    CustodyProcedureError,
+                    "custody.procedure",
+                    message,
+                    lambda text=text: corpus_custody._lint_procedure_semantics(
+                        text,
+                        2,
+                    ),
+                )
+
+    def test_p11_cl_a_05_v1_procedure_rejects_resolved_contradiction(self) -> None:
+        # Given: Valid v1 text with contradictory resolved decision statements.
+        contradictory = (
+            f"{UNRESOLVED_PROCEDURE_TEXT}\nAsset owner decision resolved. "
+            "Retention decision resolved.\n"
+        )
+
+        # When/Then: The v1 contract rejects the blended authority state.
+        self.assert_exact_failure(
+            CustodyProcedureError,
+            "custody.procedure",
+            "recovery procedure contradicts the custody schema version",
+            lambda: corpus_custody._lint_procedure_semantics(
+                contradictory,
+                1,
+            ),
+        )
 
     def test_c4_a_01_schema_null_empty_type_and_boundaries_fail(self) -> None:
         # Given: NULL/empty policies and schema/version type or boundary mutations.
@@ -1133,7 +1301,8 @@ class CustodyPolicyTests(unittest.TestCase):
                     "custody.procedure",
                     message,
                     lambda text=text: corpus_custody._lint_procedure_semantics(
-                        text
+                        text,
+                        2,
                     ),
                 )
 
@@ -1165,7 +1334,8 @@ class CustodyPolicyTests(unittest.TestCase):
                     "custody.procedure",
                     message,
                     lambda text=text: corpus_custody._lint_procedure_semantics(
-                        text
+                        text,
+                        2,
                     ),
                 )
 
@@ -1235,10 +1405,10 @@ class CustodyPolicyTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as temporary_directory:
                 repo_root = Path(temporary_directory)
                 policy = _fixture(repo_root)
-                self.assertIn(replacement[0], PROCEDURE_TEXT)
-                procedure_payload = PROCEDURE_TEXT.replace(*replacement).encode(
-                    "utf-8"
-                )
+                self.assertIn(replacement[0], UNRESOLVED_PROCEDURE_TEXT)
+                procedure_payload = UNRESOLVED_PROCEDURE_TEXT.replace(
+                    *replacement
+                ).encode("utf-8")
                 _write(repo_root, PROCEDURE_PATH, procedure_payload)
                 policy["source_references"]["recovery_procedure"][
                     "sha256"
@@ -1271,7 +1441,9 @@ class CustodyPolicyTests(unittest.TestCase):
                     repo_root = Path(temporary_directory)
                     policy = _fixture(repo_root)
                     procedure_payload = (
-                        f"{PROCEDURE_TEXT}\n{appended_text}\n".encode("utf-8")
+                        f"{UNRESOLVED_PROCEDURE_TEXT}\n{appended_text}\n".encode(
+                            "utf-8"
+                        )
                     )
                     _write(repo_root, PROCEDURE_PATH, procedure_payload)
                     policy["source_references"]["recovery_procedure"][

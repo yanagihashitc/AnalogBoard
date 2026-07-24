@@ -40,8 +40,12 @@ RECOVERY_PROCEDURE_PATH = (
     "docs/operations/initial-recording-corpus/restore-and-reacquisition.md"
 )
 APPROVED_RECOVERY_PROCEDURE_SHA256 = (
-    "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261"
+    "75e8bf0c059a4b9afdbd742e56aaa3ac00c71673f36e65da2826383529d661fe"
 )
+APPROVED_RECOVERY_PROCEDURE_SHA256_BY_SCHEMA = {
+    1: "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261",
+    2: APPROVED_RECOVERY_PROCEDURE_SHA256,
+}
 SOURCE_PATHS = {
     "plan": PLAN_PATH,
     "corpus_contract": CONTRACT_PATH,
@@ -196,10 +200,7 @@ REQUIRED_PROCEDURE_HEADINGS = (
     "## Reacquisition path",
     "## Stop conditions",
 )
-REQUIRED_PROCEDURE_TOKENS = (
-    "owner decision required",
-    "retention decision required",
-    "restore not performed",
+COMMON_REQUIRED_PROCEDURE_TOKENS = (
     "pre-d19 plaintext local-only",
     "git exclusion is not at-rest protection",
     "export is prohibited",
@@ -210,6 +211,34 @@ REQUIRED_PROCEDURE_TOKENS = (
     "separate corpus version",
     "reacquisition is not restore",
 )
+REQUIRED_PROCEDURE_TOKENS_BY_SCHEMA = {
+    1: (
+        "owner decision required",
+        "retention decision required",
+        "restore not performed",
+    ),
+    2: (
+        "asset owner decision resolved",
+        "retention decision resolved",
+        "retain-until-superseded",
+        "expiry remains unset",
+        "deletion is prohibited",
+        "restore source remains open",
+        "only unresolved custody item",
+        "restore not performed",
+    ),
+}
+PROHIBITED_PROCEDURE_TOKENS_BY_SCHEMA = {
+    1: (
+        "asset owner decision resolved",
+        "retention decision resolved",
+    ),
+    2: (
+        "owner decision required",
+        "retention decision required",
+        "retention remains open",
+    ),
+}
 ALLOWED_PROCEDURE_COMMAND = (
     "PYTHONDONTWRITEBYTECODE=1 python3 scripts/corpus-index/corpus_index.py \\\n"
     "  verify \\\n"
@@ -795,17 +824,29 @@ def _decode_metadata_source(payload: bytes, role: str) -> object:
         ) from error
 
 
-def _lint_procedure_semantics(text: str) -> None:
+def _lint_procedure_semantics(text: str, schema_version: int) -> None:
     folded = re.sub(r"\s+", " ", text.casefold())
     if any(heading not in text for heading in REQUIRED_PROCEDURE_HEADINGS):
         raise CustodyProcedureError(
             "custody.procedure",
             "recovery procedure is missing a required section",
         )
-    if any(token not in folded for token in REQUIRED_PROCEDURE_TOKENS):
+    required_tokens = (
+        COMMON_REQUIRED_PROCEDURE_TOKENS
+        + REQUIRED_PROCEDURE_TOKENS_BY_SCHEMA[schema_version]
+    )
+    if any(token not in folded for token in required_tokens):
         raise CustodyProcedureError(
             "custody.procedure",
             "recovery procedure is missing a required policy statement",
+        )
+    if any(
+        token in folded
+        for token in PROHIBITED_PROCEDURE_TOKENS_BY_SCHEMA[schema_version]
+    ):
+        raise CustodyProcedureError(
+            "custody.procedure",
+            "recovery procedure contradicts the custody schema version",
         )
     blocks = list(FENCED_BLOCK_PATTERN.finditer(text))
     if (
@@ -824,7 +865,7 @@ def _lint_procedure_semantics(text: str) -> None:
         )
 
 
-def _validate_procedure(payload: bytes) -> None:
+def _validate_procedure(payload: bytes, schema_version: int) -> None:
     try:
         text = payload.decode("utf-8")
     except UnicodeError as error:
@@ -834,13 +875,13 @@ def _validate_procedure(payload: bytes) -> None:
         ) from error
     if (
         hashlib.sha256(payload).hexdigest()
-        != APPROVED_RECOVERY_PROCEDURE_SHA256
+        != APPROVED_RECOVERY_PROCEDURE_SHA256_BY_SCHEMA[schema_version]
     ):
         raise CustodyProcedureError(
             "custody.procedure",
             "recovery procedure must match the exact approved identity",
         )
-    _lint_procedure_semantics(text)
+    _lint_procedure_semantics(text, schema_version)
 
 
 def verify_custody(
@@ -927,7 +968,10 @@ def verify_custody(
             "custody.locator.mismatch",
             "policy locator must match the contract and manifest",
         )
-    _validate_procedure(payloads["recovery_procedure"])
+    _validate_procedure(
+        payloads["recovery_procedure"],
+        policy["schema_version"],
+    )
     return policy
 
 

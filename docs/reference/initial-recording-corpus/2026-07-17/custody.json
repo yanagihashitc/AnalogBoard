@@ -124,7 +124,7 @@
     },
     "recovery_procedure": {
       "path": "docs/operations/initial-recording-corpus/restore-and-reacquisition.md",
-      "sha256": "64f9497959092742a1fb5b5733e63b76f23e7d946b2692408c9ad6748fa37261"
+      "sha256": "75e8bf0c059a4b9afdbd742e56aaa3ac00c71673f36e65da2826383529d661fe"
     }
   }
 }
